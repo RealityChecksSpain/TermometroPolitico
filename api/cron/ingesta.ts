@@ -18,6 +18,9 @@ export default async function handler(req: Request): Promise<Response> {
     const ingesta = await ejecutarIngesta(legislaturaId, 'XV', 10);
     const cola = await vaciarCola(legislaturaId);
 
+    const { db } = await import('../../src/lib/supabase');
+    await db().rpc('refrescar_metricas');
+
     return Response.json({
       ok: true,
       ingesta,

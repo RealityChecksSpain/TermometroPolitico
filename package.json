@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -18,12 +18,28 @@
     "backfill": "node --env-file=.env --import tsx scripts/backfill.ts",
     "cola:vaciar": "node --env-file=.env --import tsx scripts/vaciar-cola.ts",
     "ejes": "node --env-file=.env --import tsx scripts/calcular-ejes.ts",
-    "ejes:informe": "node --env-file=.env --import tsx scripts/calcular-ejes.ts --solo-informe"
+    "ejes:informe": "node --env-file=.env --import tsx scripts/calcular-ejes.ts --solo-informe",
+    "sondear:intervenciones": "node --import tsx scripts/sondear-intervenciones.ts",
+    "sondear:iniciativas": "node --import tsx scripts/sondear-iniciativas.ts",
+    "sondear:texto": "node --import tsx scripts/sondear-texto.ts",
+    "intervenciones": "node --env-file=.env --import tsx scripts/cargar-intervenciones.ts",
+    "iniciativas": "node --env-file=.env --import tsx scripts/cargar-iniciativas.ts",
+    "enlazar": "node --env-file=.env --import tsx scripts/enlazar.ts",
+    "resumir": "node --env-file=.env --import tsx scripts/resumir.ts",
+    "probar:gemini": "node --env-file=.env --import tsx scripts/probar-gemini.ts",
+    "textos": "node --env-file=.env --import tsx scripts/descargar-textos.ts",
+    "clasificar": "node --env-file=.env --import tsx scripts/clasificar.ts",
+    "estado:ia": "node --env-file=.env --import tsx scripts/estado-ia.ts",
+    "programas": "node --env-file=.env --import tsx scripts/cargar-programas.ts",
+    "programas:listar": "node --env-file=.env --import tsx scripts/cargar-programas.ts --listar",
+    "probar:cuota": "node --env-file=.env --import tsx scripts/probar-cuota.ts",
+    "coherencia": "node --env-file=.env --import tsx scripts/coherencia.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
