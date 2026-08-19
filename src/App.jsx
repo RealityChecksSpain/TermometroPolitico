@@ -4,6 +4,7 @@ import Detalle, { DetalleLey } from './components/Detalle.jsx';
 import FichaDiputado from './components/FichaDiputado.jsx';
 import Mapa from './components/Mapa.jsx';
 import Metodologia from './components/Metodologia.jsx';
+import Descargas from './components/Descargas.jsx';
 import Partidos from './components/Partidos.jsx';
 import Inicio from './components/Inicio.jsx';
 import {
@@ -18,11 +19,11 @@ const C = {
 };
 
 const estilos = `
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Archivo+Expanded:wght@600;800&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Archivo:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box}
 html,body{margin:0;background:${C.papel};-webkit-font-smoothing:antialiased}
 .e{font-family:'Archivo',system-ui,sans-serif}
-.ed{font-family:'Archivo Expanded','Archivo',sans-serif;letter-spacing:-0.025em}
+.ed{font-family:'Newsreader',Georgia,serif;letter-spacing:-0.012em;font-optical-sizing:auto}
 .em{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
 button,input{font-family:inherit}
 .app{max-width:1120px;margin:0 auto;padding:0 16px 96px}
@@ -243,7 +244,10 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 14px', flexWrap: 'wrap' }}>
           <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
-            className="ed" style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.tinta }}>
+            className="ed" style={{
+              fontSize: 27, fontWeight: 600, lineHeight: 1, background: 'none', border: 'none',
+              padding: 0, cursor: 'pointer', color: C.tinta, letterSpacing: '-0.02em'
+            }}>
             Escaño
           </button>
           {cobertura && (
@@ -558,18 +562,15 @@ export default function App() {
 
           {seccion === 'inicio' && (
             <div className="solo1">
-              <Inicio cobertura={cobertura} coherencia={coherencia} destacadas={destacadas}
-                colectivos={facetas.colectivos}
-                onIr={setSeccion}
-                onPerfil={d => {
-                  const col = d.colectivos[0] ?? null;
-                  const mat = !col ? (d.materias[0] ?? null) : null;
-                  setFColectivo(col); setFMateria(mat); setSeccion('leyes');
-                  recargar({ colectivo: col, materia: mat });
-                }}
-                onVotacion={async id => {
-                  const v = votaciones.find(x => x.id === id) ?? (await traerVotaciones(1, { id }))[0];
-                  if (v) { setVotacionSel(v); setSeccion('leyes'); }
+              <Inicio cobertura={cobertura} colectivos={facetas.colectivos} facetas={facetas}
+                onVotacion={async n => {
+                  const id = n?.votacion_principal ?? n?.id ?? n;
+                  const v = (await traerVotaciones(1, { id }))[0];
+                  if (v) {
+                    setVotacionSel({ ...v, clave_norma: n?.clave_norma, votaciones_norma: n?.votaciones });
+                    setSeccion('leyes');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
                 }} />
             </div>
           )}
@@ -577,6 +578,7 @@ export default function App() {
           {seccion === 'partidos' && <div className="solo1"><Partidos /></div>}
           {seccion === 'ejes' && <div className="solo1"><Mapa /></div>}
           {seccion === 'metodo' && <div className="solo1"><Metodologia cobertura={cobertura} /></div>}
+          {seccion === 'datos' && <div className="solo1"><Descargas /></div>}
         </div>
 
         <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 10, color: C.tenue, lineHeight: 1.6 }}>
@@ -586,6 +588,11 @@ export default function App() {
             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
             color: C.tinta, fontSize: 10, textDecoration: 'underline', fontFamily: 'inherit'
           }}>Cómo se hace esto</button>
+          {' · '}
+          <button onClick={() => { setSeccion('datos'); setVotacionSel(null); }} style={{
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            color: C.tinta, fontSize: 10, textDecoration: 'underline', fontFamily: 'inherit'
+          }}>Descargar los datos</button>
         </div>
       </div>
 

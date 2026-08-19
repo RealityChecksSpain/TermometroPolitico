@@ -1,332 +1,127 @@
 import React, { useState } from 'react';
+import Feed from './Feed.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
-  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3',
-  si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
+  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3'
 };
 
-function Puerta({ numero, titulo, texto, pie, onClick }) {
-  return (
-    <button onClick={onClick} style={{
-      textAlign: 'left', background: C.superficie, border: `1px solid ${C.linea}`,
-      borderRadius: 3, padding: '20px 18px', cursor: 'pointer', width: '100%',
-      display: 'flex', flexDirection: 'column', gap: 8, minHeight: 160,
-      transition: 'border-color 150ms ease, transform 150ms ease'
-    }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = C.tinta; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = C.linea; e.currentTarget.style.transform = 'none'; }}>
-      <span className="em" style={{ fontSize: 11, color: C.tenue }}>{numero}</span>
-      <span className="ed" style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.15 }}>{titulo}</span>
-      <span style={{ fontSize: 13.5, color: C.media, lineHeight: 1.5 }}>{texto}</span>
-      <span className="em" style={{ fontSize: 11, color: C.tinta, marginTop: 'auto', fontWeight: 500 }}>{pie} →</span>
-    </button>
-  );
-}
-
-function Muestra({ forma, texto }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-      <svg width="22" height="22" viewBox="-8 -8 16 16" style={{ flexShrink: 0 }}>
-        {forma === 'relleno' && <circle r="6.2" fill="#C8102E" />}
-        {forma === 'anillo' && <circle r="5.4" fill="none" stroke="#C8102E" strokeWidth="3.6" />}
-        {forma === 'punto' && <><circle r="6.2" fill="#C8102E" opacity="0.2" /><circle r="2.2" fill="#C8102E" /></>}
-      </svg>
-      <span style={{ fontSize: 13, color: C.media }}>{texto}</span>
-    </div>
-  );
-}
-
-function Destacada({ v, onAbrir }) {
-  if (!v) return null;
-  const aprobada = v.resultado === 'aprobada';
-  const total = v.total_si + v.total_no + v.total_abstencion || 1;
-  const efectos = Array.isArray(v.efectos) ? v.efectos.slice(0, 3) : [];
-
-  return (
-    <button onClick={() => onAbrir(v.id)} style={{
-      textAlign: 'left', width: '100%', cursor: 'pointer', border: 'none', padding: 0,
-      background: C.pizarra, borderRadius: 3, overflow: 'hidden', display: 'block'
-    }}>
-      <div style={{ padding: 'clamp(20px, 3.5vw, 34px)' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-          <span className="em" style={{
-            fontSize: 10, letterSpacing: '.09em', textTransform: 'uppercase',
-            color: C.pizarra, background: '#EFEFE9', padding: '3px 8px', borderRadius: 2, fontWeight: 500
-          }}>Lo último votado</span>
-          {v.materia_nombre && (
-            <span className="em" style={{
-              fontSize: 10, letterSpacing: '.06em', textTransform: 'uppercase',
-              color: v.materia_color || '#9AA0A6', border: `1px solid ${(v.materia_color || '#9AA0A6')}66`,
-              padding: '3px 8px', borderRadius: 2
-            }}>{v.materia_nombre}</span>
-          )}
-          <span className="em" style={{ fontSize: 11, color: '#6E747A' }}>{v.fecha}</span>
-        </div>
-
-        <div className="ed" style={{
-          color: '#F7F7F2', fontSize: 'clamp(20px, 3.2vw, 31px)', fontWeight: 700,
-          lineHeight: 1.18, letterSpacing: '-0.02em', maxWidth: 780
-        }}>
-          {String(v.subtitulo || v.titulo).slice(0, 175)}
-        </div>
-
-        {v.resumen && (
-          <div style={{ color: '#A8AEB4', fontSize: 'clamp(13px, 1.6vw, 15px)', lineHeight: 1.55, marginTop: 12, maxWidth: 660 }}>
-            {String(v.resumen).slice(0, 210)}{String(v.resumen).length > 210 ? '…' : ''}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22, flexWrap: 'wrap' }}>
-          <span className="ed" style={{
-            fontSize: 'clamp(15px, 2vw, 19px)', fontWeight: 800, letterSpacing: '-0.01em',
-            color: aprobada ? '#5FBF92' : '#E08278'
-          }}>{aprobada ? 'APROBADA' : 'RECHAZADA'}</span>
-          <span className="em" style={{ fontSize: 12, color: '#9AA0A6' }}>
-            {v.total_si} a favor · {v.total_no} en contra · {v.total_abstencion} abstenciones
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: '#363B42', marginTop: 10, maxWidth: 560 }}>
-          {[[v.total_si, C.si], [v.total_abstencion, C.abs], [v.total_no, C.no]].map(([n, col], i) =>
-            n > 0 && <div key={i} style={{ width: `${(n / total) * 100}%`, background: col }} />)}
-        </div>
-
-        {efectos.length > 0 && (
-          <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #363B42' }}>
-            <div className="em" style={{ fontSize: 10, color: '#6E747A', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 11 }}>
-              A quién afecta
-            </div>
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-              {efectos.map(e => (
-                <div key={e.slug}>
-                  <div style={{ color: '#F2F3F0', fontSize: 13, fontWeight: 600 }}>{e.nombre}</div>
-                  <div style={{ color: '#9AA0A6', fontSize: 12.5, lineHeight: 1.45, marginTop: 3 }}>{e.efecto}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="em" style={{ fontSize: 11, color: '#C9CDD2', marginTop: 20, fontWeight: 500 }}>
-          Ver quién votó qué →
-        </div>
-      </div>
-    </button>
-  );
-}
-
-export default function Inicio({ cobertura, coherencia, destacadas, colectivos, onIr, onVotacion, onPerfil }) {
-  const destacada = destacadas?.[0];
-  const otras = (destacadas ?? []).slice(1, 4);
-  const hayCoherencia = (coherencia ?? []).some(c => c.promesas_votadas > 0);
+export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onPerfil }) {
   const [perfil, setPerfil] = useState('');
   const [deteccion, setDeteccion] = useState({ colectivos: [], materias: [] });
   const [pensando, setPensando] = useState(false);
+  const [filtro, setFiltro] = useState({});
+  const [etiqueta, setEtiqueta] = useState(null);
 
-  const nombreColectivo = slug =>
-    (colectivos ?? []).find(c => c.slug === slug)?.nombre ?? slug;
+  const nombreColectivo = slug => (colectivos ?? []).find(c => c.slug === slug)?.nombre ?? slug;
 
-  const aplicar = () => onPerfil?.(deteccion);
-  return (
-    <div>
-      <div style={{ padding: '10px 0 4px' }}>
+  function aplicar(d) {
+    const col = d.colectivos[0] ?? null;
+    const mat = !col ? (d.materias[0] ?? null) : null;
+    setFiltro({ colectivo: col, materia: mat });
+    setEtiqueta(col ? nombreColectivo(col) : (facetas?.materias ?? []).find(m => m.slug === mat)?.nombre ?? null);
+    window.scrollTo({ top: 240, behavior: 'smooth' });
+  }
+
+  async function buscar() {
+    if (deteccion.colectivos.length) { aplicar(deteccion); return; }
+    if (perfil.trim().length < 3) return;
+    setPensando(true);
+    try {
+      const d = await detectarPerfilAmpliado(perfil);
+      setDeteccion(d);
+      if (d.colectivos.length) aplicar(d);
+    } finally { setPensando(false); }
+  }
+
+  function limpiar() {
+    setPerfil(''); setDeteccion({ colectivos: [], materias: [] });
+    setFiltro({}); setEtiqueta(null);
+  }
+
+  const cabecera = (
+    <>
+      <div style={{ padding: '4px 0 18px' }}>
         <h1 className="ed" style={{
-          fontSize: 'clamp(30px, 6vw, 52px)', fontWeight: 800, lineHeight: 1.02,
-          margin: 0, letterSpacing: '-0.03em', maxWidth: 760
+          fontSize: 'clamp(26px, 4.6vw, 40px)', fontWeight: 700, lineHeight: 1.04,
+          letterSpacing: '-0.03em', margin: 0, maxWidth: 640
         }}>
-          ¿Sabes qué votó<br />tu diputado?
+          Lo que aprueba el Congreso,<br />contado en una frase
         </h1>
-        <p style={{
-          fontSize: 'clamp(15px, 2.2vw, 19px)', color: C.media, lineHeight: 1.5,
-          margin: '18px 0 0', maxWidth: 560
-        }}>
-          Cada ley. Cada voto. Cada uno de los 350. Datos oficiales del Congreso,
-          sin opinión, sin filtro y con el enlace a la fuente en cada dato.
+        <p style={{ fontSize: 'clamp(14px, 1.8vw, 16px)', color: C.media, lineHeight: 1.5, margin: '12px 0 0', maxWidth: 520 }}>
+          Cada ley votada, quién la apoyó y a quién afecta. Datos oficiales, sin opinión.
+          {cobertura && <> Última sesión: {cobertura.ultima_sesion}.</>}
         </p>
       </div>
 
-      <div style={{ margin: '26px 0', paddingTop: 22, borderTop: `1px solid ${C.linea}` }}>
-        <label className="ed" style={{ display: 'block', fontSize: 'clamp(17px, 2.4vw, 22px)', fontWeight: 700, marginBottom: 4 }}>
-          Cuéntanos quién eres y te enseñamos tus leyes
-        </label>
-        <div style={{ fontSize: 13, color: C.media, marginBottom: 12 }}>
-          Escríbelo con tus palabras. No se envía a ningún sitio: se procesa en tu propio navegador.
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input
-            value={perfil}
-            onChange={e => { setPerfil(e.target.value); setDeteccion(detectarPerfil(e.target.value)); }}
-            onKeyDown={async e => {
-              if (e.key !== 'Enter') return;
-              if (deteccion.colectivos.length) { aplicar(); return; }
-              if (perfil.trim().length < 3) return;
-              setPensando(true);
-              try { setDeteccion(await detectarPerfilAmpliado(perfil)); }
-              finally { setPensando(false); }
-            }}
-            placeholder="Soy autónoma y tengo dos hijos…"
-            style={{
-              flex: '1 1 300px', padding: '13px 15px', fontSize: 15,
-              border: `1px solid ${deteccion.colectivos.length ? C.tinta : C.linea}`,
-              borderRadius: 3, background: C.superficie
-            }} />
-          {perfil && (
-            <button onClick={() => { setPerfil(''); setDeteccion({ colectivos: [], materias: [] }); }}
-              style={{ padding: '13px 15px', fontSize: 15, cursor: 'pointer', background: 'transparent',
-                border: `1px solid ${C.linea}`, borderRadius: 3, color: C.media }}>×</button>
-          )}
-        </div>
-
-        {!perfil && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-            {EJEMPLOS.map(e => (
-              <button key={e} onClick={() => { setPerfil(e); setDeteccion(detectarPerfil(e)); }}
-                style={{ padding: '5px 10px', fontSize: 12, cursor: 'pointer', background: 'transparent',
-                  border: `1px solid ${C.linea}`, borderRadius: 20, color: C.media }}>{e}</button>
-            ))}
-          </div>
-        )}
-
-        {pensando && (
-          <div className="em" style={{ fontSize: 12, color: C.tenue, marginTop: 10 }}>
-            No lo he reconocido a la primera, déjame pensarlo…
-          </div>
-        )}
-
-        {!pensando && perfil.trim().length > 2 && deteccion.colectivos.length === 0 && deteccion.origen && (
-          <div style={{ marginTop: 12, padding: 12, background: '#FFF8E6', border: '1px solid #E8D9A8', borderRadius: 3, fontSize: 12.5, color: '#6B5518', lineHeight: 1.5 }}>
-            No he sabido a qué colectivo perteneces con esa frase. Prueba a decirlo de otra forma,
-            o usa los filtros de la sección Leyes. Queda registrado para mejorarlo.
-          </div>
-        )}
-
-        {deteccion.colectivos.length > 0 && (
-          <div style={{ marginTop: 14, padding: 14, background: C.superficie, border: `1px solid ${C.tinta}`, borderRadius: 3 }}>
-            <div style={{ fontSize: 12.5, color: C.media, marginBottom: 9 }}>Te afectan las leyes sobre:</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-              {deteccion.colectivos.map(c => (
-                <span key={c} className="em" style={{
-                  padding: '4px 10px', fontSize: 11.5, background: C.tinta, color: C.papel,
-                  borderRadius: 2, fontWeight: 500
-                }}>{nombreColectivo(c)}</span>
-              ))}
-            </div>
-            {deteccion.origen === 'ia' && (
-              <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 9 }}>
-                interpretado automáticamente · si no encaja, usa los filtros de Leyes
-              </div>
-            )}
-            <button onClick={aplicar} style={{
-              padding: '10px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
-              background: C.tinta, color: C.papel, border: 'none', borderRadius: 2
-            }}>Ver esas leyes →</button>
-          </div>
+      <div style={{
+        display: 'flex', gap: 8, flexWrap: 'wrap', padding: '14px 0 16px',
+        borderTop: `1px solid ${C.linea}`, borderBottom: `1px solid ${C.linea}`, marginBottom: 18
+      }}>
+        <input
+          value={perfil}
+          onChange={e => { setPerfil(e.target.value); setDeteccion(detectarPerfil(e.target.value)); }}
+          onKeyDown={e => e.key === 'Enter' && buscar()}
+          placeholder="Dime quién eres y filtro tus leyes: soy autónoma, vivo de alquiler…"
+          style={{
+            flex: '1 1 280px', padding: '12px 14px', fontSize: 14.5,
+            border: `1px solid ${deteccion.colectivos.length ? C.tinta : C.linea}`,
+            borderRadius: 3, background: C.superficie
+          }} />
+        <button onClick={buscar} disabled={pensando} style={{
+          padding: '12px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          background: C.tinta, color: C.papel, border: 'none', borderRadius: 3,
+          opacity: pensando ? 0.6 : 1
+        }}>{pensando ? 'pensando…' : 'Filtrar'}</button>
+        {(etiqueta || perfil) && (
+          <button onClick={limpiar} style={{
+            padding: '12px 14px', fontSize: 14, cursor: 'pointer', background: 'transparent',
+            border: `1px solid ${C.linea}`, borderRadius: 3, color: C.media
+          }}>×</button>
         )}
       </div>
 
-      {destacada && (
-        <div style={{ marginBottom: 26 }}>
-          <Destacada v={destacada} onAbrir={onVotacion} />
-          {otras.length > 0 && (
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 8 }}>
-              {otras.map(o => (
-                <button key={o.id} onClick={() => onVotacion(o.id)} style={{
-                  textAlign: 'left', background: C.superficie, border: `1px solid ${C.linea}`,
-                  borderRadius: 3, padding: 13, cursor: 'pointer'
-                }}>
-                  <div className="em" style={{ fontSize: 10, color: o.materia_color || C.tenue, marginBottom: 5 }}>
-                    {o.materia_nombre ?? o.fecha}
-                  </div>
-                  <div style={{ fontSize: 13, lineHeight: 1.4, fontWeight: 500 }}>
-                    {String(o.subtitulo || o.titulo).slice(0, 88)}…
-                  </div>
-                  <div className="em" style={{
-                    fontSize: 10.5, marginTop: 7, fontWeight: 600,
-                    color: o.resultado === 'aprobada' ? C.si : C.no
-                  }}>{o.resultado === 'aprobada' ? 'Aprobada' : 'Rechazada'}</div>
-                </button>
-              ))}
-            </div>
-          )}
+      {!etiqueta && !perfil && (
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 18 }}>
+          {EJEMPLOS.slice(0, 4).map(e => (
+            <button key={e} onClick={() => { setPerfil(e); const d = detectarPerfil(e); setDeteccion(d); aplicar(d); }}
+              style={{
+                padding: '5px 11px', fontSize: 12, cursor: 'pointer', background: 'transparent',
+                border: `1px solid ${C.linea}`, borderRadius: 20, color: C.media
+              }}>{e}</button>
+          ))}
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-        <Puerta numero="01" titulo="Leyes que te afectan"
-          texto="Filtra por tu situación: autónomo, inquilino, pensionista, con hijos. Verás qué se votó sobre eso y qué cambia."
-          pie="Ver las leyes" onClick={() => onIr('leyes')} />
-        <Puerta numero="02" titulo="Tu diputado"
-          texto="Busca por provincia o por nombre. Su historial completo de votos, cuántos plenos se saltó y si alguna vez rompió con su partido."
-          pie="Buscar diputado" onClick={() => onIr('diputados')} />
-        <Puerta numero="03" titulo="¿Cumplen lo que prometieron?"
-          texto="Los compromisos de cada programa electoral de 2023, cruzados con cómo votaron después en el Congreso."
-          pie="Ver programas" onClick={() => onIr('partidos')} />
-      </div>
-
-      {hayCoherencia && (
-        <div style={{ marginTop: 30 }}>
-          <div style={{ fontSize: 11, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600, marginBottom: 12 }}>
-            Promesas que llegaron a votación
+      {etiqueta && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div className="ed" style={{ fontSize: 18, fontWeight: 700 }}>
+            Leyes que afectan a: {etiqueta}
           </div>
-          <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 16 }}>
-            {coherencia.filter(c => c.promesas_votadas > 0).slice(0, 8).map(c => (
-              <div key={c.partido} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 0' }}>
-                <span style={{ width: 4, height: 22, background: c.color || '#8E9299', borderRadius: 4, flexShrink: 0 }} />
-                <span style={{ width: 82, fontSize: 12.5, fontWeight: 600, flexShrink: 0 }}>{c.siglas}</span>
-                <span style={{ flex: 1, display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: '#E4E4DC' }}>
-                  <span style={{ width: `${c.pct_coherencia ?? 0}%`, background: c.color || '#8E9299' }} />
-                </span>
-                <span className="em" style={{ fontSize: 12.5, width: 48, textAlign: 'right', flexShrink: 0 }}>
-                  {c.pct_coherencia ?? 0}%
-                </span>
-                <span className="em" style={{ fontSize: 10.5, color: C.tenue, width: 80, textAlign: 'right', flexShrink: 0 }}>
-                  {c.cumplidas}/{c.promesas_votadas}
-                </span>
-              </div>
-            ))}
-            <div style={{ fontSize: 11.5, color: C.tenue, lineHeight: 1.55, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.linea}` }}>
-              Porcentaje de compromisos electorales que llegaron a votarse y en los que el partido
-              votó en la dirección que prometió. Los compromisos que nunca se sometieron a votación
-              no cuentan aquí: se listan aparte en cada partido.
-            </div>
-          </div>
+          <button onClick={limpiar} className="em" style={{
+            background: 'none', border: 'none', cursor: 'pointer', color: C.media, fontSize: 11.5, padding: 0
+          }}>ver todas</button>
         </div>
       )}
 
-      <div style={{ marginTop: 30, background: C.pizarra, borderRadius: 3, padding: '20px 18px' }}>
-        <div className="ed" style={{ color: '#F2F3F0', fontSize: 17, fontWeight: 700 }}>
-          Cómo se lee el hemiciclo
-        </div>
-        <div style={{ color: '#9AA0A6', fontSize: 13.5, lineHeight: 1.55, margin: '8px 0 16px', maxWidth: 520 }}>
-          Cada punto es un escaño. El color es el partido. Cuando eliges una votación,
-          la forma del punto cambia según lo que votó esa persona.
-        </div>
-        <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-          <Muestra forma="relleno" texto="Votó a favor" />
-          <Muestra forma="anillo" texto="Votó en contra" />
-          <Muestra forma="punto" texto="Se abstuvo" />
-        </div>
-        <div style={{ color: '#6E747A', fontSize: 12, marginTop: 16, lineHeight: 1.5 }}>
-          Usamos la forma y no el color porque el color ya indica el partido.
-          Así se distingue también en blanco y negro y con daltonismo.
-        </div>
-      </div>
+      {!etiqueta && (
+        <div className="rot" style={{ marginBottom: 12 }}>Lo último votado</div>
+      )}
+    </>
+  );
 
-      <div style={{ marginTop: 26, padding: 18, background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3 }}>
-        <div className="ed" style={{ fontSize: 17, fontWeight: 700 }}>De dónde salen estos datos</div>
-        <div style={{ fontSize: 13.5, color: C.media, lineHeight: 1.6, marginTop: 8, maxWidth: 640 }}>
-          Todo procede del portal de datos abiertos del Congreso de los Diputados y se actualiza
-          cada noche. Los recuentos no son estimaciones: se calculan sobre los votos individuales
-          que publica la Cámara. Los resúmenes de las leyes se generan automáticamente a partir
-          del texto oficial del Boletín de las Cortes, y siempre puedes abrir ese texto para
-          comprobarlo.
-        </div>
-        <div style={{ fontSize: 13.5, color: C.media, lineHeight: 1.6, marginTop: 12, maxWidth: 640 }}>
-          Esta herramienta no valora ni puntúa a nadie. No dice si una ley es buena o mala, ni si
-          un diputado lo hace bien o mal. Enseña lo que hizo y te deja juzgar a ti.
+  return (
+    <div>
+      <Feed filtros={filtro} onAbrir={onVotacion} cabecera={cabecera} />
+
+      <div style={{ marginTop: 26, padding: 16, background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3 }}>
+        <div className="ed" style={{ fontSize: 15, fontWeight: 700 }}>De dónde salen estos datos</div>
+        <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 7 }}>
+          Del portal de datos abiertos del Congreso, actualizado cada noche. Los recuentos se calculan
+          sobre los votos individuales que publica la Cámara. Los resúmenes se generan del texto oficial
+          del Boletín de las Cortes y siempre puedes abrirlo para comprobarlo. Esta herramienta no valora
+          ni puntúa a nadie: enseña lo que se hizo y te deja juzgar a ti.
         </div>
       </div>
     </div>

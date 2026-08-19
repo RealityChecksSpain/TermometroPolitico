@@ -1,0 +1,10 @@
+# Una linea por persona: apellido o nombre parcial | cargo
+# Comprueba CADA cargo en la fuente oficial antes de escribirlo aqui.
+# El buscador hace coincidencia parcial sobre el nombre completo.
+#
+# Sánchez Pérez-Castejón | Presidente del Gobierno
+# Díaz Pérez, Yolanda | Vicepresidenta segunda y ministra de Trabajo
+# Montero Cuadrado | Vicepresidenta primera y ministra de Hacienda
+# Bolaños García | Ministro de la Presidencia y Justicia
+# Robles Fernández | Ministra de Defensa
+# Núñez Feijóo | Líder de la oposición

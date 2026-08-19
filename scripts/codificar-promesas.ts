@@ -160,11 +160,15 @@ if (ejes?.length) {
   pintar('EJE ECONOMICO  (-1 izquierda ... +1 derecha)', 'eje_economico');
   pintar('EJE SOCIAL  (-1 progresista ... +1 conservador)', 'eje_social');
 
-  console.log('\nDESGLOSE POR DIMENSION  (ratio: -1 expande ... +1 restringe)');
-  console.log('  PARTIDO      GASTO  IMPUESTOS  REGULACION');
+  console.log('\nDESGLOSE POR DIMENSION');
+  console.log('  ratio: -1 expande ... +1 restringe · (n) = señales que lo sustentan · minimo 10');
+  console.log('  PARTIDO           GASTO       IMPUESTOS      REGULACION');
   ejes.forEach((e: any) => {
-    const f = (v: any) => v === null || v === undefined ? '     —' : Number(v).toFixed(2).padStart(6);
-    console.log(`  ${String(e.siglas).padEnd(11)} ${f(e.ratio_gasto)}    ${f(e.ratio_impuestos)}      ${f(e.ratio_regulacion)}`);
+    const f = (v: any, n: any) => {
+      const num = v === null || v === undefined ? '   —' : Number(v).toFixed(2).padStart(5);
+      return `${num} (${String(n ?? 0).padStart(3)})`;
+    };
+    console.log(`  ${String(e.siglas).padEnd(11)} ${f(e.ratio_gasto, e.n_gasto)}  ${f(e.ratio_impuestos, e.n_impuestos)}  ${f(e.ratio_regulacion, e.n_regulacion)}`);
   });
 }
 console.log('');

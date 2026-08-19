@@ -213,3 +213,15 @@ export async function traerSesgo() {
   if (error) return null;
   return data?.[0] ?? null;
 }
+
+export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
+  let q = supabase.from('mv_normas').select('*');
+  if (filtros.materia) q = q.eq('materia', filtros.materia);
+  if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
+  if (filtros.soloAprobadas) q = q.not('resumen', 'is', null);
+  const { data, error } = await q
+    .order('fecha', { ascending: false })
+    .range(desplazamiento, desplazamiento + limite - 1);
+  if (error) throw error;
+  return data ?? [];
+}

@@ -41,7 +41,10 @@
     "sondear:bienes": "node --import tsx scripts/sondear-bienes.ts",
     "bienes": "node --env-file=.env --import tsx scripts/servidor-bienes.ts",
     "probar:perfil": "node --import tsx scripts/probar-perfil.ts",
-    "busquedas": "node --env-file=.env --import tsx scripts/revisar-busquedas.ts"
+    "busquedas": "node --env-file=.env --import tsx scripts/revisar-busquedas.ts",
+    "sondear:fotos": "node --import tsx scripts/sondear-fotos.ts",
+    "cargos": "node --env-file=.env --import tsx scripts/asignar-cargos.ts",
+    "cargos:candidatos": "node --env-file=.env --import tsx scripts/asignar-cargos.ts --candidatos"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
