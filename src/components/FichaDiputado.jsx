@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { traerVotosDeDiputado, traerResumenDiputado } from '../lib/cliente.js';
+import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -22,12 +22,16 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
   const [votos, setVotos] = useState(null);
   const [resumen, setResumen] = useState(null);
   const [fallo, setFallo] = useState(null);
+  const [actividades, setActividades] = useState([]);
+  const [pestana, setPestana] = useState('votos');
   const [pagina, setPagina] = useState(0);
   const [soloDisidencias, setSoloDisidencias] = useState(false);
 
   useEffect(() => {
     if (!d) return;
     setVotos(null); setResumen(null); setFallo(null); setPagina(0); setSoloDisidencias(false);
+    setActividades([]); setPestana('votos');
+    traerActividades(d.mandato_id).then(setActividades).catch(() => setActividades([]));
     let vivo = true;
     Promise.all([traerVotosDeDiputado(d.mandato_id, 60, 0), traerResumenDiputado(d.mandato_id)])
       .then(([v, r]) => { if (vivo) { setVotos(v); setResumen(r); } })
@@ -114,7 +118,66 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           )}
         </div>
 
-        <div style={{ overflowY: 'auto', flex: 1, padding: '0 18px 18px' }}>
+        <div style={{ display: 'flex', gap: 4, padding: '10px 18px 0', borderBottom: `1px solid ${C.linea}` }}>
+          {[['votos', `Votaciones${resumen ? ` (${resumen.total_votos})` : ''}`],
+            ['intereses', `Intereses declarados${actividades.length ? ` (${actividades.length})` : ''}`]].map(([k, t]) => (
+            <button key={k} onClick={() => setPestana(k)} style={{
+              padding: '8px 12px', fontSize: 12.5, cursor: 'pointer', background: 'none',
+              border: 'none', borderBottom: `2px solid ${pestana === k ? C.tinta : 'transparent'}`,
+              color: pestana === k ? C.tinta : C.tenue, fontWeight: pestana === k ? 600 : 400, marginBottom: -1
+            }}>{t}</button>
+          ))}
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, padding: '12px 18px 18px', display: pestana === 'intereses' ? 'block' : 'none' }}>
+          {actividades.length === 0 && (
+            <div style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 12 }}>
+              Sin declaraciones registradas.
+            </div>
+          )}
+          {['DONACION', 'ACTIVIDAD', 'FUNDACIONES', 'OBSERVACIONES'].map(tipo => {
+            const grupo = actividades.filter(a => a.tipo === tipo);
+            if (grupo.length === 0) return null;
+            const titulos = {
+              DONACION: 'Donaciones declaradas',
+              ACTIVIDAD: 'Actividades y empleos',
+              FUNDACIONES: 'Fundaciones y entidades',
+              OBSERVACIONES: 'Observaciones'
+            };
+            return (
+              <div key={tipo} style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase',
+                  letterSpacing: '.05em', fontWeight: 600, marginBottom: 8 }}>
+                  {titulos[tipo]} · {grupo.length}
+                </div>
+                {grupo.map((a, i) => (
+                  <div key={i} style={{ padding: '9px 0', borderTop: `1px solid ${C.linea}` }}>
+                    {a.empleador && <div style={{ fontSize: 13, fontWeight: 600 }}>{a.empleador}</div>}
+                    {a.descripcion && (
+                      <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.45, marginTop: 2 }}>{a.descripcion}</div>
+                    )}
+                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {a.periodo && <span>{a.periodo}</span>}
+                      {a.sector_norm && (
+                        <span style={{
+                          padding: '1px 6px', borderRadius: 2,
+                          background: a.sector_norm === 'privado' ? '#FBE9EC' : '#E7EEF8',
+                          color: a.sector_norm === 'privado' ? '#8E0B20' : '#083A79'
+                        }}>{a.sector_norm}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          <div className="em" style={{ fontSize: 10, color: C.tenue, lineHeight: 1.5, marginTop: 10 }}>
+            Declaración de intereses económicos presentada por el propio diputado y publicada por el
+            Congreso. No incluye patrimonio: el Congreso solo publica los bienes en PDF individuales.
+          </div>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, padding: '0 18px 18px', display: pestana === 'votos' ? 'block' : 'none' }}>
           {votos === null && !fallo && <div style={{ padding: 30, textAlign: 'center', color: C.tenue, fontSize: 12 }}>Cargando su historial de votos…</div>}
 
           {fallo && (

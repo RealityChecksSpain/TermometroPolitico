@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
+import { traerVotacionesDeNorma, traerRelacionadas } from '../lib/cliente.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -217,7 +218,19 @@ export function DetalleLey({ votacion, onVolver }) {
   );
 }
 
-export default function Detalle({ votacion, diputados, votos, onDiputado }) {
+export default function Detalle({ votacion, diputados, votos, onDiputado, onNorma }) {
+  const [enmiendas, setEnmiendas] = useState(null);
+  const [verEnmiendas, setVerEnmiendas] = useState(false);
+  const [relacionadas, setRelacionadas] = useState([]);
+
+  useEffect(() => {
+    setEnmiendas(null); setVerEnmiendas(false); setRelacionadas([]);
+    if (votacion.clave_norma && votacion.votaciones_norma > 1) {
+      traerVotacionesDeNorma(votacion.clave_norma).then(setEnmiendas).catch(() => setEnmiendas([]));
+    }
+    traerRelacionadas(votacion).then(setRelacionadas).catch(() => setRelacionadas([]));
+  }, [votacion.clave_norma, votacion.id]);
+
   const analisis = useMemo(() => analizarVotacion(diputados, votos), [diputados, votos]);
 
   const total = votacion.total_si + votacion.total_no + votacion.total_abstencion || 1;
@@ -274,27 +287,6 @@ export default function Detalle({ votacion, diputados, votos, onDiputado }) {
             </Bloque>
           )}
 
-          <Bloque titulo="Posición de cada grupo">
-            {analisis.grupos.map(g => (
-              <div key={g.grupo} style={{ padding: '7px 0', borderBottom: `1px solid ${C.linea}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ width: 3, height: 20, background: g.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: 12.5, minWidth: 0 }}>{g.grupo}</span>
-                  <span className="em" style={{
-                    fontSize: 11.5, fontWeight: 500,
-                    color: g.mayoritario === 'si' ? C.si : g.mayoritario === 'no' ? C.no : C.abs
-                  }}>{ETIQUETA[g.mayoritario]}</span>
-                  <span className="em" style={{ fontSize: 10, color: C.tenue, width: 30, textAlign: 'right' }}>{g.total}</span>
-                </div>
-                {g.cohesion < 100 && (
-                  <div className="em" style={{ fontSize: 10, color: C.tenue, marginLeft: 12, marginTop: 2 }}>
-                    cohesión {g.cohesion}% · Sí {g.si} No {g.no} Abs {g.abstencion}
-                  </div>
-                )}
-              </div>
-            ))}
-          </Bloque>
-
           {(() => {
             const disidentes = analisis.grupos.flatMap(g => g.rebeldes.map(r => ({ ...r, partido: g.grupo })));
             const hay = disidentes.length > 0;
@@ -317,7 +309,64 @@ export default function Detalle({ votacion, diputados, votos, onDiputado }) {
             );
           })()}
 
-          <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 12, lineHeight: 1.5 }}>
+      {enmiendas && enmiendas.length > 1 && (
+        <Bloque titulo={`Historial de esta norma · ${enmiendas.length} votaciones`}>
+          <button onClick={() => setVerEnmiendas(!verEnmiendas)} className="em" style={{
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            color: C.media, fontSize: 11.5, marginBottom: verEnmiendas ? 10 : 0
+          }}>
+            {verEnmiendas ? 'ocultar el desglose' : 'ver todas las votaciones y enmiendas'}
+          </button>
+
+          {verEnmiendas && enmiendas.map(e => (
+            <div key={e.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
+              borderTop: `1px solid ${C.linea}`,
+              opacity: e.es_tramite ? 0.72 : 1
+            }}>
+              <span className="em" style={{ fontSize: 10, color: C.tenue, width: 74, flexShrink: 0 }}>{e.fecha}</span>
+              <span style={{ flex: 1, fontSize: 12, minWidth: 0 }}>
+                {e.titulo}
+                {e.es_tramite && <span className="em" style={{ fontSize: 9.5, color: C.tenue }}> · trámite</span>}
+              </span>
+              <span className="em" style={{ fontSize: 10.5, color: C.tenue, flexShrink: 0 }}>
+                {e.total_si}–{e.total_no}
+              </span>
+              <span className="em" style={{
+                fontSize: 10.5, width: 62, textAlign: 'right', flexShrink: 0, fontWeight: 500,
+                color: e.resultado === 'aprobada' ? C.si : C.no
+              }}>{e.resultado}</span>
+            </div>
+          ))}
+
+          {!verEnmiendas && (
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.5, marginTop: 8 }}>
+              Esta norma pasó por {enmiendas.length} votaciones, de las cuales{' '}
+              {enmiendas.filter(e => e.es_tramite).length} fueron enmiendas o trámites.
+              Lo que ves arriba es la votación principal.
+            </div>
+          )}
+        </Bloque>
+      )}
+
+      {relacionadas.length > 0 && (
+        <Bloque titulo="Otras normas aprobadas sobre lo mismo">
+          {relacionadas.map(rn => (
+            <button key={rn.clave_norma} onClick={() => onNorma?.(rn)} style={{
+              display: 'block', width: '100%', textAlign: 'left', background: 'none',
+              border: 'none', borderTop: `1px solid ${C.linea}`, cursor: 'pointer', padding: '9px 0'
+            }}>
+              <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>{String(rn.titular).slice(0, 130)}</div>
+              <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 3 }}>
+                {rn.fecha} · <span style={{ color: C.si }}>aprobada</span> · {rn.total_si}–{rn.total_no}
+              </div>
+            </button>
+          ))}
+        </Bloque>
+      )}
+
+
+          <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 14, lineHeight: 1.5 }}>
             Recuentos calculados sobre los {votos.length} votos individuales publicados por el
             Congreso. Ninguno es una estimación.
           </div>

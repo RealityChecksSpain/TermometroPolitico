@@ -1,4 +1,5 @@
 import { db, exigirEnv } from '../src/lib/supabase';
+import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
@@ -44,19 +45,15 @@ REGLAS ESTRICTAS:
 - Espanol de Espana.`;
 }
 
-const { data: yaHechas } = await db()
-  .from('promesa_votacion').select('promesa_id').eq('version_prompt', VERSION);
-const hechas = new Set((yaHechas ?? []).map((r: any) => r.promesa_id));
+const yaHechas = await traerTodo<any>((a, b) =>
+  db().from('promesa_votacion').select('promesa_id').eq('version_prompt', VERSION).order('promesa_id').range(a, b));
+const hechas = new Set(yaHechas.map((r: any) => r.promesa_id));
 
-const { data: todas, error } = await db()
-  .from('v_promesas')
-  .select('id, texto, partido, siglas')
-  .eq('verificable', true)
-  .limit(5000);
+const todas = await traerTodo<any>((a, b) =>
+  db().from('v_promesas').select('id, texto, partido, siglas')
+    .eq('verificable', true).order('id').range(a, b));
 
-if (error) { console.error(error.message); process.exit(1); }
-
-const pendientes = (todas ?? []).filter((p: any) => !hechas.has(p.id));
+const pendientes = todas.filter((p: any) => !hechas.has(p.id));
 
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Promesas verificables: ${todas?.length ?? 0}`);

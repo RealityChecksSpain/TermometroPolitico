@@ -1,4 +1,5 @@
 import { db, exigirEnv } from '../src/lib/supabase';
+import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
@@ -47,22 +48,19 @@ CAMPOS:
 - suficiente_informacion: false solo si el texto es ilegible o no contiene articulado.`;
 }
 
-const { data: yaHechas } = await db()
-  .from('resumenes_ia').select('iniciativa_id').eq('version_prompt', VERSION);
-const hechas = new Set((yaHechas ?? []).map((r: any) => r.iniciativa_id));
+const yaHechas = await traerTodo<any>((a, b) =>
+  db().from('resumenes_ia').select('iniciativa_id').eq('version_prompt', VERSION).order('iniciativa_id').range(a, b));
+const hechas = new Set(yaHechas.map((r: any) => r.iniciativa_id));
 
-let consulta = db()
-  .from('iniciativas')
-  .select('id, titulo, autor_texto, situacion, texto_extraido, texto_chars')
-  .order('fecha_presentacion', { ascending: false })
-  .limit(3000);
+const todas = await traerTodo<any>((a, b) => {
+  let q = db().from('iniciativas')
+    .select('id, titulo, autor_texto, situacion, texto_extraido, texto_chars')
+    .order('id').range(a, b);
+  if (SOLO_CON_TEXTO) q = q.gt('texto_chars', 400);
+  return q;
+});
 
-if (SOLO_CON_TEXTO) consulta = consulta.gt('texto_chars', 400);
-
-const { data: todas, error } = await consulta;
-if (error) { console.error(error.message); process.exit(1); }
-
-const pendientes = (todas ?? []).filter((i: any) => !hechas.has(i.id));
+const pendientes = todas.filter((i: any) => !hechas.has(i.id));
 
 console.log(`\nModelo:    ${modeloActivo()}`);
 console.log(`Version:   ${VERSION}`);

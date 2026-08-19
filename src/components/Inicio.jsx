@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -116,10 +117,18 @@ function Destacada({ v, onAbrir }) {
   );
 }
 
-export default function Inicio({ cobertura, coherencia, destacadas, onIr, onVotacion }) {
+export default function Inicio({ cobertura, coherencia, destacadas, colectivos, onIr, onVotacion, onPerfil }) {
   const destacada = destacadas?.[0];
   const otras = (destacadas ?? []).slice(1, 4);
   const hayCoherencia = (coherencia ?? []).some(c => c.promesas_votadas > 0);
+  const [perfil, setPerfil] = useState('');
+  const [deteccion, setDeteccion] = useState({ colectivos: [], materias: [] });
+  const [pensando, setPensando] = useState(false);
+
+  const nombreColectivo = slug =>
+    (colectivos ?? []).find(c => c.slug === slug)?.nombre ?? slug;
+
+  const aplicar = () => onPerfil?.(deteccion);
   return (
     <div>
       <div style={{ padding: '10px 0 4px' }}>
@@ -138,23 +147,85 @@ export default function Inicio({ cobertura, coherencia, destacadas, onIr, onVota
         </p>
       </div>
 
-      {cobertura && (
-        <div style={{
-          display: 'flex', gap: 'clamp(18px, 4vw, 44px)', flexWrap: 'wrap',
-          padding: '22px 0 26px', borderBottom: `1px solid ${C.linea}`, marginBottom: 26
-        }}>
-          {[
-            [new Date(cobertura.ultima_sesion + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' }), 'último pleno con votaciones'],
-            [Number(cobertura.votaciones).toLocaleString('es'), 'votaciones registradas'],
-            ['cada noche', 'se actualiza']
-          ].map(([n, t]) => (
-            <div key={t}>
-              <div className="ed" style={{ fontSize: 'clamp(22px, 3.4vw, 30px)', fontWeight: 800, lineHeight: 1 }}>{n}</div>
-              <div style={{ fontSize: 12, color: C.tenue, marginTop: 5 }}>{t}</div>
-            </div>
-          ))}
+      <div style={{ margin: '26px 0', paddingTop: 22, borderTop: `1px solid ${C.linea}` }}>
+        <label className="ed" style={{ display: 'block', fontSize: 'clamp(17px, 2.4vw, 22px)', fontWeight: 700, marginBottom: 4 }}>
+          Cuéntanos quién eres y te enseñamos tus leyes
+        </label>
+        <div style={{ fontSize: 13, color: C.media, marginBottom: 12 }}>
+          Escríbelo con tus palabras. No se envía a ningún sitio: se procesa en tu propio navegador.
         </div>
-      )}
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            value={perfil}
+            onChange={e => { setPerfil(e.target.value); setDeteccion(detectarPerfil(e.target.value)); }}
+            onKeyDown={async e => {
+              if (e.key !== 'Enter') return;
+              if (deteccion.colectivos.length) { aplicar(); return; }
+              if (perfil.trim().length < 3) return;
+              setPensando(true);
+              try { setDeteccion(await detectarPerfilAmpliado(perfil)); }
+              finally { setPensando(false); }
+            }}
+            placeholder="Soy autónoma y tengo dos hijos…"
+            style={{
+              flex: '1 1 300px', padding: '13px 15px', fontSize: 15,
+              border: `1px solid ${deteccion.colectivos.length ? C.tinta : C.linea}`,
+              borderRadius: 3, background: C.superficie
+            }} />
+          {perfil && (
+            <button onClick={() => { setPerfil(''); setDeteccion({ colectivos: [], materias: [] }); }}
+              style={{ padding: '13px 15px', fontSize: 15, cursor: 'pointer', background: 'transparent',
+                border: `1px solid ${C.linea}`, borderRadius: 3, color: C.media }}>×</button>
+          )}
+        </div>
+
+        {!perfil && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+            {EJEMPLOS.map(e => (
+              <button key={e} onClick={() => { setPerfil(e); setDeteccion(detectarPerfil(e)); }}
+                style={{ padding: '5px 10px', fontSize: 12, cursor: 'pointer', background: 'transparent',
+                  border: `1px solid ${C.linea}`, borderRadius: 20, color: C.media }}>{e}</button>
+            ))}
+          </div>
+        )}
+
+        {pensando && (
+          <div className="em" style={{ fontSize: 12, color: C.tenue, marginTop: 10 }}>
+            No lo he reconocido a la primera, déjame pensarlo…
+          </div>
+        )}
+
+        {!pensando && perfil.trim().length > 2 && deteccion.colectivos.length === 0 && deteccion.origen && (
+          <div style={{ marginTop: 12, padding: 12, background: '#FFF8E6', border: '1px solid #E8D9A8', borderRadius: 3, fontSize: 12.5, color: '#6B5518', lineHeight: 1.5 }}>
+            No he sabido a qué colectivo perteneces con esa frase. Prueba a decirlo de otra forma,
+            o usa los filtros de la sección Leyes. Queda registrado para mejorarlo.
+          </div>
+        )}
+
+        {deteccion.colectivos.length > 0 && (
+          <div style={{ marginTop: 14, padding: 14, background: C.superficie, border: `1px solid ${C.tinta}`, borderRadius: 3 }}>
+            <div style={{ fontSize: 12.5, color: C.media, marginBottom: 9 }}>Te afectan las leyes sobre:</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {deteccion.colectivos.map(c => (
+                <span key={c} className="em" style={{
+                  padding: '4px 10px', fontSize: 11.5, background: C.tinta, color: C.papel,
+                  borderRadius: 2, fontWeight: 500
+                }}>{nombreColectivo(c)}</span>
+              ))}
+            </div>
+            {deteccion.origen === 'ia' && (
+              <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 9 }}>
+                interpretado automáticamente · si no encaja, usa los filtros de Leyes
+              </div>
+            )}
+            <button onClick={aplicar} style={{
+              padding: '10px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+              background: C.tinta, color: C.papel, border: 'none', borderRadius: 2
+            }}>Ver esas leyes →</button>
+          </div>
+        )}
+      </div>
 
       {destacada && (
         <div style={{ marginBottom: 26 }}>

@@ -1,4 +1,5 @@
 import { db, exigirEnv } from '../src/lib/supabase';
+import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
@@ -65,30 +66,28 @@ REGLAS ESTRICTAS:
 - Espanol de Espana. Sin adjetivos valorativos.`;
 }
 
-const { data: yaHechas } = await db()
-  .from('promesa_codigo').select('promesa_id').eq('version_prompt', VERSION);
-const hechas = new Set((yaHechas ?? []).map((r: any) => r.promesa_id));
+const yaHechas = await traerTodo<any>((a, b) =>
+  db().from('promesa_codigo').select('promesa_id').eq('version_prompt', VERSION).order('promesa_id').range(a, b));
+const hechas = new Set(yaHechas.map((r: any) => r.promesa_id));
 
-const { data: todas, error } = await db()
-  .from('v_promesas').select('id, texto, literal, siglas').limit(6000);
+const todas = await traerTodo<any>((a, b) =>
+  db().from('v_promesas').select('id, texto, literal, siglas').order('id').range(a, b));
 
-if (error) { console.error(error.message); process.exit(1); }
-const pendientes = (todas ?? []).filter((p: any) => !hechas.has(p.id));
+const pendientes = todas.filter((p: any) => !hechas.has(p.id));
 
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Promesas totales: ${todas?.length ?? 0}`);
 console.log(`Pendientes: ${pendientes.length}`);
 console.log(`Tiempo estimado: ~${Math.round((pendientes.length * 2.3) / 60)} min\n`);
 
-if (!pendientes.length) {
-  console.log('Nada pendiente. Comprueba: select * from mv_eje_programa order by eje_economico;\n');
-  process.exit(0);
-}
+const SOLO_INFORME = process.argv.includes('--informe') || pendientes.length === 0;
 
 const errores = new Map<string, number>();
 let todoNeutro = 0;
 
-const progreso = await procesarLote(
+const progreso = SOLO_INFORME
+  ? { procesados: 0, omitidos: 0, fallidos: 0, cuotaAgotada: false }
+  : await procesarLote(
   pendientes,
   async (p: any, cadencia: Cadencia) => {
     const r = await preguntar<any>(prompt(p), cadencia, { esquema: ESQUEMA });
@@ -118,34 +117,54 @@ const progreso = await procesarLote(
   }
 );
 
-console.log('\nRESULTADO');
-console.log(`  codificadas:   ${progreso.procesados}`);
+if (SOLO_INFORME) {
+  console.log(pendientes.length === 0
+    ? `Todas las ${todas.length} promesas estan codificadas.`
+    : 'Modo informe: no se ha codificado nada.');
+} else {
+  console.log('\nRESULTADO');
+  console.log(`  codificadas:   ${progreso.procesados}`);
 console.log(`  todo neutro:   ${todoNeutro}`);
 console.log(`  fallidas:      ${progreso.fallidos}`);
-console.log(`  omitidas:      ${progreso.omitidos}`);
+  console.log(`  omitidas:      ${progreso.omitidos}`);
+}
 
-if (errores.size > 0) {
+if (!SOLO_INFORME && errores.size > 0) {
   console.log('\nERRORES');
   Array.from(errores.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
     .forEach(([e, n]) => console.log(`  ${String(n).padStart(4)}  ${String(e).slice(0, 120)}`));
 }
 
-await db().rpc('refrescar_metricas');
+if (!SOLO_INFORME) await db().rpc('refrescar_metricas');
 
 const { data: ejes } = await db().from('mv_eje_programa').select('*').order('eje_economico');
 if (ejes?.length) {
-  console.log('\nEJE ECONOMICO  (-1 izquierda ... +1 derecha)');
-  ejes.forEach((e: any) => {
-    const v = Number(e.eje_economico ?? 0);
-    const pos = Math.round((v + 1) * 20);
-    console.log(`  ${String(e.siglas).padEnd(11)} ${String(v.toFixed(3)).padStart(7)}  ${' '.repeat(pos)}#`);
-  });
+  const pintar = (titulo: string, campo: string) => {
+    console.log(`\n${titulo}`);
+    [...ejes]
+      .sort((a: any, b: any) => {
+        if (a[campo] === null) return 1;
+        if (b[campo] === null) return -1;
+        return Number(a[campo]) - Number(b[campo]);
+      })
+      .forEach((e: any) => {
+        if (e[campo] === null || e[campo] === undefined) {
+          console.log(`  ${String(e.siglas).padEnd(11)}   sin base suficiente`);
+          return;
+        }
+        const v = Number(e[campo]);
+        console.log(`  ${String(e.siglas).padEnd(11)} ${v.toFixed(3).padStart(7)}  ${' '.repeat(Math.round((v + 1) * 20))}#`);
+      });
+  };
 
-  console.log('\nEJE SOCIAL  (-1 progresista ... +1 conservador)');
-  [...ejes].sort((a: any, b: any) => (a.eje_social ?? 0) - (b.eje_social ?? 0)).forEach((e: any) => {
-    const v = Number(e.eje_social ?? 0);
-    const pos = Math.round((v + 1) * 20);
-    console.log(`  ${String(e.siglas).padEnd(11)} ${String(v.toFixed(3)).padStart(7)}  ${' '.repeat(pos)}#`);
+  pintar('EJE ECONOMICO  (-1 izquierda ... +1 derecha)', 'eje_economico');
+  pintar('EJE SOCIAL  (-1 progresista ... +1 conservador)', 'eje_social');
+
+  console.log('\nDESGLOSE POR DIMENSION  (ratio: -1 expande ... +1 restringe)');
+  console.log('  PARTIDO      GASTO  IMPUESTOS  REGULACION');
+  ejes.forEach((e: any) => {
+    const f = (v: any) => v === null || v === undefined ? '     —' : Number(v).toFixed(2).padStart(6);
+    console.log(`  ${String(e.siglas).padEnd(11)} ${f(e.ratio_gasto)}    ${f(e.ratio_impuestos)}      ${f(e.ratio_regulacion)}`);
   });
 }
 console.log('');

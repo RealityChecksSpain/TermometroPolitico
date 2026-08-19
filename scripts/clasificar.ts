@@ -1,4 +1,5 @@
 import { db, exigirEnv } from '../src/lib/supabase';
+import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
@@ -66,19 +67,15 @@ REGLAS ESTRICTAS:
 - Español de España, sin jerga.`;
 }
 
-const { data: yaHechas } = await db()
-  .from('iniciativa_materia').select('iniciativa_id').eq('version_prompt', VERSION);
-const hechas = new Set((yaHechas ?? []).map((r: any) => r.iniciativa_id));
+const yaHechas = await traerTodo<any>((a, b) =>
+  db().from('iniciativa_materia').select('iniciativa_id')
+    .eq('version_prompt', VERSION).order('iniciativa_id').range(a, b));
+const hechas = new Set(yaHechas.map((r: any) => r.iniciativa_id));
 
-const { data: todas, error } = await db()
-  .from('iniciativas')
-  .select('id, titulo, texto_extraido, texto_chars')
-  .order('fecha_presentacion', { ascending: false })
-  .limit(3000);
+const todas = await traerTodo<any>((a, b) =>
+  db().from('iniciativas').select('id, titulo, texto_extraido, texto_chars').order('id').range(a, b));
 
-if (error) { console.error(error.message); process.exit(1); }
-
-const pendientes = (todas ?? []).filter((i: any) => !hechas.has(i.id));
+const pendientes = todas.filter((i: any) => !hechas.has(i.id));
 
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Materias: ${materias?.length ?? 0} · Colectivos: ${colectivos?.length ?? 0}`);

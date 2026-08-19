@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Hemiciclo, { LeyendaVoto } from './components/Hemiciclo.jsx';
 import Detalle, { DetalleLey } from './components/Detalle.jsx';
 import FichaDiputado from './components/FichaDiputado.jsx';
-import Ejes from './components/Ejes.jsx';
+import Mapa from './components/Mapa.jsx';
+import Metodologia from './components/Metodologia.jsx';
 import Partidos from './components/Partidos.jsx';
 import Inicio from './components/Inicio.jsx';
 import {
@@ -51,6 +52,11 @@ color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,co
 .hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
 .hero .chip:hover{color:#FFFFFF;border-color:#8E959C}
 .hero .chip[data-on="1"]{background:#F2F3F0;color:#14161A;border-color:#F2F3F0}
+.heroCols{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:760px){.heroCols.conPanel{grid-template-columns:172px 1fr;gap:20px;align-items:start}}
+.panelGrupos{max-height:330px;overflow-y:auto;padding-right:4px}
+.panelGrupos::-webkit-scrollbar{width:5px}
+.panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;overflow:hidden}
 .rot{font-size:10px;color:${C.tenue};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
@@ -79,7 +85,9 @@ const ORDENES = [
   ['tribuna', 'Más minutos hablando', d => Number(d.minutos_tribuna ?? 0), true],
   ['intervenciones', 'Más intervenciones', d => Number(d.intervenciones ?? 0), true],
   ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
-  ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true]
+  ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true],
+  ['donaciones', 'Más donaciones recibidas', d => Number(d.donaciones ?? 0), true],
+  ['privadas', 'Más cargos en el sector privado', d => Number(d.actividades_privadas ?? 0), true]
 ];
 
 function Chip({ on, onClick, color, children, titulo }) {
@@ -165,6 +173,24 @@ export default function App() {
     return l;
   }, [activos, fCcaa]);
 
+  const posicionPartidos = useMemo(() => {
+    if (!votos) return [];
+    const mapa = new Map(votos.map(v => [v.mandato_id, v.voto]));
+    const g = new Map();
+    diputados.forEach(d => {
+      const voto = mapa.get(d.mandato_id);
+      const k = d.partido_siglas || d.grupo;
+      if (!voto || !k) return;
+      const a = g.get(k) ?? { siglas: k, color: d.color, si: 0, no: 0, abstencion: 0, no_vota: 0 };
+      a[voto] = (a[voto] ?? 0) + 1;
+      g.set(k, a);
+    });
+    return Array.from(g.values()).map(a => {
+      const orden = [['si', a.si], ['no', a.no], ['abstencion', a.abstencion]].sort((x, y) => y[1] - x[1]);
+      return { ...a, voto: orden[0][0], n: orden[0][1], total: a.si + a.no + a.abstencion + a.no_vota };
+    }).sort((a, b) => b.total - a.total);
+  }, [diputados, votos]);
+
   const listaDip = useMemo(() => {
     let l = enHemiciclo;
     if (fPartido) l = l.filter(d => (d.partido_siglas || d.grupo) === fPartido);
@@ -184,7 +210,8 @@ export default function App() {
   useEffect(() => {
     if (seccion !== 'diputados' || orden === 'nombre') { setLideres([]); return; }
     const mapa = { ausencias: 'ausencias', disidencias: 'disidencias', tribuna: 'tribuna',
-      intervenciones: 'intervenciones', abstenciones: 'abstenciones', telematicos: 'telematicos' };
+      intervenciones: 'intervenciones', abstenciones: 'abstenciones', telematicos: 'telematicos',
+      donaciones: 'donaciones', privadas: 'privadas' };
     if (!mapa[orden]) { setLideres([]); return; }
     traerLideres(mapa[orden]).then(setLideres).catch(() => setLideres([]));
   }, [seccion, orden]);
@@ -247,19 +274,49 @@ export default function App() {
               }} />}
             </div>
 
-            <Hemiciclo
-              diputados={enHemiciclo}
-              votos={votos}
-              resaltado={fPartido ? d => (d.partido_siglas || d.grupo) === fPartido : null}
-              seleccionado={sel?.mandato_id}
-              onSeleccionar={setSel}
-            />
+            <div className={`heroCols${votacionSel && votos ? ' conPanel' : ''}`}>
+              {votacionSel && votos && (
+                <div className="panelGrupos">
+                  <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
+                    letterSpacing: '.07em', marginBottom: 9 }}>
+                    Cómo votó cada partido
+                  </div>
+                  {posicionPartidos.map(g => (
+                    <button key={g.siglas}
+                      onMouseEnter={() => setFPartido(g.siglas)}
+                      onMouseLeave={() => setFPartido(null)}
+                      onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                        padding: '6px 7px', background: fPartido === g.siglas ? '#2B3037' : 'transparent',
+                        border: 'none', borderRadius: 2, cursor: 'pointer', transition: 'background 140ms ease'
+                      }}>
+                      <span style={{ width: 3, height: 20, background: g.color, borderRadius: 3, flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5', minWidth: 0 }}>{g.siglas}</span>
+                      <span className="em" style={{ fontSize: 11, fontWeight: 500, flexShrink: 0,
+                        color: g.voto === 'si' ? '#5FBF92' : g.voto === 'no' ? '#E08278' : '#E0BB6A' }}>
+                        {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'} {g.n}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-            {votacionSel && (
-              <div style={{ marginTop: 10, color: '#DDE1E5', fontSize: 13, lineHeight: 1.45 }}>
-                {votacionSel.subtitulo || votacionSel.titulo}
+              <div style={{ minWidth: 0 }}>
+                <Hemiciclo
+                  diputados={enHemiciclo}
+                  votos={votos}
+                  resaltado={fPartido ? d => (d.partido_siglas || d.grupo) === fPartido : null}
+                  seleccionado={sel?.mandato_id}
+                  onSeleccionar={setSel}
+                />
+                {votacionSel && (
+                  <div style={{ marginTop: 10, color: '#DDE1E5', fontSize: 13, lineHeight: 1.45 }}>
+                    {votacionSel.titular || votacionSel.subtitulo || votacionSel.titulo}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="chips" style={{ marginTop: 14 }}>
               <Chip on={!fPartido} onClick={() => setFPartido(null)}>TODOS</Chip>
@@ -390,7 +447,11 @@ export default function App() {
           {seccion === 'leyes' && votacionSel && (
             <>
               <DetalleLey votacion={votacionSel} onVolver={() => setVotacionSel(null)} />
-              <Detalle votacion={votacionSel} diputados={diputados} votos={votos} onDiputado={setSel} />
+              <Detalle votacion={votacionSel} diputados={diputados} votos={votos} onDiputado={setSel}
+                onNorma={async n => {
+                  const v = (await traerVotaciones(1, { id: n.votacion_principal }))[0];
+                  if (v) setVotacionSel({ ...v, clave_norma: n.clave_norma, votaciones_norma: 1 });
+                }} />
             </>
           )}
 
@@ -407,6 +468,15 @@ export default function App() {
                   <Chip key={k} on={orden === k} onClick={() => setOrden(k)}>{t}</Chip>
                 ))}
               </div>
+
+              {(orden === 'privadas' || orden === 'donaciones') && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Esto <strong>no mide dinero ni patrimonio</strong>. Es el número de cargos o donaciones
+                  que cada diputado declaró en su registro de intereses económicos. El Congreso no
+                  publica los importes en formato reutilizable, así que aquí no hay ninguna cifra en euros.
+                </div>
+              )}
 
               {orden === 'ausencias' && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
@@ -465,12 +535,18 @@ export default function App() {
                           tribuna: ['min tribuna', d.minutos_tribuna],
                           intervenciones: ['intervenciones', d.intervenciones],
                           abstenciones: ['abstenciones', d.abstenciones],
-                          telematicos: ['a distancia', d.telematicos]
+                          telematicos: ['a distancia', d.telematicos],
+                          donaciones: ['donaciones', d.donaciones],
+                          privadas: ['cargos privados', d.actividades_privadas]
                         };
                         const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
                         return (<>
                           <span className="ed" style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{val ?? 0}</span>
-                          <span style={{ display: 'block', fontSize: 9, color: C.tenue }}>{et}</span>
+                          <span style={{ display: 'block', fontSize: 9, color: C.tenue }}>
+                            {et}
+                            {(cfg[0] === 'ausencias' || cfg[0] === 'abstenciones' || cfg[0] === 'disidencias' || cfg[0] === 'telematicos') &&
+                              ` de ${Number(d.votos_emitidos) + Number(d.ausencias ?? 0)}`}
+                          </span>
                         </>);
                       })()}
                     </span>
@@ -483,7 +559,14 @@ export default function App() {
           {seccion === 'inicio' && (
             <div className="solo1">
               <Inicio cobertura={cobertura} coherencia={coherencia} destacadas={destacadas}
+                colectivos={facetas.colectivos}
                 onIr={setSeccion}
+                onPerfil={d => {
+                  const col = d.colectivos[0] ?? null;
+                  const mat = !col ? (d.materias[0] ?? null) : null;
+                  setFColectivo(col); setFMateria(mat); setSeccion('leyes');
+                  recargar({ colectivo: col, materia: mat });
+                }}
                 onVotacion={async id => {
                   const v = votaciones.find(x => x.id === id) ?? (await traerVotaciones(1, { id }))[0];
                   if (v) { setVotacionSel(v); setSeccion('leyes'); }
@@ -492,12 +575,17 @@ export default function App() {
           )}
 
           {seccion === 'partidos' && <div className="solo1"><Partidos /></div>}
-          {seccion === 'ejes' && <div className="solo1"><Ejes diputados={activos} ejes={ejes} onSeleccionar={setSel} /></div>}
+          {seccion === 'ejes' && <div className="solo1"><Mapa /></div>}
+          {seccion === 'metodo' && <div className="solo1"><Metodologia cobertura={cobertura} /></div>}
         </div>
 
         <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 10, color: C.tenue, lineHeight: 1.6 }}>
           Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.
-          Aplicación independiente, sin vínculo con ninguna institución.
+          Aplicación independiente, sin vínculo con ninguna institución.{' '}
+          <button onClick={() => { setSeccion('metodo'); setVotacionSel(null); }} style={{
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            color: C.tinta, fontSize: 10, textDecoration: 'underline', fontFamily: 'inherit'
+          }}>Cómo se hace esto</button>
         </div>
       </div>
 

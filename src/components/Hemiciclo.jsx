@@ -1,5 +1,8 @@
 import React, { useMemo, useState, useRef } from 'react';
 
+const esTactil = typeof window !== 'undefined' &&
+  (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
+
 const FORMA = { si: 'relleno', no: 'anillo', abstencion: 'punto', no_vota: 'tenue', ausente: 'tenue' };
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abstención', no_vota: 'No votó' };
 
@@ -70,9 +73,12 @@ export default function Hemiciclo({
           const escala = hover ? 1.55 : sel ? 1.4 : 1;
 
           const comun = {
-            onMouseEnter: () => setEncima(d.mandato_id),
+            onMouseEnter: () => !esTactil && setEncima(d.mandato_id),
             onFocus: () => setEncima(d.mandato_id),
-            onClick: () => onSeleccionar?.(d),
+            onClick: () => {
+              if (esTactil && encima !== d.mandato_id) { setEncima(d.mandato_id); return; }
+              onSeleccionar?.(d);
+            },
             tabIndex: visible ? 0 : -1,
             style: {
               cursor: 'pointer',
@@ -114,7 +120,9 @@ export default function Hemiciclo({
         borderTop: '1px solid #363B42', transition: 'opacity 160ms ease'
       }}>
         {activo ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            onClick={() => esTactil && onSeleccionar?.(activo)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: esTactil ? 'pointer' : 'default' }}>
             <span style={{ width: 10, height: 10, borderRadius: 10, background: activo.color || '#8E9299', flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ color: '#F2F3F0', fontSize: 13.5, fontWeight: 600, lineHeight: 1.25 }}>
@@ -134,7 +142,9 @@ export default function Hemiciclo({
           </div>
         ) : (
           <div style={{ color: '#A0A6AC', fontSize: 12 }}>
-            {votos ? 'Pasa por encima de un escaño para ver quién es y qué votó.' : 'Pasa por encima de un escaño para ver quién lo ocupa.'}
+            {esTactil
+              ? (votos ? 'Toca un escaño para ver quién es y qué votó.' : 'Toca un escaño para ver quién lo ocupa.')
+              : (votos ? 'Pasa por encima de un escaño para ver quién es y qué votó.' : 'Pasa por encima de un escaño para ver quién lo ocupa.')}
           </div>
         )}
       </div>

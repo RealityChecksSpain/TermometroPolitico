@@ -181,3 +181,35 @@ export async function traerLideres(metrica) {
   if (error) return [];
   return data ?? [];
 }
+
+export async function traerMapaPartidos() {
+  const { data, error } = await supabase.from('v_mapa_partidos').select('*');
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function traerRelacionadas(norma, limite = 4) {
+  if (!norma?.materia) return [];
+  const { data, error } = await supabase
+    .from('mv_normas').select('clave_norma, titular, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, votacion_principal')
+    .eq('materia', norma.materia)
+    .neq('clave_norma', norma.clave_norma ?? '')
+    .order('fecha', { ascending: false })
+    .limit(30);
+  if (error) return [];
+  return (data ?? [])
+    .filter(n => (n.resultado_final ?? n.resultado_ultima) === 'aprobada')
+    .slice(0, limite);
+}
+
+export async function traerActividades(mandatoId) {
+  const { data, error } = await supabase.rpc('actividades_de_diputado', { p_mandato_id: mandatoId });
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function traerSesgo() {
+  const { data, error } = await supabase.from('v_sesgo_programas').select('*').limit(1);
+  if (error) return null;
+  return data?.[0] ?? null;
+}

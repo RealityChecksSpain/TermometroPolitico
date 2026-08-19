@@ -34,7 +34,14 @@
     "programas:listar": "node --env-file=.env --import tsx scripts/cargar-programas.ts --listar",
     "probar:cuota": "node --env-file=.env --import tsx scripts/probar-cuota.ts",
     "coherencia": "node --env-file=.env --import tsx scripts/coherencia.ts",
-    "codificar": "node --env-file=.env --import tsx scripts/codificar-promesas.ts"
+    "codificar": "node --env-file=.env --import tsx scripts/codificar-promesas.ts",
+    "codificar:leyes": "node --env-file=.env --import tsx scripts/codificar-leyes.ts",
+    "sondear:patrimonio": "node --import tsx scripts/sondear-patrimonio.ts",
+    "actividades": "node --env-file=.env --import tsx scripts/cargar-actividades.ts",
+    "sondear:bienes": "node --import tsx scripts/sondear-bienes.ts",
+    "bienes": "node --env-file=.env --import tsx scripts/servidor-bienes.ts",
+    "probar:perfil": "node --import tsx scripts/probar-perfil.ts",
+    "busquedas": "node --env-file=.env --import tsx scripts/revisar-busquedas.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
