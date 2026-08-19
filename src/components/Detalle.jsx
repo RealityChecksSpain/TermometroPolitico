@@ -101,37 +101,64 @@ export function DetalleLey({ votacion, onVolver }) {
         <div className="ed" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>
           {votacion.subtitulo || votacion.titulo}
         </div>
-        <div style={{ marginTop: 12 }}><Sello aprobada={aprobada} /></div>
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Sello aprobada={aprobada} />
+          {votacion.votaciones_norma > 1 && (
+            <span className="em" style={{ fontSize: 11, color: C.media }}>
+              Esta norma se votó {votacion.votaciones_norma} veces (enmiendas incluidas).
+              Aquí se muestra la votación principal.
+            </span>
+          )}
+        </div>
       </div>
+
+      {Array.isArray(votacion.efectos) && votacion.efectos.length > 0 && (
+        <Bloque titulo="Si esto te afecta">
+          {votacion.efectos.map(e => (
+            <div key={e.slug} style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: `1px solid ${C.linea}` }}>
+              <span style={{
+                flexShrink: 0, width: 7, height: 7, borderRadius: 7, marginTop: 6,
+                background: votacion.materia_color || C.tinta
+              }} />
+              <div>
+                <div className="ed" style={{ fontSize: 14, fontWeight: 600 }}>{e.nombre}</div>
+                <div style={{ fontSize: 13.5, color: C.tinta, lineHeight: 1.5, marginTop: 3 }}>{e.efecto}</div>
+              </div>
+            </div>
+          ))}
+          <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 10, lineHeight: 1.5 }}>
+            Colectivos identificados automáticamente sobre una lista cerrada. El efecto describe
+            lo que cambia, no si es bueno o malo.
+          </div>
+        </Bloque>
+      )}
 
       {votacion.resumen && (
         <Bloque titulo="Qué dice esta norma">
-          <div style={{ fontSize: 13.5, lineHeight: 1.6 }}>{votacion.resumen}</div>
-          {Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0 && (
-            <ul style={{ margin: '12px 0 0', paddingLeft: 18, fontSize: 12.5, lineHeight: 1.55 }}>
-              {votacion.puntos_clave.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
-            </ul>
+          <div style={{ fontSize: 14.5, lineHeight: 1.6 }}>
+            {String(votacion.resumen).split(/(?<=\.)\s+/).slice(0, 2).join(' ')}
+          </div>
+          {(String(votacion.resumen).split(/(?<=\.)\s+/).length > 2 ||
+            (Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0)) && (
+            <details style={{ marginTop: 12 }}>
+              <summary className="em" style={{ fontSize: 11.5, color: C.media, cursor: 'pointer' }}>
+                Leer el detalle completo
+              </summary>
+              <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 10, color: C.media }}>
+                {String(votacion.resumen).split(/(?<=\.)\s+/).slice(2).join(' ')}
+              </div>
+              {Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0 && (
+                <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, lineHeight: 1.55, color: C.media }}>
+                  {votacion.puntos_clave.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
+                </ul>
+              )}
+            </details>
           )}
           <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 12, lineHeight: 1.5 }}>
             {votacion.resumen_basado_en === 'texto_bocg'
               ? 'Resumen sintetizado automáticamente del texto oficial publicado en el BOCG.'
               : 'Resumen sintetizado automáticamente a partir del título oficial.'}
             {' '}No sustituye al texto legal.
-          </div>
-        </Bloque>
-      )}
-
-      {Array.isArray(votacion.efectos) && votacion.efectos.length > 0 && (
-        <Bloque titulo="A quién afecta y cómo">
-          {votacion.efectos.map(e => (
-            <div key={e.slug} style={{ padding: '9px 0', borderBottom: `1px solid ${C.linea}` }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>{e.nombre}</div>
-              <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.5, marginTop: 3 }}>{e.efecto}</div>
-            </div>
-          ))}
-          <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 10, lineHeight: 1.5 }}>
-            Colectivos identificados automáticamente sobre una lista cerrada. El efecto describe
-            lo que cambia, no si es bueno o malo.
           </div>
         </Bloque>
       )}

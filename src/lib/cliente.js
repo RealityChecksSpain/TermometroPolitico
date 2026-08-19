@@ -46,15 +46,25 @@ export async function traerDiputados() {
 }
 
 export async function traerVotaciones(limite = 200, filtros = {}) {
-  let q = supabase.from('mv_votaciones').select('*');
-  if (filtros.id) q = q.eq('id', filtros.id);
+  if (filtros.id) {
+    const { data, error } = await supabase.from('mv_votaciones').select('*').eq('id', filtros.id);
+    if (error) throw error;
+    return data ?? [];
+  }
+  let q = supabase.from('mv_normas').select('*');
   if (filtros.materia) q = q.eq('materia', filtros.materia);
   if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
   if (filtros.texto?.trim()) {
-    q = q.or(`titulo.ilike.%${filtros.texto}%,subtitulo.ilike.%${filtros.texto}%,resumen.ilike.%${filtros.texto}%`);
+    q = q.or(`titular.ilike.%${filtros.texto}%,resumen.ilike.%${filtros.texto}%`);
   }
   const { data, error } = await q.order('fecha', { ascending: false }).limit(limite);
   if (error) throw error;
+  return data ?? [];
+}
+
+export async function traerVotacionesDeNorma(clave) {
+  const { data, error } = await supabase.rpc('votaciones_de_norma', { p_clave: clave });
+  if (error) return [];
   return data ?? [];
 }
 
@@ -148,5 +158,26 @@ export async function traerPromesas(partido, soloVerificables = false, limite = 
   if (soloVerificables) q = q.eq('verificable', true);
   const { data, error } = await q.order('orden').limit(limite);
   if (error) throw error;
+  return data ?? [];
+}
+
+export async function traerCoherencia() {
+  const { data, error } = await supabase
+    .from('mv_coherencia').select('*').order('pct_coherencia', { ascending: false, nullsFirst: false });
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function traerDestacadas(limite = 5) {
+  const { data, error } = await supabase
+    .from('mv_destacadas').select('*').order('relevancia', { ascending: false }).limit(limite);
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function traerLideres(metrica) {
+  const { data, error } = await supabase
+    .from('mv_lider_partido').select('*').eq('metrica', metrica).order('valor', { ascending: false });
+  if (error) return [];
   return data ?? [];
 }

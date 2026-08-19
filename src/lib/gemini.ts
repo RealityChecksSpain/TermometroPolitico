@@ -36,6 +36,7 @@ export class Cadencia {
   private ultima = 0;
   private hoy = 0;
   private seguidos429 = 0;
+  private agotados = new Set<string>();
   private readonly intervaloMs: number;
   private readonly rpd: number;
 
@@ -57,6 +58,23 @@ export class Cadencia {
     return this.hoy >= this.rpd;
   }
 
+  marcarAgotado(modelo: string) {
+    this.agotados.add(modelo);
+    return this.agotados.size;
+  }
+
+  estaAgotado(modelo: string) {
+    return this.agotados.has(modelo);
+  }
+
+  get modelosAgotados() {
+    return Array.from(this.agotados);
+  }
+
+  todosAgotados(modelos: string[]) {
+    return modelos.every(m => this.agotados.has(m));
+  }
+
   registrar429() {
     this.seguidos429++;
     return this.seguidos429;
@@ -67,12 +85,10 @@ export class Cadencia {
   }
 
   get bloqueada() {
-    return this.seguidos429 >= 3;
+    return false;
   }
 
   async esperar() {
-    if (this.agotado()) throw new CuotaDiariaAgotada(this.rpd);
-    if (this.bloqueada) throw new CuotaDiariaAgotada(this.rpd);
     const ahora = Date.now();
     const espera = this.intervaloMs - (ahora - this.ultima);
     if (espera > 0) await new Promise(r => setTimeout(r, espera));
@@ -83,7 +99,12 @@ export class Cadencia {
 
 export class CuotaDiariaAgotada extends Error {
   constructor(rpd: number) {
-    super(`Cuota diaria agotada (${rpd} peticiones). Reanuda manana; el progreso esta guardado.`);
+    super(
+      rpd > 0
+        ? `Cuota diaria agotada (${rpd} peticiones). Reanuda manana; el progreso esta guardado.`
+        : 'Todos los modelos de la cadena han agotado su cuota diaria. ' +
+          'Anade mas modelos a MODELO_IA o reanuda manana; el progreso esta guardado.'
+    );
     this.name = 'CuotaDiariaAgotada';
   }
 }
@@ -108,7 +129,13 @@ export async function preguntar<T>(
 
   let ultimoError = '';
 
+  if (cadencia.todosAgotados(modelos)) {
+    throw new CuotaDiariaAgotada(0);
+  }
+
   for (const modelo of modelos) {
+    if (cadencia.estaAgotado(modelo)) continue;
+
     for (let intento = 0; intento < reintentos; intento++) {
       await cadencia.esperar();
 
@@ -167,15 +194,18 @@ export async function preguntar<T>(
         }
 
         if (porMinuto) {
-          ultimoError = `${modelo}: limite por minuto (${detalle}), esperando ${esperaSeg}s`;
+          ultimoError = `${modelo}: limite por minuto, esperando ${esperaSeg}s`;
           await new Promise(r => setTimeout(r, esperaSeg * 1000));
           continue;
         }
 
-        const n = cadencia.registrar429();
-        ultimoError = `${modelo}: 429 [${detalle}] consecutivos ${n}`;
-        if (n >= 3) return { ok: false, datos: null, bruto: '', error: ultimoError };
-        await new Promise(r => setTimeout(r, esperaSeg * 1000));
+        const n = cadencia.marcarAgotado(modelo);
+        ultimoError = `${modelo}: cuota diaria agotada [${detalle}]. Modelos agotados: ${n}/${modelos.length}`;
+        console.log(`  · ${modelo} sin cuota diaria, pasando al siguiente modelo`);
+
+        if (cadencia.todosAgotados(modelos)) {
+          throw new CuotaDiariaAgotada(0);
+        }
         break;
       }
 
@@ -237,14 +267,6 @@ export async function procesarLote<E, S>(
   const progreso: Progreso = { procesados: 0, omitidos: 0, fallidos: 0, cuotaAgotada: false };
 
   for (let i = 0; i < elementos.length; i++) {
-    if (cadencia.agotado()) {
-      progreso.cuotaAgotada = true;
-      progreso.omitidos = elementos.length - i;
-      console.log(`\n  Cuota diaria agotada tras ${progreso.procesados}. Quedan ${progreso.omitidos}.`);
-      console.log('  Vuelve a lanzar el comando manana: retoma donde lo dejo.');
-      break;
-    }
-
     try {
       const r = await tarea(elementos[i], cadencia);
       if (r === null) progreso.fallidos++;

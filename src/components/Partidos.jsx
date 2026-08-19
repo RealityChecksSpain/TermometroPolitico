@@ -17,12 +17,14 @@ export default function Partidos({ onDiputados }) {
   const [abierto, setAbierto] = useState(null);
   const [promesas, setPromesas] = useState({});
   const [soloVerificables, setSoloVerificables] = useState(true);
+  const [fMateria, setFMateria] = useState(null);
 
   useEffect(() => { traerProgramas().then(setProgramas).catch(() => setProgramas([])); }, []);
 
   async function abrir(p) {
     if (abierto === p.partido) { setAbierto(null); return; }
     setAbierto(p.partido);
+    setFMateria(null);
     if (!promesas[p.partido]) {
       const l = await traerPromesas(p.partido, false, 400);
       setPromesas(prev => ({ ...prev, [p.partido]: l }));
@@ -50,7 +52,15 @@ export default function Partidos({ onDiputados }) {
 
       {programas.map(p => {
         const activo = abierto === p.partido;
-        const lista = (promesas[p.partido] ?? []).filter(x => !soloVerificables || x.verificable);
+        const todas = (promesas[p.partido] ?? []).filter(x => !soloVerificables || x.verificable);
+        const materias = Array.from(
+          todas.reduce((m, x) => {
+            if (!x.materia) return m;
+            const a = m.get(x.materia) ?? { nombre: x.materia_nombre, color: x.materia_color, n: 0 };
+            a.n++; m.set(x.materia, a); return m;
+          }, new Map()).entries()
+        ).sort((a, b) => b[1].n - a[1].n);
+        const lista = fMateria ? todas.filter(x => x.materia === fMateria) : todas;
         const pct = p.promesas ? Math.round((p.verificables / p.promesas) * 100) : 0;
 
         return (
@@ -88,8 +98,33 @@ export default function Partidos({ onDiputados }) {
                   {soloVerificables ? 'solo verificables' : 'todos los compromisos'}
                 </button>
 
+                {materias.length > 1 && (
+                  <>
+                    <div style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600, margin: '4px 0 7px' }}>
+                      Qué propone sobre
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                      {materias.map(([slug, m]) => (
+                        <button key={slug} onClick={() => setFMateria(fMateria === slug ? null : slug)} style={{
+                          padding: '4px 9px', fontSize: 11, borderRadius: 2, cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
+                          background: fMateria === slug ? (m.color || C.tinta) : 'transparent',
+                          color: fMateria === slug ? '#FFFFFF' : C.media,
+                          border: `1px solid ${fMateria === slug ? (m.color || C.tinta) : C.linea}`,
+                          fontWeight: fMateria === slug ? 600 : 400
+                        }}>
+                          {m.nombre}
+                          <span className="em" style={{ fontSize: 10, opacity: .75 }}>{m.n}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 {lista.length === 0 && (
-                  <div style={{ fontSize: 12, color: C.tenue, padding: '10px 0' }}>Sin compromisos que mostrar.</div>
+                  <div style={{ fontSize: 12, color: C.tenue, padding: '10px 0' }}>
+                    {fMateria ? 'Este partido no propone nada verificable sobre esa materia.' : 'Sin compromisos que mostrar.'}
+                  </div>
                 )}
 
                 {lista.slice(0, 60).map(pr => (

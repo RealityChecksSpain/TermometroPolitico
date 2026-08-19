@@ -45,7 +45,7 @@ export default function Hemiciclo({
 
   return (
     <div style={{ position: 'relative' }}>
-      <svg ref={svgRef} viewBox="-2.78 -2.78 5.56 1.72"
+      <svg ref={svgRef} viewBox="-2.64 -2.64 5.28 2.78"
         style={{ width: '100%', display: 'block' }}
         onMouseLeave={() => setEncima(null)}
         role="img" aria-label={votos ? 'Resultado de la votación por escaño' : 'Composición del hemiciclo'}>
@@ -80,29 +80,32 @@ export default function Hemiciclo({
               filter: hover ? 'url(#brillo)' : 'none',
               outline: 'none'
             },
+            onMouseLeave: () => setEncima(null),
             'aria-label': `${d.nombre_completo}, ${d.partido_siglas || d.grupo || ''}${voto ? `, ${ETIQUETA[voto]}` : ''}`
           };
 
-          if (forma === 'anillo') {
-            return <circle key={d.mandato_id} {...comun} cx={a.cx} cy={a.cy}
-              r={r * 0.9 * escala} fill="none" stroke={color}
-              strokeWidth={r * (hover ? 0.75 : 0.6)} opacity={op} />;
-          }
-          if (forma === 'punto') {
-            return (
-              <g key={d.mandato_id} {...comun} opacity={op}>
-                <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={0.18} />
-                <circle cx={a.cx} cy={a.cy} r={r * 0.36 * escala} fill={color} />
-              </g>
+          const marca =
+            forma === 'anillo' ? (
+              <circle cx={a.cx} cy={a.cy} r={r * 0.9 * escala} fill="none" stroke={color}
+                strokeWidth={r * (hover ? 0.75 : 0.6)} opacity={op} />
+            ) : forma === 'punto' ? (
+              <>
+                <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={op * 0.2} />
+                <circle cx={a.cx} cy={a.cy} r={r * 0.36 * escala} fill={color} opacity={op} />
+              </>
+            ) : forma === 'tenue' ? (
+              <circle cx={a.cx} cy={a.cy} r={r * 0.55 * escala} fill={color} opacity={op * 0.32} />
+            ) : (
+              <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={op}
+                stroke={sel ? '#FFFFFF' : 'none'} strokeWidth={sel ? r * 0.4 : 0} />
             );
-          }
-          if (forma === 'tenue') {
-            return <circle key={d.mandato_id} {...comun} cx={a.cx} cy={a.cy}
-              r={r * 0.55 * escala} fill={color} opacity={op * 0.32} />;
-          }
-          return <circle key={d.mandato_id} {...comun} cx={a.cx} cy={a.cy}
-            r={r * escala} fill={color} opacity={op}
-            stroke={sel ? '#FFFFFF' : 'none'} strokeWidth={sel ? r * 0.4 : 0} />;
+
+          return (
+            <g key={d.mandato_id} {...comun}>
+              {marca}
+              <circle cx={a.cx} cy={a.cy} r={r * 1.75} fill="transparent" pointerEvents="all" />
+            </g>
+          );
         })}
       </svg>
 
@@ -117,7 +120,7 @@ export default function Hemiciclo({
               <div style={{ color: '#F2F3F0', fontSize: 13.5, fontWeight: 600, lineHeight: 1.25 }}>
                 {activo.nombre_completo}
               </div>
-              <div className="em" style={{ color: '#9AA0A6', fontSize: 10.5, marginTop: 2 }}>
+              <div className="em" style={{ color: '#B4BAC0', fontSize: 11, marginTop: 3 }}>
                 {activo.partido_siglas || activo.grupo} · {activo.circunscripcion ?? '—'}
                 {votoActivo && (
                   <span style={{
@@ -130,7 +133,7 @@ export default function Hemiciclo({
             </div>
           </div>
         ) : (
-          <div style={{ color: '#6E747A', fontSize: 11.5 }}>
+          <div style={{ color: '#A0A6AC', fontSize: 12 }}>
             {votos ? 'Pasa por encima de un escaño para ver quién es y qué votó.' : 'Pasa por encima de un escaño para ver quién lo ocupa.'}
           </div>
         )}

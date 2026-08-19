@@ -33,7 +33,8 @@
     "programas": "node --env-file=.env --import tsx scripts/cargar-programas.ts",
     "programas:listar": "node --env-file=.env --import tsx scripts/cargar-programas.ts --listar",
     "probar:cuota": "node --env-file=.env --import tsx scripts/probar-cuota.ts",
-    "coherencia": "node --env-file=.env --import tsx scripts/coherencia.ts"
+    "coherencia": "node --env-file=.env --import tsx scripts/coherencia.ts",
+    "codificar": "node --env-file=.env --import tsx scripts/codificar-promesas.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

@@ -4,9 +4,10 @@ import Detalle, { DetalleLey } from './components/Detalle.jsx';
 import FichaDiputado from './components/FichaDiputado.jsx';
 import Ejes from './components/Ejes.jsx';
 import Partidos from './components/Partidos.jsx';
+import Inicio from './components/Inicio.jsx';
 import {
   faltaConfig, problemasConfig, traerDiputados, traerVotaciones, traerVotos,
-  traerEjes, traerCobertura, traerFacetas, traerCcaa
+  traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
 } from './lib/cliente.js';
 
 const C = {
@@ -45,13 +46,18 @@ border-top:none;border-bottom:2px solid transparent;margin-bottom:-2px}}
 .chip{padding:4px 9px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
 display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:transparent;
 color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,color 120ms ease}
+.chip:hover{border-color:${C.tinta}}
 .chip[data-on="1"]{background:${C.tinta};color:${C.papel};border-color:${C.tinta}}
+.hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
+.hero .chip:hover{color:#FFFFFF;border-color:#8E959C}
+.hero .chip[data-on="1"]{background:#F2F3F0;color:#14161A;border-color:#F2F3F0}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;overflow:hidden}
 .rot{font-size:10px;color:${C.tenue};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
 `;
 
 const ICONOS = {
+  inicio: 'M3 11l9-8 9 8 M5 10v10h14V10',
   leyes: 'M4 3h11l5 5v13H4z M15 3v5h5',
   diputados: 'M8 11a4 4 0 100-8 4 4 0 000 8z M2 21a6 6 0 0112 0 M17 11a3 3 0 100-6 M16 21a5 5 0 016-5',
   partidos: 'M3 21h18 M5 21V8l7-5 7 5v13 M10 21v-6h4v6',
@@ -64,6 +70,17 @@ function Icono({ d }) {
     {d.split(' M').map((p, i) => <path key={i} d={(i ? 'M' : '') + p} />)}
   </svg>;
 }
+
+
+const ORDENES = [
+  ['nombre', 'Nombre', d => d.nombre_completo, false],
+  ['ausencias', 'Más ausencias', d => Number(d.ausencias ?? 0), true],
+  ['disidencias', 'Más veces contra su partido', d => Number(d.disidencias ?? 0), true],
+  ['tribuna', 'Más minutos hablando', d => Number(d.minutos_tribuna ?? 0), true],
+  ['intervenciones', 'Más intervenciones', d => Number(d.intervenciones ?? 0), true],
+  ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
+  ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true]
+];
 
 function Chip({ on, onClick, color, children, titulo }) {
   return (
@@ -85,7 +102,9 @@ function Barra({ si, no, abs, alto = 5 }) {
 }
 
 export default function App() {
-  const [seccion, setSeccion] = useState('leyes');
+  const [seccion, setSeccion] = useState('inicio');
+  const [coherencia, setCoherencia] = useState([]);
+  const [destacadas, setDestacadas] = useState([]);
   const [diputados, setDiputados] = useState([]);
   const [votaciones, setVotaciones] = useState([]);
   const [ejes, setEjes] = useState([]);
@@ -105,6 +124,8 @@ export default function App() {
   const [fColectivo, setFColectivo] = useState(null);
   const [verMas, setVerMas] = useState(false);
   const [buscaFaceta, setBuscaFaceta] = useState('');
+  const [orden, setOrden] = useState('nombre');
+  const [lideres, setLideres] = useState([]);
   const [cargandoLista, setCargandoLista] = useState(false);
 
   useEffect(() => {
@@ -112,8 +133,8 @@ export default function App() {
       setError('Configuracion en .env:\n\n' + problemasConfig.map(p => '  - ' + p).join('\n'));
       setCargando(false); return;
     }
-    Promise.all([traerDiputados(), traerVotaciones(200), traerEjes(), traerCobertura(), traerFacetas(), traerCcaa()])
-      .then(([d, v, e, c, f, cc]) => { setDiputados(d); setVotaciones(v); setEjes(e); setCobertura(c); setFacetas(f); setCcaa(cc); })
+    Promise.all([traerDiputados(), traerVotaciones(200), traerEjes(), traerCobertura(), traerFacetas(), traerCcaa(), traerCoherencia(), traerDestacadas(4)])
+      .then(([d, v, e, c, f, cc, co, de]) => { setDiputados(d); setVotaciones(v); setEjes(e); setCobertura(c); setFacetas(f); setCcaa(cc); setCoherencia(co); setDestacadas(de); })
       .catch(e => setError(String(e.message ?? e)))
       .finally(() => setCargando(false));
   }, []);
@@ -151,8 +172,22 @@ export default function App() {
       const q = busqueda.toLowerCase();
       l = l.filter(d => d.nombre_completo.toLowerCase().includes(q) || (d.circunscripcion ?? '').toLowerCase().includes(q));
     }
-    return l;
-  }, [enHemiciclo, fPartido, busqueda]);
+    const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
+    const [, , clave, desc] = cfg;
+    return [...l].sort((a, b) => {
+      const va = clave(a), vb = clave(b);
+      if (typeof va === 'string') return va.localeCompare(vb, 'es');
+      return desc ? vb - va : va - vb;
+    });
+  }, [enHemiciclo, fPartido, busqueda, orden]);
+
+  useEffect(() => {
+    if (seccion !== 'diputados' || orden === 'nombre') { setLideres([]); return; }
+    const mapa = { ausencias: 'ausencias', disidencias: 'disidencias', tribuna: 'tribuna',
+      intervenciones: 'intervenciones', abstenciones: 'abstenciones', telematicos: 'telematicos' };
+    if (!mapa[orden]) { setLideres([]); return; }
+    traerLideres(mapa[orden]).then(setLideres).catch(() => setLideres([]));
+  }, [seccion, orden]);
 
   async function recargar(c = {}) {
     setCargandoLista(true);
@@ -171,7 +206,7 @@ export default function App() {
     <pre className="em" style={{ fontSize: 12, background: '#FBE9EC', padding: 12, borderRadius: 3, whiteSpace: 'pre-wrap', marginTop: 12 }}>{error}</pre>
   </div></>;
 
-  const secciones = [['leyes', 'Leyes'], ['diputados', 'Diputados'], ['partidos', 'Partidos'], ['ejes', 'Mapa']];
+  const secciones = [['inicio', 'Inicio'], ['leyes', 'Leyes'], ['diputados', 'Diputados'], ['partidos', 'Partidos'], ['ejes', 'Mapa']];
   const mostrarHemiciclo = seccion === 'leyes' || seccion === 'diputados';
 
   return (
@@ -180,7 +215,10 @@ export default function App() {
       <div className="e app">
 
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 14px', flexWrap: 'wrap' }}>
-          <div className="ed" style={{ fontSize: 27, fontWeight: 800, lineHeight: 1 }}>Escaño</div>
+          <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
+            className="ed" style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.tinta }}>
+            Escaño
+          </button>
           {cobertura && (
             <div className="em" style={{ fontSize: 10, color: C.tenue }}>
               {cobertura.votaciones} votaciones · {Number(cobertura.votos_individuales).toLocaleString('es')} votos · {cobertura.ultima_sesion}
@@ -200,7 +238,7 @@ export default function App() {
         {mostrarHemiciclo && (
           <div className="hero">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <div className="em" style={{ fontSize: 10, color: '#6E747A', textTransform: 'uppercase', letterSpacing: '.07em' }}>
+              <div className="em" style={{ fontSize: 10.5, color: '#A0A6AC', textTransform: 'uppercase', letterSpacing: '.07em' }}>
                 {enHemiciclo.length} escaños{fCcaa ? ` · ${ccaa.find(c => c.slug === fCcaa)?.nombre}` : ''}
               </div>
               {votacionSel && votos && <LeyendaVoto totales={{
@@ -218,7 +256,7 @@ export default function App() {
             />
 
             {votacionSel && (
-              <div style={{ marginTop: 10, color: '#C9CDD2', fontSize: 12.5, lineHeight: 1.45 }}>
+              <div style={{ marginTop: 10, color: '#DDE1E5', fontSize: 13, lineHeight: 1.45 }}>
                 {votacionSel.subtitulo || votacionSel.titulo}
               </div>
             )}
@@ -307,20 +345,41 @@ export default function App() {
                   </div>
                 )}
                 {votaciones.map((v, i) => (
-                  <button key={v.id} className="fila" onClick={() => setVotacionSel(v)} style={{
+                  <button key={v.clave_norma ?? v.id} className="fila"
+                    onClick={async () => {
+                      const id = v.votacion_principal ?? v.id;
+                      const completa = (await traerVotaciones(1, { id }))[0];
+                      if (completa) setVotacionSel({ ...completa, clave_norma: v.clave_norma, votaciones_norma: v.votaciones });
+                    }} style={{
                     display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '12px 13px',
                     background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
                   }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{v.subtitulo || v.titulo}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{v.titular || v.subtitulo || v.titulo}</div>
                     <div className="em" style={{ fontSize: 10, color: C.tenue, margin: '5px 0 7px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       {v.materia_nombre && <span style={{ background: (v.materia_color || '#8E9299') + '22', color: v.materia_color || C.media, padding: '1px 6px', borderRadius: 2, fontWeight: 500 }}>{v.materia_nombre}</span>}
                       <span>{v.fecha}</span>
+                      {v.votaciones > 1 && (
+                        <span style={{ color: C.media }}>
+                          {v.votaciones} votaciones{v.tramites > 0 ? ` · ${v.tramites} enmiendas` : ''}
+                        </span>
+                      )}
                     </div>
                     <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} />
                     <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 5, display: 'flex', gap: 10 }}>
                       <span style={{ color: C.si }}>Sí {v.total_si}</span>
                       <span style={{ color: C.no }}>No {v.total_no}</span>
-                      <span style={{ marginLeft: 'auto', color: v.resultado === 'aprobada' ? C.si : C.no, fontWeight: 500 }}>{v.resultado}</span>
+                      {v.resultado_fiable === false && v.votaciones > 1 ? (
+                        <span style={{ marginLeft: 'auto', color: C.tenue }}>
+                          última: <span style={{ color: v.resultado_ultima === 'aprobada' ? C.si : C.no }}>
+                            {v.resultado_ultima}
+                          </span>
+                        </span>
+                      ) : (
+                        <span style={{ marginLeft: 'auto', fontWeight: 500,
+                          color: (v.resultado_final ?? v.resultado_ultima ?? v.resultado) === 'aprobada' ? C.si : C.no }}>
+                          {v.resultado_final ?? v.resultado_ultima ?? v.resultado}
+                        </span>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -341,6 +400,45 @@ export default function App() {
                 placeholder="Nombre o circunscripción"
                 style={{ width: '100%', padding: '10px 12px', fontSize: 14, marginBottom: 10,
                   border: `1px solid ${C.linea}`, borderRadius: 2, background: C.superficie }} />
+
+              <div className="rot">Ordenar por</div>
+              <div className="chips" style={{ marginBottom: 12 }}>
+                {ORDENES.map(([k, t]) => (
+                  <Chip key={k} on={orden === k} onClick={() => setOrden(k)}>{t}</Chip>
+                ))}
+              </div>
+
+              {orden === 'ausencias' && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Ministros, presidencia del Gobierno y líderes de la oposición acumulan ausencias por
+                  obligaciones institucionales. Una cifra alta no implica dejadez: es el número de
+                  votaciones en las que esa persona no emitió voto.
+                </div>
+              )}
+
+              {lideres.length > 0 && (
+                <div className="tarjeta" style={{ padding: 14, marginBottom: 12 }}>
+                  <div className="rot" style={{ marginBottom: 10 }}>
+                    Quien más {ORDENES.find(o => o[0] === orden)?.[1].replace('Más ', '').toLowerCase()} en cada partido
+                  </div>
+                  <div style={{ display: 'grid', gap: 7, gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}>
+                    {lideres.map(l => (
+                      <div key={l.partido} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                        <span style={{ width: 3, height: 26, background: l.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {l.nombre_completo}
+                          </span>
+                          <span className="em" style={{ display: 'block', fontSize: 9.5, color: C.tenue }}>{l.partido_siglas}</span>
+                        </span>
+                        <span className="em" style={{ fontSize: 13, flexShrink: 0 }}>{l.valor}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 8 }}>{listaDip.length} diputados</div>
               <div className="tarjeta">
                 {listaDip.slice(0, 200).map((d, i) => (
@@ -354,15 +452,42 @@ export default function App() {
                       <span style={{ display: 'block', fontSize: 13 }}>{d.nombre_completo}</span>
                       <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue }}>
                         {d.partido_siglas || d.grupo || '—'} · {d.circunscripcion ?? '—'}
+                        {d.cargo && <span style={{ color: C.media }}> · {d.cargo}</span>}
                       </span>
                     </span>
                     <span style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <span className="em" style={{ display: 'block', fontSize: 14 }}>{d.minutos_tribuna}</span>
-                      <span style={{ display: 'block', fontSize: 9, color: C.tenue }}>min tribuna</span>
+                      {(() => {
+                        const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
+                        const etiquetas = {
+                          nombre: ['min tribuna', d.minutos_tribuna],
+                          ausencias: ['ausencias', d.ausencias],
+                          disidencias: ['contra su partido', d.disidencias],
+                          tribuna: ['min tribuna', d.minutos_tribuna],
+                          intervenciones: ['intervenciones', d.intervenciones],
+                          abstenciones: ['abstenciones', d.abstenciones],
+                          telematicos: ['a distancia', d.telematicos]
+                        };
+                        const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
+                        return (<>
+                          <span className="ed" style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{val ?? 0}</span>
+                          <span style={{ display: 'block', fontSize: 9, color: C.tenue }}>{et}</span>
+                        </>);
+                      })()}
                     </span>
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {seccion === 'inicio' && (
+            <div className="solo1">
+              <Inicio cobertura={cobertura} coherencia={coherencia} destacadas={destacadas}
+                onIr={setSeccion}
+                onVotacion={async id => {
+                  const v = votaciones.find(x => x.id === id) ?? (await traerVotaciones(1, { id }))[0];
+                  if (v) { setVotacionSel(v); setSeccion('leyes'); }
+                }} />
             </div>
           )}
 
