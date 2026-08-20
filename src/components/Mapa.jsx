@@ -78,7 +78,8 @@ export default function Mapa({ onDiputados }) {
         </div>
       ) : (
         <div style={{ background: C.pizarra, borderRadius: 3, padding: 'clamp(16px, 3vw, 28px)' }}>
-          <svg viewBox="-1.45 -1.5 2.9 3.05" style={{ width: '100%', display: 'block' }}>
+          <svg viewBox="-1.45 -1.5 2.9 3.05"
+            style={{ width: '100%', maxHeight: '62vh', display: 'block', margin: '0 auto' }}>
             <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
             <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
@@ -181,8 +182,95 @@ export default function Mapa({ onDiputados }) {
         </div>
       )}
 
+      <div className="ejesGuia" style={{ marginTop: 14 }}>
+        <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15 }}>
+          <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Qué es izquierda y derecha aquí</div>
+          <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>
+            Este eje mide <strong>una sola cosa</strong>: qué papel debe tener el Estado en la economía.
+            No mide simpatías ni identidades.
+          </div>
+
+          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+              Izquierda económica
+            </div>
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
+              El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto
+              público, impuestos progresivos y reglas que limiten el poder de las empresas.
+              Es la línea que va de Marx a la socialdemocracia de posguerra: para el primero el conflicto
+              está en quién posee los medios de producción; para la segunda basta con redistribuir
+              lo que el mercado reparte mal.
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+              Derecha económica
+            </div>
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
+              El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información
+              necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación.
+              Es el argumento de Hayek y Friedman, y su corolario es que ampliar el Estado reduce
+              la libertad individual aunque se haga con buena intención.
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+            <div className="em" style={{ fontSize: 10, color: C.tenue, letterSpacing: '.05em', fontWeight: 600 }}>
+              LO QUE MIRAMOS
+            </div>
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
+              Si cada medida sube o baja el <strong>gasto público</strong>, si sube o baja los
+              <strong> impuestos</strong>, y si añade o quita <strong>regulación</strong> a las empresas.
+              Nada más.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15 }}>
+          <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Qué es progresista y conservador</div>
+          <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>
+            Es un eje <strong>independiente</strong> del anterior. Se puede ser de izquierda económica
+            y socialmente conservador, o al revés. En España se confunden los dos ejes constantemente,
+            y por eso el mapa los separa.
+          </div>
+
+          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+              Conservador
+            </div>
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
+              Las instituciones y costumbres heredadas acumulan una sabiduría que nadie diseñó y que
+              conviene no desmontar a la ligera. Es la tesis de Burke: prudencia frente al cambio
+              rápido, y prioridad de la comunidad, la familia y la nación sobre la elección individual.
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+              Progresista
+            </div>
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
+              Cada persona debe poder decidir sobre su vida mientras no dañe a otros, y las costumbres
+              heredadas no bastan para justificar una restricción. Viene de Mill y del liberalismo de
+              los derechos: ampliar la autonomía personal y quitar límites que no protegen a nadie.
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+            <div className="em" style={{ fontSize: 10, color: C.tenue, letterSpacing: '.05em', fontWeight: 600 }}>
+              LO QUE MIRAMOS
+            </div>
+            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
+              Si cada medida amplía o restringe <strong>derechos individuales</strong>, y si facilita o
+              endurece la <strong>entrada y regularización de migrantes</strong>. Nada más.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ marginTop: 14, padding: 15, background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3 }}>
-        <div className="ed" style={{ fontSize: 15, fontWeight: 700 }}>Cómo se calcula esta posición</div>
+        <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Cómo se calcula esta posición</div>
         <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 8 }}>
           Nadie decide si un partido es de izquierdas o de derechas. Cada compromiso electoral y cada
           norma se etiqueta según <strong>seis preguntas de hecho</strong>: ¿sube o baja el gasto público?

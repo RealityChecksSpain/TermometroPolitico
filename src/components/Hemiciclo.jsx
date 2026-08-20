@@ -34,9 +34,12 @@ function calcularAsientos(total, filas) {
 
 export default function Hemiciclo({
   diputados, votos = null, resaltado = null,
-  onSeleccionar, seleccionado = null, filas = 11, compacto = false
+  onSeleccionar, seleccionado = null, filas = 11, compacto = false,
+  encimaExterno = null, onEncima = null
 }) {
-  const [encima, setEncima] = useState(null);
+  const [encimaLocal, setEncimaLocal] = useState(null);
+  const encima = encimaExterno ?? encimaLocal;
+  const setEncima = v => { setEncimaLocal(v); onEncima?.(v); };
   const svgRef = useRef(null);
 
   const asientos = useMemo(() => calcularAsientos(diputados.length, filas), [diputados.length, filas]);
@@ -71,48 +74,60 @@ export default function Hemiciclo({
           const color = d.color || '#8E9299';
           const op = visible ? (hover ? 1 : 0.94) : 0.1;
           const escala = hover ? 1.55 : sel ? 1.4 : 1;
-
-          const comun = {
-            onMouseEnter: () => !esTactil && setEncima(d.mandato_id),
-            onFocus: () => setEncima(d.mandato_id),
-            onClick: () => {
-              if (esTactil && encima !== d.mandato_id) { setEncima(d.mandato_id); return; }
-              onSeleccionar?.(d);
-            },
-            tabIndex: visible ? 0 : -1,
-            style: {
-              cursor: 'pointer',
-              transition: 'opacity 180ms ease, r 220ms cubic-bezier(.34,1.56,.64,1), stroke-width 220ms ease',
-              filter: hover ? 'url(#brillo)' : 'none',
-              outline: 'none'
-            },
-            onMouseLeave: () => setEncima(null),
-            'aria-label': `${d.nombre_completo}, ${d.partido_siglas || d.grupo || ''}${voto ? `, ${ETIQUETA[voto]}` : ''}`
+          const estilo = {
+            transition: 'opacity 180ms ease, r 220ms cubic-bezier(.34,1.56,.64,1), stroke-width 220ms ease',
+            filter: hover ? 'url(#brillo)' : 'none',
+            pointerEvents: 'none'
           };
 
-          const marca =
-            forma === 'anillo' ? (
-              <circle cx={a.cx} cy={a.cy} r={r * 0.9 * escala} fill="none" stroke={color}
-                strokeWidth={r * (hover ? 0.75 : 0.6)} opacity={op} />
-            ) : forma === 'punto' ? (
-              <>
-                <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={op * 0.2} />
-                <circle cx={a.cx} cy={a.cy} r={r * 0.36 * escala} fill={color} opacity={op} />
-              </>
-            ) : forma === 'tenue' ? (
-              <circle cx={a.cx} cy={a.cy} r={r * 0.55 * escala} fill={color} opacity={op * 0.32} />
-            ) : (
-              <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={op}
-                stroke={sel ? '#FFFFFF' : 'none'} strokeWidth={sel ? r * 0.4 : 0} />
+          if (forma === 'anillo') {
+            return <circle key={d.mandato_id} style={estilo} cx={a.cx} cy={a.cy}
+              r={r * 0.9 * escala} fill="none" stroke={color}
+              strokeWidth={r * (hover ? 0.75 : 0.6)} opacity={op} />;
+          }
+          if (forma === 'punto') {
+            return (
+              <g key={d.mandato_id} style={estilo} opacity={op}>
+                <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={0.2} />
+                <circle cx={a.cx} cy={a.cy} r={r * 0.36 * escala} fill={color} />
+              </g>
             );
-
-          return (
-            <g key={d.mandato_id} {...comun}>
-              {marca}
-              <circle cx={a.cx} cy={a.cy} r={r * 1.75} fill="transparent" pointerEvents="all" />
-            </g>
-          );
+          }
+          if (forma === 'tenue') {
+            return <circle key={d.mandato_id} style={estilo} cx={a.cx} cy={a.cy}
+              r={r * 0.55 * escala} fill={color} opacity={op * 0.32} />;
+          }
+          return <circle key={d.mandato_id} style={estilo} cx={a.cx} cy={a.cy}
+            r={r * escala} fill={color} opacity={op}
+            stroke={sel ? '#FFFFFF' : 'none'} strokeWidth={sel ? r * 0.4 : 0} />;
         })}
+
+        <g>
+          {diputados.map((d, i) => {
+            const a = asientos[i];
+            if (!a) return null;
+            const visible = !resaltado || resaltado(d);
+            const voto = mapaVotos?.get(d.mandato_id);
+            return (
+              <circle
+                key={'hit-' + d.mandato_id}
+                cx={a.cx} cy={a.cy} r={r * 1.12}
+                fill="transparent" pointerEvents={visible ? 'all' : 'none'}
+                tabIndex={visible ? 0 : -1}
+                role="button"
+                aria-label={`${d.nombre_completo}, ${d.partido_siglas || d.grupo || ''}${voto ? `, ${ETIQUETA[voto]}` : ''}`}
+                onMouseEnter={() => !esTactil && setEncima(d.mandato_id)}
+                onFocus={() => setEncima(d.mandato_id)}
+                onClick={() => {
+                  if (esTactil && encima !== d.mandato_id) { setEncima(d.mandato_id); return; }
+                  onSeleccionar?.(d);
+                }}
+                style={{ cursor: 'pointer', outline: 'none' }}
+              />
+            );
+          })}
+        </g>
+
       </svg>
 
       <div style={{

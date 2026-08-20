@@ -53,6 +53,20 @@ color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,co
 .hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
 .hero .chip:hover{color:#FFFFFF;border-color:#8E959C}
 .hero .chip[data-on="1"]{background:#F2F3F0;color:#14161A;border-color:#F2F3F0}
+.trabajo{display:grid;grid-template-columns:1fr;gap:18px;align-items:start}
+@media(min-width:980px){.trabajo{grid-template-columns:minmax(360px,44%) 1fr;gap:22px}
+.trabajo>.izq{position:sticky;top:14px}
+.trabajo>.der{max-height:calc(100vh - 28px);overflow-y:auto;padding-right:4px}
+.trabajo>.der::-webkit-scrollbar{width:6px}
+.trabajo>.der::-webkit-scrollbar-thumb{background:#C9C9BE;border-radius:6px}}
+.contents{display:contents}
+.ejesGuia{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:820px){.ejesGuia{grid-template-columns:1fr 1fr}}
+.split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+@media(min-width:960px){.split{grid-template-columns:minmax(360px,1.05fr) minmax(340px,1fr);gap:22px;align-items:start}
+.split>.izq{position:sticky;top:14px}}
+.portada{display:grid;grid-template-columns:1fr;gap:20px;padding-top:6px}
+@media(min-width:900px){.portada{grid-template-columns:1.35fr 1fr;gap:32px;align-items:start}}
 .heroCols{display:grid;grid-template-columns:1fr;gap:14px}
 @media(min-width:760px){.heroCols.conPanel{grid-template-columns:172px 1fr;gap:20px;align-items:start}}
 .panelGrupos{max-height:330px;overflow-y:auto;padding-right:4px}
@@ -135,6 +149,8 @@ export default function App() {
   const [buscaFaceta, setBuscaFaceta] = useState('');
   const [orden, setOrden] = useState('nombre');
   const [lideres, setLideres] = useState([]);
+  const [encimaDip, setEncimaDip] = useState(null);
+  const [encimaEscano, setEncimaEscano] = useState(null);
   const [cargandoLista, setCargandoLista] = useState(false);
 
   useEffect(() => {
@@ -266,8 +282,10 @@ export default function App() {
           ))}
         </nav>
 
-        {mostrarHemiciclo && (
-          <div className="hero">
+        <div className={mostrarHemiciclo ? 'split' : 'cols'}>
+          {mostrarHemiciclo && (
+            <div className="izq">
+              <div className="hero">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div className="em" style={{ fontSize: 10.5, color: '#A0A6AC', textTransform: 'uppercase', letterSpacing: '.07em' }}>
                 {enHemiciclo.length} escaños{fCcaa ? ` · ${ccaa.find(c => c.slug === fCcaa)?.nombre}` : ''}
@@ -313,6 +331,8 @@ export default function App() {
                   resaltado={fPartido ? d => (d.partido_siglas || d.grupo) === fPartido : null}
                   seleccionado={sel?.mandato_id}
                   onSeleccionar={setSel}
+                  encimaExterno={encimaEscano}
+                  onEncima={setEncimaEscano}
                 />
                 {votacionSel && (
                   <div style={{ marginTop: 10, color: '#DDE1E5', fontSize: 13, lineHeight: 1.45 }}>
@@ -341,10 +361,11 @@ export default function App() {
                 ))}
               </div>
             )}
-          </div>
-        )}
+              </div>
+            </div>
+          )}
 
-        <div className="cols">
+          <div className={mostrarHemiciclo ? 'der' : 'contents'} style={mostrarHemiciclo ? { minWidth: 0 } : undefined}>
           {seccion === 'leyes' && !votacionSel && (
             <>
               <div>
@@ -513,15 +534,33 @@ export default function App() {
                 </div>
               )}
 
-              <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 8 }}>{listaDip.length} diputados</div>
+              <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 8 }}>
+                {listaDip.length} diputados
+                {encimaDip && (() => {
+                  const d = listaDip.find(x => x.mandato_id === encimaDip);
+                  return d ? <span style={{ color: C.media }}> · {d.nombre_completo}</span> : null;
+                })()}
+              </div>
               <div className="tarjeta">
                 {listaDip.slice(0, 200).map((d, i) => (
-                  <button key={d.mandato_id} className="fila" onClick={() => setSel(d)} style={{
-                    display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
-                    padding: '10px 13px', cursor: 'pointer', background: 'transparent',
-                    border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
-                  }}>
-                    <span style={{ width: 3, height: 30, background: d.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
+                  <button key={d.mandato_id} className="fila" onClick={() => setSel(d)}
+                    onMouseEnter={() => setEncimaEscano(d.mandato_id)}
+                    onMouseLeave={() => setEncimaEscano(null)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
+                      padding: '10px 13px', cursor: 'pointer',
+                      background: encimaEscano === d.mandato_id ? '#F3F3EE' : 'transparent',
+                      border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none',
+                      boxShadow: encimaEscano === d.mandato_id ? `inset 3px 0 0 ${d.color || '#8E9299'}` : 'none'
+                    }}>
+                    {d.foto_url ? (
+                      <img src={d.foto_url} alt="" width={34} height={42} loading="lazy"
+                        onError={e => { e.currentTarget.style.visibility = 'hidden'; }}
+                        style={{ width: 34, height: 42, objectFit: 'cover', borderRadius: 2,
+                          flexShrink: 0, borderLeft: `3px solid ${d.color || '#8E9299'}`, background: '#E4E4DC' }} />
+                    ) : (
+                      <span style={{ width: 3, height: 34, background: d.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
+                    )}
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: 13 }}>{d.nombre_completo}</span>
                       <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue }}>
@@ -563,6 +602,7 @@ export default function App() {
           {seccion === 'inicio' && (
             <div className="solo1">
               <Inicio cobertura={cobertura} colectivos={facetas.colectivos} facetas={facetas}
+                onIr={setSeccion}
                 onVotacion={async n => {
                   const id = n?.votacion_principal ?? n?.id ?? n;
                   const v = (await traerVotaciones(1, { id }))[0];
@@ -579,6 +619,7 @@ export default function App() {
           {seccion === 'ejes' && <div className="solo1"><Mapa /></div>}
           {seccion === 'metodo' && <div className="solo1"><Metodologia cobertura={cobertura} /></div>}
           {seccion === 'datos' && <div className="solo1"><Descargas /></div>}
+          </div>
         </div>
 
         <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 10, color: C.tenue, lineHeight: 1.6 }}>

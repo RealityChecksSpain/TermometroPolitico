@@ -225,3 +225,17 @@ export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
   if (error) throw error;
   return data ?? [];
 }
+
+export async function traerPromesaVsVoto() {
+  const { data, error } = await supabase.from('v_promesa_vs_voto').select('*').order('brecha_gasto');
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function traerUltimas(limite = 6) {
+  const { data, error } = await supabase
+    .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no')
+    .order('fecha', { ascending: false }).limit(limite);
+  if (error) return [];
+  return data ?? [];
+}

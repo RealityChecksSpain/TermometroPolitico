@@ -59,13 +59,35 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
       }}>
         <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.linea}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
-              <span style={{ width: 4, background: d.color || '#8E9299', borderRadius: 4, flexShrink: 0 }} />
+            <div style={{ display: 'flex', gap: 12, minWidth: 0 }}>
+              {d.foto_url ? (
+                <img src={d.foto_url} alt="" width={58} height={74} loading="lazy"
+                  onError={e => { e.currentTarget.style.display = 'none'; }}
+                  style={{
+                    width: 58, height: 74, objectFit: 'cover', borderRadius: 2, flexShrink: 0,
+                    borderLeft: `4px solid ${d.color || '#8E9299'}`, background: '#E4E4DC'
+                  }} />
+              ) : (
+                <span style={{ width: 4, background: d.color || '#8E9299', borderRadius: 4, flexShrink: 0 }} />
+              )}
               <div>
-                <div className="ed" style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>{d.nombre_completo}</div>
+                <div className="ed" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{d.nombre_completo}</div>
                 <div className="em" style={{ fontSize: 11, color: C.tenue, marginTop: 3 }}>
                   {d.partido_siglas || d.grupo} · {d.circunscripcion ?? '—'}
                   {!d.activo && ` · baja ${d.fecha_baja ?? ''}`}
+                </div>
+                {d.cargo && (
+                  <div style={{ fontSize: 12, color: C.media, marginTop: 4, fontWeight: 500 }}>{d.cargo}</div>
+                )}
+                <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                  {d.url_ficha && (
+                    <a href={d.url_ficha} target="_blank" rel="noreferrer" className="em"
+                      style={{ fontSize: 10.5, color: C.media }}>ficha oficial →</a>
+                  )}
+                  {d.url_bienes && (
+                    <a href={d.url_bienes} target="_blank" rel="noreferrer" className="em"
+                      style={{ fontSize: 10.5, color: C.media }}>declaración de bienes →</a>
+                  )}
                 </div>
               </div>
             </div>
