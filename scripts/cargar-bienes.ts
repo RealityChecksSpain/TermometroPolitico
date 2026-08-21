@@ -68,9 +68,15 @@ async function pendientes() {
   // No fiarnos de pendientes_bienes.hecho: puede marcar "hecho" sin patrimonio.
   const { data: mandatos, error } = await db()
     .from('mandatos')
-    .select('id, nombre_completo, url_bienes')
+    .select('id, url_bienes, politicos(nombre_completo)')
     .not('url_bienes', 'is', null);
   if (error) throw error;
+
+  const lista = (mandatos ?? []).map((m: any) => ({
+    id: m.id,
+    url_bienes: m.url_bienes,
+    nombre_completo: m.politicos?.nombre_completo ?? String(m.id)
+  }));
 
   const { count: nUrls } = await db()
     .from('mandatos')
@@ -99,7 +105,7 @@ async function pendientes() {
     return false;
   };
 
-  return (mandatos ?? []).filter(m => {
+  return lista.filter(m => {
     const h = mapa.get(m.id);
     if (!tieneDatoUtil(h)) return true;
     if (SOLO_OUTLIERS) {
@@ -110,10 +116,8 @@ async function pendientes() {
       if (h.confianza === 'baja' && !h.verificado) return true;
       return false;
     }
-    // Reanudar: saltar verificados o confianza alta ya con patrimonio
     if (h.verificado && h.patrimonio_euros != null) return false;
     if (h.confianza === 'alta' && h.patrimonio_euros != null) return false;
-    // Si hay fila pero sin patrimonio calculable, reintentar
     if (h.patrimonio_euros == null && (h.depositos != null || h.valores != null)) return false;
     return h.patrimonio_euros == null;
   }).map(m => ({ ...m, previo: mapa.get(m.id) }));

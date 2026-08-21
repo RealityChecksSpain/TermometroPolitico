@@ -11,6 +11,20 @@ const C = {
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3'
 };
 
+/** Estira un eje al intervalo ~[-0.95, 0.95] si el rango real está amontonado en el centro. */
+function estirarEje(lista, campo) {
+  const vals = lista.map(p => Number(p[campo])).filter(v => Number.isFinite(v));
+  if (vals.length < 2) return lista;
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min;
+  const absMax = Math.max(Math.abs(min), Math.abs(max), 1e-9);
+  if (absMax >= 0.35 && span >= 0.5) return lista;
+  if (span < 1e-9) return lista;
+  const factor = 0.95 / Math.max(absMax, span / 2);
+  return lista.map(p => ({ ...p, [campo]: Number(p[campo]) * factor }));
+}
+
 function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
   return (
     <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15, height: '100%' }}>
@@ -69,7 +83,7 @@ export default function Mapa({ onDiputados }) {
         n: fuente === 'programa' ? d.promesas_codificadas : d.leyes_valoradas
       }))
       .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
-      .map(d => ({ ...d, cx: Number(d.x), cy: -Number(d.y) }));
+      .map(d => ({ ...d, x: Number(d.x), y: Number(d.y) }));
 
     // Si el eje de votos deja al PP a la izquierda del PSOE pero el de programa
     // no, el signo del eje de votos está invertido respecto al criterio declarado.
@@ -83,11 +97,9 @@ export default function Mapa({ onDiputados }) {
         && ppP.prog_economico != null && psoeP.prog_economico != null
         && Number(ppP.prog_economico) > Number(psoeP.prog_economico);
       if (votosEcoInvertidos && programaEcoOk) {
-        list = list.map(p => ({ ...p, x: -Number(p.x), cx: -Number(p.x) }));
+        list = list.map(p => ({ ...p, x: -Number(p.x) }));
       }
 
-      // Misma salvaguarda en el eje social: PP debería quedar más conservador que PSOE
-      // si el programa ya lo dice así.
       const ppVs = list.find(p => p.siglas === 'PP');
       const psoeVs = list.find(p => p.siglas === 'PSOE');
       const votosSocInvertidos = ppVs && psoeVs && Number(ppVs.y) < Number(psoeVs.y);
@@ -95,10 +107,17 @@ export default function Mapa({ onDiputados }) {
         && ppP.prog_social != null && psoeP.prog_social != null
         && Number(ppP.prog_social) > Number(psoeP.prog_social);
       if (votosSocInvertidos && programaSocOk) {
-        list = list.map(p => ({ ...p, y: -Number(p.y), cy: Number(p.y) }));
+        list = list.map(p => ({ ...p, y: -Number(p.y) }));
       }
+
+      // Los ejes por votos salen muy comprimidos (todos cerca de 0) porque casi
+      // todos apoyan las mismas normas. Estiramos el rango para que se lea el mapa
+      // sin inventar el orden relativo.
+      list = estirarEje(list, 'x');
+      list = estirarEje(list, 'y');
     }
-    return list;
+
+    return list.map(d => ({ ...d, cx: d.x, cy: -d.y }));
   }, [datos, fuente]);
 
   const r = escanos => 0.035 + Math.sqrt(Number(escanos ?? 1)) * 0.011;
@@ -164,9 +183,11 @@ export default function Mapa({ onDiputados }) {
 
       {puntos.length === 0 ? (
         <div style={{ padding: 24, background: '#FFF8E6', border: '1px solid #E8D9A8', borderRadius: 3, fontSize: 13, color: '#6B5518', lineHeight: 1.6 }}>
-          {fuente === 'programa'
-            ? 'Todavía no hay suficientes compromisos codificados. Ejecuta npm run codificar.'
-            : 'Todavía no hay suficientes leyes codificadas. Ejecuta npm run codificar:leyes.'}
+          {datos.length > 0
+            ? `Hay ${datos.length} partidos en la base, pero ninguno tiene aún los dos ejes (${fuente === 'programa' ? 'programa' : 'votos'}) completos.`
+            : (fuente === 'programa'
+              ? 'Todavía no hay suficientes compromisos codificados. Ejecuta npm run codificar y luego el SQL sql/create_v_mapa_partidos.sql.'
+              : 'Todavía no hay suficientes leyes codificadas. Ejecuta npm run codificar:leyes y el SQL sql/create_v_mapa_partidos.sql.')}
         </div>
       ) : (
         <div style={{
@@ -215,6 +236,11 @@ export default function Mapa({ onDiputados }) {
               role="img"
               aria-label="Mapa de partidos en dos ejes">
               <rect x="-1.45" y="-1.5" width="2.9" height="3.05" fill="transparent" />
+              {/* Tintes suaves por cuadrante para leer los ejes */}
+              <rect x="-1.24" y="-1.24" width="1.24" height="1.24" fill="#F2A7A018" />
+              <rect x="0" y="-1.24" width="1.24" height="1.24" fill="#8EB8F018" />
+              <rect x="-1.24" y="0" width="1.24" height="1.24" fill="#6ECFBC14" />
+              <rect x="0" y="0" width="1.24" height="1.24" fill="#E8C56A14" />
               <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
               <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
@@ -289,8 +315,8 @@ export default function Mapa({ onDiputados }) {
             Cada círculo es un partido y su tamaño es el número de escaños.
             {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
             {fuente === 'votos' && (
-              <span> La posición por votos cuenta solo los <em>sí</em> a normas ya codificadas:
-                es una aproximación y puede diferir del sentido político habitual.
+              <span> La posición por votos cuenta solo los <em>sí</em> a normas ya codificadas
+                y se reescala para leerse (en bruto casi todos quedan cerca del centro).
                 El mapa de <em>programa</em> es la referencia más estable.</span>
             )}
           </div>

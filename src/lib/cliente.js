@@ -257,8 +257,73 @@ export async function traerLideres(metrica) {
 
 export async function traerMapaPartidos() {
   const { data, error } = await supabase.from('v_mapa_partidos').select('*');
-  if (error) return [];
-  return data ?? [];
+  if (!error && data?.length) return data.map(normalizarFilaMapa);
+
+  // Fallback: la vista puede no existir (PGRST205) aunque mv_eje_* sí tengan datos.
+  const [{ data: prog }, { data: votos }, { data: dips }] = await Promise.all([
+    supabase.from('mv_eje_programa').select('*'),
+    supabase.from('mv_eje_votos').select('*'),
+    supabase.from('mv_diputados').select('partido_siglas, partido, activo')
+  ]);
+
+  const escanos = new Map();
+  for (const d of dips ?? []) {
+    if (d.activo === false) continue;
+    const k = d.partido_siglas || d.partido;
+    if (!k) continue;
+    escanos.set(k, (escanos.get(k) ?? 0) + 1);
+  }
+
+  const porSlug = new Map();
+  for (const p of prog ?? []) {
+    porSlug.set(p.partido, {
+      partido: p.partido,
+      siglas: p.siglas,
+      color: p.color,
+      prog_economico: p.eje_economico,
+      prog_social: p.eje_social,
+      prog_bruto_economico: p.bruto_economico,
+      promesas_codificadas: p.promesas,
+      voto_economico: null,
+      voto_social: null,
+      leyes_valoradas: null,
+      escanos: escanos.get(p.siglas) ?? escanos.get(p.partido) ?? 0
+    });
+  }
+  for (const v of votos ?? []) {
+    const base = porSlug.get(v.partido) ?? {
+      partido: v.partido,
+      siglas: v.siglas,
+      color: v.color,
+      prog_economico: null,
+      prog_social: null,
+      promesas_codificadas: null,
+      escanos: escanos.get(v.siglas) ?? 0
+    };
+    porSlug.set(v.partido, {
+      ...base,
+      color: base.color || v.color,
+      voto_economico: v.eje_economico,
+      voto_social: v.eje_social,
+      leyes_valoradas: v.leyes_valoradas ?? v.leyes_apoyadas
+    });
+  }
+
+  return Array.from(porSlug.values()).map(normalizarFilaMapa);
+}
+
+function normalizarFilaMapa(d) {
+  return {
+    ...d,
+    prog_economico: d.prog_economico ?? d.eje_economico ?? null,
+    prog_social: d.prog_social ?? d.eje_social ?? null,
+    voto_economico: d.voto_economico ?? null,
+    voto_social: d.voto_social ?? null,
+    promesas_codificadas: d.promesas_codificadas ?? d.promesas ?? null,
+    leyes_valoradas: d.leyes_valoradas ?? d.leyes_apoyadas ?? null,
+    escanos: d.escanos ?? d.diputados ?? 1,
+    color: d.color || d.color_hex || '#8E9299'
+  };
 }
 
 export async function traerRelacionadas(norma, limite = 4) {

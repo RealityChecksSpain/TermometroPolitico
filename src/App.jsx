@@ -46,12 +46,16 @@ border-top:2px solid transparent}
 border-top:none;border-bottom:2px solid transparent;margin-bottom:-2px}}
 .navb[data-on="1"]{color:${C.tinta};font-weight:600;border-top-color:${C.tinta}}
 @media(min-width:900px){.navb[data-on="1"]{border-top-color:transparent;border-bottom-color:${C.tinta}}}
+.tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;
+box-shadow:0 1px 0 rgba(20,22,26,0.03)}
+.fila{transition:background 140ms ease, transform 140ms ease}
 .fila:hover{background:#F3F3EE}
-.chip{padding:4px 9px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
+.chip{padding:5px 11px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
 display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:transparent;
-color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,color 120ms ease}
-.chip:hover{border-color:${C.tinta}}
+color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,color 140ms ease,border-color 140ms ease,transform 140ms ease}
+.chip:hover{border-color:${C.tinta};transform:translateY(-1px)}
 .chip[data-on="1"]{background:${C.tinta};color:${C.papel};border-color:${C.tinta}}
+.navb{transition:color 140ms ease,border-color 140ms ease}
 .hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
 .hero .chip:hover{color:#FFFFFF;border-color:#8E959C}
 .hero .chip[data-on="1"]{background:#F2F3F0;color:#14161A;border-color:#F2F3F0}
@@ -530,8 +534,11 @@ export default function App() {
             <div className="solo1">
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Nombre o circunscripción"
-                style={{ width: '100%', padding: '10px 12px', fontSize: 14, marginBottom: 10,
-                  border: `1px solid ${C.linea}`, borderRadius: 2, background: C.superficie }} />
+                style={{
+                  width: '100%', padding: '12px 14px', fontSize: 14.5, marginBottom: 12,
+                  border: `1px solid ${C.linea}`, borderRadius: 3, background: C.superficie,
+                  boxShadow: 'inset 0 1px 0 rgba(20,22,26,0.02)', outline: 'none'
+                }} />
 
               <div className="rot">Ordenar por</div>
               <div className="chips" style={{ marginBottom: 12 }}>
@@ -552,10 +559,12 @@ export default function App() {
               {orden === 'patrimonio' && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Patrimonio estimado (depósitos + valores + planes − deuda) e inmuebles contados
-                  desde el PDF oficial. Ejecuta <code>npm run bienes:auto</code> para digitalizar
-                  en lote (puede tardar días). Los outliers se reintentan con Gemini. Si ves «—»,
-                  aún falta esa declaración.
+                  Patrimonio estimado (depósitos + valores + planes − deuda) e inmuebles del PDF oficial.
+                  Tras <code>npm run fichas</code> hay que digitalizar con{' '}
+                  <code>npm run bienes:auto</code> (prueba: <code>-- --limite=5</code>).
+                  {' '}Ahora mismo: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con patrimonio
+                  · {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con inmuebles.
+                  Si ves «—», esa declaración aún no se ha leído.
                 </div>
               )}
 
