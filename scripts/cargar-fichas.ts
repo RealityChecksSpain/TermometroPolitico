@@ -1,26 +1,32 @@
 import { db, exigirEnv } from '../src/lib/supabase';
-import { normalizarNombre } from '../src/lib/texto';
 import { UA, BASE_CONGRESO } from '../src/lib/descubrir';
 
 exigirEnv('LEGISLATURA_ACTIVA_ID');
 const legislaturaId = process.env.LEGISLATURA_ACTIVA_ID!;
-const LEG = process.env.LEG_INT ?? '15';
 const DESDE = Number(process.argv[2] ?? 1);
 const HASTA = Number(process.argv[3] ?? 450);
 const PAUSA = 550;
+const LEG_FOTO = process.env.LEG_FOTO ?? '15';
 
-function urlFicha(cod: number) {
-  return `${BASE_CONGRESO}/es/busqueda-de-diputados?p_p_id=diputadomodule&p_p_lifecycle=2` +
-    `&p_p_state=normal&p_p_mode=view&p_p_resource_id=agendaDiputados` +
-    `&p_p_cacheability=cacheLevelPage&_diputadomodule_mostrarAgenda=false` +
-    `&_diputadomodule_idLegislatura=XV&_diputadomodule_mostrarFicha=true` +
-    `&_diputadomodule_codParlamentario=${cod}`;
-}
-
+/**
+ * Página HTML de la ficha (lifecycle=0). NUNCA usar agendaDiputados:
+ * ese resource_id devuelve JSON de agenda, no la ficha.
+ */
 function urlPublica(cod: number) {
   return `${BASE_CONGRESO}/es/busqueda-de-diputados?p_p_id=diputadomodule&p_p_lifecycle=0` +
     `&p_p_state=normal&p_p_mode=view&_diputadomodule_mostrarFicha=true` +
-    `&codParlamentario=${cod}&idLegislatura=XV&mostrarAgenda=false`;
+    `&_diputadomodule_codParlamentario=${cod}` +
+    `&codParlamentario=${cod}&idLegislatura=XV&_diputadomodule_idLegislatura=XV&mostrarAgenda=false`;
+}
+
+function urlFotoCandidata(cod: number, leg = LEG_FOTO) {
+  const id = String(cod).padStart(5, '0');
+  return [
+    `${BASE_CONGRESO}/docu/imgweb/diputados/${cod}_${leg}.jpg`,
+    `${BASE_CONGRESO}/docu/imgweb/diputados/${id}_${leg}.jpg`,
+    `${BASE_CONGRESO}/docu/imgweb/diputados/${cod}.jpg`,
+    `${BASE_CONGRESO}/docu/imgweb/diputados/${id}.jpg`
+  ];
 }
 
 function limpiar(t: string) {
@@ -31,10 +37,16 @@ function limpiar(t: string) {
     .replace(/&Ntilde;/g, 'Ñ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 }
 
+function esJsonAgenda(t: string) {
+  const s = t.trim();
+  return s.startsWith('{') && /fechaSeleccionada|agendasDiputado|diasConAgenda/.test(s);
+}
+
 function extraer(html: string, cod: number) {
   const t = limpiar(html);
 
-  const foto = t.match(/\/docu\/imgweb\/diputados\/(\d+)_(\d+)\.(jpg|jpeg|png)/i);
+  const foto = t.match(/\/docu\/imgweb\/diputados\/(\d+)_(\d+)\.(jpg|jpeg|png)/i)
+    ?? t.match(/\/docu\/imgweb\/diputados\/(\d+)\.(jpg|jpeg|png)/i);
   const tituloPagina = t.match(/<title[^>]*>\s*([^<]{4,120})\s*<\/title>/i)?.[1] ?? '';
   const bienes = Array.from(new Set(t.match(/\/docbienes\/leg\d+\/\d+\/[^"'\s<>]+\.pdf/gi) ?? []));
   const acteco = Array.from(new Set(t.match(/\/docu\/[a-z0-9/_.-]*acteco[^"'\s<>]*\.pdf/gi) ?? []));
@@ -64,7 +76,6 @@ function extraer(html: string, cod: number) {
   return {
     nombre,
     foto: foto ? BASE_CONGRESO + foto[0] : null,
-    codFoto: foto ? Number(foto[1]) : null,
     bienes: bienes.length ? BASE_CONGRESO + bienes[bienes.length - 1] : null,
     actividades: acteco.length ? BASE_CONGRESO + acteco[acteco.length - 1] : null,
     email: email ? email[1] : null,
@@ -87,12 +98,34 @@ async function abrirSesion() {
   return cookies;
 }
 
+async function fotoExiste(url: string) {
+  try {
+    const r = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': UA, Cookie: cookies, Referer: `${BASE_CONGRESO}/es/busqueda-de-diputados` }
+    });
+    const tipo = r.headers.get('content-type') ?? '';
+    return r.ok && /image/i.test(tipo);
+  } catch {
+    return false;
+  }
+}
+
+async function resolverFoto(cod: number, fotoHtml: string | null) {
+  if (fotoHtml) return fotoHtml;
+  for (const u of urlFotoCandidata(cod)) {
+    if (await fotoExiste(u)) return u;
+  }
+  return null;
+}
+
 console.log('\nAbriendo sesion...');
 await abrirSesion();
 console.log(`  cookies: ${cookies ? cookies.slice(0, 70) + '…' : 'NINGUNA'}`);
 
 async function pedirFicha(cod: number, reintentado = false): Promise<string> {
-  const r = await fetch(urlPublica(cod), {
+  const url = urlPublica(cod);
+  const r = await fetch(url, {
     headers: {
       'User-Agent': UA,
       Accept: 'text/html,application/xhtml+xml',
@@ -103,6 +136,13 @@ async function pedirFicha(cod: number, reintentado = false): Promise<string> {
   });
 
   const t = await r.text();
+
+  if (esJsonAgenda(t)) {
+    throw new Error(
+      `El servidor devolvió JSON de agenda (resource_id incorrecto). URL: ${url.slice(0, 120)}…`
+    );
+  }
+
   if ((!r.ok || t.length < 2000) && !reintentado) {
     await abrirSesion();
     return pedirFicha(cod, true);
@@ -110,16 +150,18 @@ async function pedirFicha(cod: number, reintentado = false): Promise<string> {
   return t;
 }
 
-console.log(`\nRecorriendo fichas del ${DESDE} al ${HASTA}\n`);
+console.log(`\nRecorriendo fichas del ${DESDE} al ${HASTA}`);
+console.log('(HTML lifecycle=0 + sondeo de /docu/imgweb/diputados/)\n');
 
-let conNombre = 0, vacias = 0, asignadas = 0, sinCruce = 0;
+let conNombre = 0, vacias = 0, asignadas = 0, sinCruce = 0, conFotoOk = 0;
 const noCruzan: string[] = [];
 
 for (let cod = DESDE; cod <= HASTA; cod++) {
   let html = '';
   try {
     html = await pedirFicha(cod);
-  } catch {
+  } catch (e: any) {
+    if (cod === DESDE) console.log('  ERROR muestra:', String(e.message ?? e).slice(0, 200));
     vacias++;
     await new Promise(res => setTimeout(res, PAUSA));
     continue;
@@ -128,7 +170,8 @@ for (let cod = DESDE; cod <= HASTA; cod++) {
   if (cod === DESDE) {
     const t = limpiar(html);
     console.log(`  respuesta de muestra: ${html.length} caracteres`);
-    console.log(`  foto encontrada: ${/imgweb\/diputados/i.test(t) ? 'SI' : 'NO'}`);
+    console.log(`  parece HTML: ${/<html|/i.test(html) ? 'SI' : 'NO'}`);
+    console.log(`  foto en HTML: ${/imgweb\/diputados/i.test(t) ? 'SI' : 'NO'}`);
     console.log(`  docbienes: ${(t.match(/docbienes/gi) ?? []).length}`);
     const nom = t.match(/<h2[^>]*>\s*([^<]{6,80})\s*<\/h2>/i)?.[1]
       ?? t.match(/<h3[^>]*>\s*([^<]{6,80})\s*<\/h3>/i)?.[1];
@@ -136,11 +179,23 @@ for (let cod = DESDE; cod <= HASTA; cod++) {
     console.log('');
   }
 
-  if (!/imgweb\/diputados/i.test(html)) { vacias++; await new Promise(res => setTimeout(res, PAUSA)); continue; }
-
   const d = extraer(html, cod);
-  if (!d.nombre) { vacias++; await new Promise(res => setTimeout(res, PAUSA)); continue; }
+  const foto = await resolverFoto(cod, d.foto);
+
+  // Sin nombre en HTML y sin foto: probablemente código vacío / otra legislatura
+  if (!d.nombre && !foto) {
+    vacias++;
+    await new Promise(res => setTimeout(res, PAUSA));
+    continue;
+  }
+
+  if (!d.nombre) {
+    vacias++;
+    await new Promise(res => setTimeout(res, PAUSA));
+    continue;
+  }
   conNombre++;
+  if (foto) conFotoOk++;
 
   const { data: cand } = await db().rpc('resolver_nombre', {
     p_nombre: d.nombre, p_legislatura_id: legislaturaId,
@@ -157,7 +212,7 @@ for (let cod = DESDE; cod <= HASTA; cod++) {
 
   const { error } = await db().from('mandatos').update({
     cod_parlamentario: cod,
-    foto_url: d.foto,
+    foto_url: foto,
     url_ficha: d.ficha,
     url_bienes: d.bienes,
     url_actividades: d.actividades,
@@ -175,6 +230,7 @@ for (let cod = DESDE; cod <= HASTA; cod++) {
 
 console.log('\nRESULTADO');
 console.log(`  fichas con nombre:  ${conNombre}`);
+console.log(`  con foto resuelta:  ${conFotoOk}`);
 console.log(`  vacias o sin datos: ${vacias}`);
 console.log(`  asignadas:          ${asignadas}`);
 console.log(`  sin cruzar:         ${sinCruce}`);
@@ -191,10 +247,12 @@ const { count: conBienes } = await db().from('mandatos')
   .select('id', { count: 'exact', head: true })
   .eq('legislatura_id', legislaturaId).not('url_bienes', 'is', null);
 
-console.log(`\n  con foto:   ${conFoto ?? 0}`);
-console.log(`  con bienes: ${conBienes ?? 0}`);
+console.log(`\n  con foto en BD:   ${conFoto ?? 0}`);
+console.log(`  con bienes en BD: ${conBienes ?? 0}`);
 
 await db().rpc('refrescar_metricas');
 console.log('\n  Metricas refrescadas.\n');
+console.log('Si asignadas=0: revisa la muestra de HTML. Si sigue siendo JSON, el Congreso');
+console.log('cambió de nuevo la URL — pega un cURL de la ficha (lifecycle=0), no de agenda.\n');
 
 export {};

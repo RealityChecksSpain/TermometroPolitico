@@ -1,19 +1,51 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { traerMapaPartidos, traerSesgo } from '../lib/cliente.js';
+import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
 const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
-import { traerMapaPartidos, traerSesgo } from '../lib/cliente.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3'
 };
 
+function GuiaEje({ titulo, intro, a, b, miramos }) {
+  return (
+    <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15, height: '100%' }}>
+      <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>{titulo}</div>
+      <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>{intro}</div>
+
+      <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+        <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+          {a.titulo}
+        </div>
+        <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>{a.texto}</div>
+      </div>
+
+      <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+        <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+          {b.titulo}
+        </div>
+        <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>{b.texto}</div>
+      </div>
+
+      <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
+        <div className="em" style={{ fontSize: 10, color: C.tenue, letterSpacing: '.05em', fontWeight: 600 }}>
+          LO QUE MIRAMOS
+        </div>
+        <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>{miramos}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Mapa({ onDiputados }) {
   const [datos, setDatos] = useState(null);
   const [fuente, setFuente] = useState('programa');
   const [encima, setEncima] = useState(null);
   const [sesgo, setSesgo] = useState(null);
+  const svgRef = useRef(null);
 
   useEffect(() => {
     traerMapaPartidos().then(setDatos).catch(() => setDatos([]));
@@ -27,33 +59,59 @@ export default function Mapa({ onDiputados }) {
         ...d,
         x: fuente === 'programa' ? d.prog_economico : d.voto_economico,
         y: fuente === 'programa' ? d.prog_social : d.voto_social,
-        n: fuente === 'programa' ? d.promesas_codificadas : d.leyes_valoradas
+        n: fuente === 'programa' ? d.promesas_codificadas : d.leyes_valoradas,
+        cx: null,
+        cy: null
       }))
-      .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined);
+      .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
+      .map(d => ({ ...d, cx: Number(d.x), cy: -Number(d.y) }));
   }, [datos, fuente]);
 
-  if (datos === null) return <div style={{ padding: 40, textAlign: 'center', color: C.tenue, fontSize: 13 }}>Cargando…</div>;
-
-  const activo = encima ? puntos.find(p => p.partido === encima) : null;
   const r = escanos => 0.035 + Math.sqrt(Number(escanos ?? 1)) * 0.011;
 
-  const conEtiqueta = (() => {
-    const orden = [...puntos].sort((a, b) => Number(a.x) - Number(b.x) || Number(b.y) - Number(a.y));
+  const conEtiqueta = useMemo(() => {
+    const orden = [...puntos].sort((a, b) => a.cx - b.cx || b.cy - a.cy);
     const puestas = [];
     return orden.map(p => {
-      const px = Number(p.x);
-      const base = -Number(p.y) + r(p.escanos) + 0.095;
+      const radio = r(p.escanos);
+      const base = p.cy + radio + 0.095;
       let ly = base;
       let intentos = 0;
-      while (puestas.some(q => Math.abs(q.x - px) < 0.30 && Math.abs(q.y - ly) < 0.085) && intentos < 8) {
+      while (puestas.some(q => Math.abs(q.x - p.cx) < 0.30 && Math.abs(q.y - ly) < 0.085) && intentos < 8) {
         ly += 0.088;
         intentos++;
       }
-      puestas.push({ x: px, y: ly });
-      return { ...p, labelY: ly };
+      puestas.push({ x: p.cx, y: ly });
+      return { ...p, labelY: ly, radio };
     });
-  })();
+  }, [puntos]);
 
+  const resolver = useCallback((clientX, clientY) => {
+    const p = puntoSvg(svgRef.current, clientX, clientY);
+    if (!p) return null;
+    const coords = conEtiqueta.map(q => ({ cx: q.cx, cy: q.cy }));
+    const maxR = Math.max(0.12, ...conEtiqueta.map(q => q.radio * 2.4));
+    const idx = indiceMasCercano(coords, p.x, p.y, maxR);
+    if (idx < 0) return null;
+    return conEtiqueta[idx];
+  }, [conEtiqueta]);
+
+  const onPointerMove = useCallback(e => {
+    const hit = resolver(e.clientX, e.clientY);
+    setEncima(hit ? hit.partido : null);
+  }, [resolver]);
+
+  const onPointerLeave = useCallback(() => setEncima(null), []);
+
+  const onPointerUp = useCallback(e => {
+    const hit = resolver(e.clientX, e.clientY);
+    if (!hit) return;
+    setEncima(prev => (prev === hit.partido ? null : hit.partido));
+  }, [resolver]);
+
+  if (datos === null) return <div style={{ padding: 40, textAlign: 'center', color: C.tenue, fontSize: 13 }}>Cargando…</div>;
+
+  const activo = encima ? conEtiqueta.find(p => p.partido === encima) : null;
   const faltan = 13 - (datos?.length ?? 0);
 
   return (
@@ -77,88 +135,133 @@ export default function Mapa({ onDiputados }) {
             : 'Todavía no hay suficientes leyes codificadas. Ejecuta npm run codificar:leyes.'}
         </div>
       ) : (
-        <div style={{ background: C.pizarra, borderRadius: 3, padding: 'clamp(16px, 3vw, 28px)' }}>
-          <svg viewBox="-1.45 -1.5 2.9 3.05"
-            style={{ width: '100%', maxHeight: '62vh', display: 'block', margin: '0 auto' }}>
-            <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
-            <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: 12,
+          alignItems: 'stretch'
+        }}
+          className="mapaLayout">
+          <style>{`
+            @media(min-width:960px){
+              .mapaLayout{grid-template-columns:minmax(200px,.85fr) minmax(320px,1.3fr) minmax(200px,.85fr)!important}
+            }
+          `}</style>
 
-            <text x="-1.32" y="-1.30" fill="#8E959C" fontSize="0.058" fontFamily="DM Mono, monospace">IZQUIERDA</text>
-            <text x="1.32" y="-1.30" fill="#8E959C" fontSize="0.058" textAnchor="end" fontFamily="DM Mono, monospace">DERECHA</text>
-            <text x="0" y="-1.38" fill="#8E959C" fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace">CONSERVADOR</text>
-            <text x="0" y="1.46" fill="#8E959C" fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace">PROGRESISTA</text>
+          <div className="mapaLado">
+            <GuiaEje
+              titulo="Eje económico"
+              intro="Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades."
+              a={{
+                titulo: 'Izquierda económica',
+                texto: 'El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto público, impuestos progresivos y reglas que limiten el poder de las empresas. Es la línea que va de Marx a la socialdemocracia de posguerra.'
+              }}
+              b={{
+                titulo: 'Derecha económica',
+                texto: 'El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación. Es el argumento de Hayek y Friedman.'
+              }}
+              miramos={<>Si cada medida sube o baja el <strong>gasto público</strong>, si sube o baja los <strong>impuestos</strong>, y si añade o quita <strong>regulación</strong> a las empresas. Nada más.</>}
+            />
+          </div>
 
-            {conEtiqueta.map(p => {
-              const on = !encima || encima === p.partido;
-              const radio = r(p.escanos);
-              const px = Number(p.x), py = -Number(p.y);
-              const desviada = p.labelY > py + radio + 0.12;
-              return (
-                <g key={p.partido}
-                  onMouseEnter={() => !esTactil && setEncima(p.partido)}
-                  onMouseLeave={() => !esTactil && setEncima(null)}
-                  onClick={() => setEncima(encima === p.partido ? null : p.partido)}
-                  tabIndex={0}
-                  onFocus={() => setEncima(p.partido)}
-                  role="button"
-                  aria-label={`${p.siglas}, ${p.escanos} escaños`}
-                  style={{ cursor: 'pointer', transition: 'opacity 160ms ease', outline: 'none' }}
-                  opacity={on ? 1 : 0.16}>
-                  {desviada && (
-                    <line x1={px} y1={py + radio} x2={px} y2={p.labelY - 0.045}
-                      stroke="#5A6067" strokeWidth="0.005" />
-                  )}
-                  <circle cx={px} cy={py} r={radio * 1.9} fill="transparent" pointerEvents="all" />
-                  <circle cx={px} cy={py}
-                    r={encima === p.partido ? radio * 1.22 : radio}
-                    fill={p.color || '#8E9299'} stroke={C.pizarra} strokeWidth="0.014"
-                    style={{ transition: 'r 200ms cubic-bezier(.34,1.56,.64,1)' }} />
-                  <text x={px} y={p.labelY}
-                    fill={encima === p.partido ? '#FFFFFF' : '#C9CDD2'}
-                    fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace"
-                    fontWeight={encima === p.partido ? 500 : 400}>
-                    {p.siglas}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+          <div style={{ background: C.pizarra, borderRadius: 3, padding: 'clamp(14px, 2.5vw, 22px)', minWidth: 0 }}>
+            <svg ref={svgRef}
+              viewBox="-1.45 -1.5 2.9 3.05"
+              preserveAspectRatio="xMidYMid meet"
+              style={{ width: '100%', height: 'auto', maxHeight: '58vh', display: 'block', margin: '0 auto', touchAction: 'manipulation', cursor: 'crosshair' }}
+              onPointerMove={onPointerMove}
+              onPointerLeave={onPointerLeave}
+              onPointerUp={onPointerUp}
+              role="img"
+              aria-label="Mapa de partidos en dos ejes">
+              <rect x="-1.45" y="-1.5" width="2.9" height="3.05" fill="transparent" />
+              <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
+              <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
-          {faltan > 0 && (
-            <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
-              {datos.length} de 13 partidos con datos suficientes. El resto aparecerá cuando termine la codificación.
-            </div>
-          )}
+              <text x="-1.32" y="-1.30" fill="#8E959C" fontSize="0.058" fontFamily="DM Mono, monospace">IZQUIERDA</text>
+              <text x="1.32" y="-1.30" fill="#8E959C" fontSize="0.058" textAnchor="end" fontFamily="DM Mono, monospace">DERECHA</text>
+              <text x="0" y="-1.38" fill="#8E959C" fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace">CONSERVADOR</text>
+              <text x="0" y="1.46" fill="#8E959C" fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace">PROGRESISTA</text>
 
-          <div style={{ minHeight: 56, marginTop: 12, paddingTop: 12, borderTop: '1px solid #3A4048' }}>
-            {activo ? (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ width: 11, height: 11, borderRadius: 11, background: activo.color, flexShrink: 0 }} />
-                  <span style={{ color: '#F2F3F0', fontSize: 14.5, fontWeight: 600 }}>{activo.siglas}</span>
-                  <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.escanos} escaños</span>
-                </div>
-                <div className="em" style={{ color: '#A8AEB4', fontSize: 11.5, marginTop: 6, lineHeight: 1.6 }}>
-                  económico {Number(activo.x).toFixed(2)} · social {Number(activo.y).toFixed(2)}
-                  {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'leyes'}
-                </div>
-                {fuente === 'programa' && activo.prog_bruto_economico != null && (
-                  <div className="em" style={{ color: '#7C8288', fontSize: 10.5, marginTop: 3 }}>
-                    valor absoluto sin comparar: {Number(activo.prog_bruto_economico).toFixed(2)}
-                  </div>
-                )}
-                {activo.mas_disidente && Number(activo.disidencias_max) > 0 && (
-                  <div style={{ color: '#8E959C', fontSize: 11.5, marginTop: 5 }}>
-                    Quien más se separa del partido: {activo.mas_disidente} ({activo.disidencias_max} veces)
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ color: '#8E959C', fontSize: 12, lineHeight: 1.5 }}>
-                Cada círculo es un partido y su tamaño es el número de escaños.
-                {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
+              {conEtiqueta.map(p => {
+                const on = !encima || encima === p.partido;
+                const desviada = p.labelY > p.cy + p.radio + 0.12;
+                return (
+                  <g key={p.partido}
+                    style={{ transition: 'opacity 160ms ease' }}
+                    opacity={on ? 1 : 0.16}
+                    pointerEvents="none">
+                    {desviada && (
+                      <line x1={p.cx} y1={p.cy + p.radio} x2={p.cx} y2={p.labelY - 0.045}
+                        stroke="#5A6067" strokeWidth="0.005" />
+                    )}
+                    <circle cx={p.cx} cy={p.cy}
+                      r={encima === p.partido ? p.radio * 1.22 : p.radio}
+                      fill={p.color || '#8E9299'} stroke={C.pizarra} strokeWidth="0.014"
+                      style={{ transition: 'r 200ms cubic-bezier(.34,1.56,.64,1)' }} />
+                    <text x={p.cx} y={p.labelY}
+                      fill={encima === p.partido ? '#FFFFFF' : '#C9CDD2'}
+                      fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace"
+                      fontWeight={encima === p.partido ? 500 : 400}>
+                      {p.siglas}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+
+            {faltan > 0 && (
+              <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
+                {datos.length} de 13 partidos con datos suficientes. El resto aparecerá cuando termine la codificación.
               </div>
             )}
+
+            <div style={{ minHeight: 56, marginTop: 12, paddingTop: 12, borderTop: '1px solid #3A4048' }}>
+              {activo ? (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: 11, background: activo.color, flexShrink: 0 }} />
+                    <span style={{ color: '#F2F3F0', fontSize: 14.5, fontWeight: 600 }}>{activo.siglas}</span>
+                    <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.escanos} escaños</span>
+                  </div>
+                  <div className="em" style={{ color: '#A8AEB4', fontSize: 11.5, marginTop: 6, lineHeight: 1.6 }}>
+                    económico {Number(activo.x).toFixed(2)} · social {Number(activo.y).toFixed(2)}
+                    {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'leyes'}
+                  </div>
+                  {fuente === 'programa' && activo.prog_bruto_economico != null && (
+                    <div className="em" style={{ color: '#7C8288', fontSize: 10.5, marginTop: 3 }}>
+                      valor absoluto sin comparar: {Number(activo.prog_bruto_economico).toFixed(2)}
+                    </div>
+                  )}
+                  {activo.mas_disidente && Number(activo.disidencias_max) > 0 && (
+                    <div style={{ color: '#8E959C', fontSize: 11.5, marginTop: 5 }}>
+                      Quien más se separa del partido: {activo.mas_disidente} ({activo.disidencias_max} veces)
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: '#8E959C', fontSize: 12, lineHeight: 1.5 }}>
+                  Cada círculo es un partido y su tamaño es el número de escaños.
+                  {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mapaLado">
+            <GuiaEje
+              titulo="Eje social"
+              intro="Es un eje independiente del económico. Se puede situar a un lado en economía y al otro en este. En España se confunden a menudo; por eso el mapa los separa."
+              a={{
+                titulo: 'Conservador',
+                texto: 'Las instituciones y costumbres heredadas acumulan una sabiduría que nadie diseñó y que conviene no desmontar a la ligera. Es la tesis de Burke: prudencia frente al cambio rápido, y prioridad de la comunidad, la familia y la nación sobre la elección individual.'
+              }}
+              b={{
+                titulo: 'Progresista',
+                texto: 'Cada persona debe poder decidir sobre su vida mientras no dañe a otros, y las costumbres heredadas no bastan para justificar una restricción. Viene de Mill y del liberalismo de los derechos: ampliar la autonomía personal y quitar límites que no protegen a nadie.'
+              }}
+              miramos={<>Si cada medida amplía o restringe <strong>derechos individuales</strong>, y si facilita o endurece la <strong>entrada y regularización de migrantes</strong>. Nada más.</>}
+            />
           </div>
         </div>
       )}
@@ -181,93 +284,6 @@ export default function Mapa({ onDiputados }) {
           </div>
         </div>
       )}
-
-      <div className="ejesGuia" style={{ marginTop: 14 }}>
-        <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15 }}>
-          <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Qué es izquierda y derecha aquí</div>
-          <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>
-            Este eje mide <strong>una sola cosa</strong>: qué papel debe tener el Estado en la economía.
-            No mide simpatías ni identidades.
-          </div>
-
-          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
-              Izquierda económica
-            </div>
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
-              El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto
-              público, impuestos progresivos y reglas que limiten el poder de las empresas.
-              Es la línea que va de Marx a la socialdemocracia de posguerra: para el primero el conflicto
-              está en quién posee los medios de producción; para la segunda basta con redistribuir
-              lo que el mercado reparte mal.
-            </div>
-          </div>
-
-          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
-              Derecha económica
-            </div>
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
-              El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información
-              necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación.
-              Es el argumento de Hayek y Friedman, y su corolario es que ampliar el Estado reduce
-              la libertad individual aunque se haga con buena intención.
-            </div>
-          </div>
-
-          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-            <div className="em" style={{ fontSize: 10, color: C.tenue, letterSpacing: '.05em', fontWeight: 600 }}>
-              LO QUE MIRAMOS
-            </div>
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
-              Si cada medida sube o baja el <strong>gasto público</strong>, si sube o baja los
-              <strong> impuestos</strong>, y si añade o quita <strong>regulación</strong> a las empresas.
-              Nada más.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15 }}>
-          <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Qué es progresista y conservador</div>
-          <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>
-            Es un eje <strong>independiente</strong> del anterior. Se puede ser de izquierda económica
-            y socialmente conservador, o al revés. En España se confunden los dos ejes constantemente,
-            y por eso el mapa los separa.
-          </div>
-
-          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
-              Conservador
-            </div>
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
-              Las instituciones y costumbres heredadas acumulan una sabiduría que nadie diseñó y que
-              conviene no desmontar a la ligera. Es la tesis de Burke: prudencia frente al cambio
-              rápido, y prioridad de la comunidad, la familia y la nación sobre la elección individual.
-            </div>
-          </div>
-
-          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-            <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
-              Progresista
-            </div>
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
-              Cada persona debe poder decidir sobre su vida mientras no dañe a otros, y las costumbres
-              heredadas no bastan para justificar una restricción. Viene de Mill y del liberalismo de
-              los derechos: ampliar la autonomía personal y quitar límites que no protegen a nadie.
-            </div>
-          </div>
-
-          <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-            <div className="em" style={{ fontSize: 10, color: C.tenue, letterSpacing: '.05em', fontWeight: 600 }}>
-              LO QUE MIRAMOS
-            </div>
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>
-              Si cada medida amplía o restringe <strong>derechos individuales</strong>, y si facilita o
-              endurece la <strong>entrada y regularización de migrantes</strong>. Nada más.
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div style={{ marginTop: 14, padding: 15, background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3 }}>
         <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Cómo se calcula esta posición</div>

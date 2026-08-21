@@ -63,13 +63,13 @@ color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,co
 .ejesGuia{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:820px){.ejesGuia{grid-template-columns:1fr 1fr}}
 .split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
-@media(min-width:960px){.split{grid-template-columns:minmax(360px,1.05fr) minmax(340px,1fr);gap:22px;align-items:start}
+@media(min-width:960px){.split{grid-template-columns:minmax(340px,.95fr) minmax(340px,1.05fr);gap:22px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
 .portada{display:grid;grid-template-columns:1fr;gap:20px;padding-top:6px}
 @media(min-width:900px){.portada{grid-template-columns:1.35fr 1fr;gap:32px;align-items:start}}
 .heroCols{display:grid;grid-template-columns:1fr;gap:14px}
-@media(min-width:760px){.heroCols.conPanel{grid-template-columns:172px 1fr;gap:20px;align-items:start}}
-.panelGrupos{max-height:330px;overflow-y:auto;padding-right:4px}
+@media(min-width:760px){.heroCols.conPanel{grid-template-columns:148px 1fr;gap:16px;align-items:start}}
+.panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
 .panelGrupos::-webkit-scrollbar{width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
@@ -101,6 +101,7 @@ const ORDENES = [
   ['intervenciones', 'Más intervenciones', d => Number(d.intervenciones ?? 0), true],
   ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
   ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true],
+  ['patrimonio', 'Mayor patrimonio declarado', d => Number(d.patrimonio_euros ?? d.bienes_total ?? -1), true],
   ['donaciones', 'Más donaciones recibidas', d => Number(d.donaciones ?? 0), true],
   ['privadas', 'Más cargos en el sector privado', d => Number(d.actividades_privadas ?? 0), true]
 ];
@@ -112,6 +113,15 @@ function Chip({ on, onClick, color, children, titulo }) {
       {children}
     </button>
   );
+}
+
+/** Evita titulares que flagean al autor (p. ej. «Presentada por el Grupo Parlamentario de…»). */
+function limpiarTitular(t) {
+  if (!t) return t;
+  return String(t)
+    .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
+    .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
+    .trim() || t;
 }
 
 function Barra({ si, no, abs, alto = 5 }) {
@@ -268,7 +278,7 @@ export default function App() {
           </button>
           {cobertura && (
             <div className="em" style={{ fontSize: 10, color: C.tenue }}>
-              {cobertura.votaciones} votaciones · {Number(cobertura.votos_individuales).toLocaleString('es')} votos · {cobertura.ultima_sesion}
+              última sesión {cobertura.ultima_sesion}
             </div>
           )}
         </div>
@@ -296,33 +306,66 @@ export default function App() {
               }} />}
             </div>
 
-            <div className={`heroCols${votacionSel && votos ? ' conPanel' : ''}`}>
-              {votacionSel && votos && (
-                <div className="panelGrupos">
-                  <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
-                    letterSpacing: '.07em', marginBottom: 9 }}>
-                    Cómo votó cada partido
-                  </div>
-                  {posicionPartidos.map(g => (
-                    <button key={g.siglas}
-                      onMouseEnter={() => setFPartido(g.siglas)}
-                      onMouseLeave={() => setFPartido(null)}
-                      onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                        padding: '6px 7px', background: fPartido === g.siglas ? '#2B3037' : 'transparent',
-                        border: 'none', borderRadius: 2, cursor: 'pointer', transition: 'background 140ms ease'
-                      }}>
-                      <span style={{ width: 3, height: 20, background: g.color, borderRadius: 3, flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5', minWidth: 0 }}>{g.siglas}</span>
+            <div className="heroCols conPanel">
+              <div className="panelGrupos">
+                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
+                  letterSpacing: '.07em', marginBottom: 9 }}>
+                  {votacionSel && votos ? 'Cómo votó cada partido' : 'Filtrar por partido'}
+                </div>
+                <button
+                  onClick={() => setFPartido(null)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                    padding: '6px 7px', background: !fPartido ? '#2B3037' : 'transparent',
+                    border: 'none', borderRadius: 2, cursor: 'pointer', marginBottom: 2
+                  }}>
+                  <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5' }}>Todos</span>
+                  <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{enHemiciclo.length}</span>
+                </button>
+                {(votacionSel && votos ? posicionPartidos : partidos.map(([siglas, { n, color }]) => ({
+                  siglas, color, n, total: n, voto: null
+                }))).map(g => (
+                  <button key={g.siglas}
+                    onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                      padding: '6px 7px', background: fPartido === g.siglas ? '#2B3037' : 'transparent',
+                      border: 'none', borderRadius: 2, cursor: 'pointer', transition: 'background 140ms ease'
+                    }}>
+                    <span style={{ width: 3, height: 20, background: g.color, borderRadius: 3, flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5', minWidth: 0 }}>{g.siglas}</span>
+                    {g.voto ? (
                       <span className="em" style={{ fontSize: 11, fontWeight: 500, flexShrink: 0,
                         color: g.voto === 'si' ? '#5FBF92' : g.voto === 'no' ? '#E08278' : '#E0BB6A' }}>
                         {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'} {g.n}
                       </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                    ) : (
+                      <span className="em" style={{ fontSize: 11, color: '#8E959C', flexShrink: 0 }}>{g.n}</span>
+                    )}
+                  </button>
+                ))}
+                {ccaa.length > 0 && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #3A4048' }}>
+                    <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
+                      letterSpacing: '.07em', marginBottom: 7 }}>Autonomía</div>
+                    <button onClick={() => setFCcaa(null)} style={{
+                      display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px',
+                      background: !fCcaa ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
+                      cursor: 'pointer', fontSize: 11, color: '#DDE1E5', marginBottom: 2
+                    }}>Toda España</button>
+                    {ccaa.map(c => (
+                      <button key={c.slug} onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)} style={{
+                        display: 'flex', width: '100%', textAlign: 'left', padding: '4px 7px',
+                        background: fCcaa === c.slug ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
+                        cursor: 'pointer', fontSize: 11, color: '#DDE1E5', gap: 6
+                      }}>
+                        <span style={{ flex: 1, minWidth: 0 }}>{c.nombre}</span>
+                        <span className="em" style={{ color: '#8E959C' }}>{c.diputados}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div style={{ minWidth: 0 }}>
                 <Hemiciclo
@@ -336,31 +379,11 @@ export default function App() {
                 />
                 {votacionSel && (
                   <div style={{ marginTop: 10, color: '#DDE1E5', fontSize: 13, lineHeight: 1.45 }}>
-                    {votacionSel.titular || votacionSel.subtitulo || votacionSel.titulo}
+                    {limpiarTitular(votacionSel.titular || votacionSel.subtitulo || votacionSel.titulo)}
                   </div>
                 )}
               </div>
             </div>
-
-            <div className="chips" style={{ marginTop: 14 }}>
-              <Chip on={!fPartido} onClick={() => setFPartido(null)}>TODOS</Chip>
-              {partidos.map(([p, { n, color }]) => (
-                <Chip key={p} on={fPartido === p} color={color} onClick={() => setFPartido(fPartido === p ? null : p)}>
-                  {p} <span className="em" style={{ fontSize: 10, opacity: .7 }}>{n}</span>
-                </Chip>
-              ))}
-            </div>
-
-            {ccaa.length > 0 && (
-              <div className="chips" style={{ marginTop: 6 }}>
-                <Chip on={!fCcaa} onClick={() => setFCcaa(null)}>TODA ESPAÑA</Chip>
-                {ccaa.map(c => (
-                  <Chip key={c.slug} on={fCcaa === c.slug} onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)}>
-                    {c.nombre} <span className="em" style={{ fontSize: 10, opacity: .7 }}>{c.diputados}</span>
-                  </Chip>
-                ))}
-              </div>
-            )}
               </div>
             </div>
           )}
@@ -436,7 +459,7 @@ export default function App() {
                     display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '12px 13px',
                     background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
                   }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{v.titular || v.subtitulo || v.titulo}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{limpiarTitular(v.titular || v.subtitulo || v.titulo)}</div>
                     <div className="em" style={{ fontSize: 10, color: C.tenue, margin: '5px 0 7px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       {v.materia_nombre && <span style={{ background: (v.materia_color || '#8E9299') + '22', color: v.materia_color || C.media, padding: '1px 6px', borderRadius: 2, fontWeight: 500 }}>{v.materia_nombre}</span>}
                       <span>{v.fecha}</span>
@@ -500,6 +523,14 @@ export default function App() {
                   Esto <strong>no mide dinero ni patrimonio</strong>. Es el número de cargos o donaciones
                   que cada diputado declaró en su registro de intereses económicos. El Congreso no
                   publica los importes en formato reutilizable, así que aquí no hay ninguna cifra en euros.
+                </div>
+              )}
+
+              {orden === 'patrimonio' && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Patrimonio declarado en la declaración de bienes del Congreso. Solo aparece si ya se
+                  ha cargado el PDF (npm run bienes). Si ves ceros, faltan declaraciones digitalizadas.
                 </div>
               )}
 
@@ -579,6 +610,7 @@ export default function App() {
                           intervenciones: ['intervenciones', d.intervenciones],
                           abstenciones: ['abstenciones', d.abstenciones],
                           telematicos: ['a distancia', d.telematicos],
+                          patrimonio: ['€ declarados', d.patrimonio_euros ?? d.bienes_total ?? '—'],
                           donaciones: ['donaciones', d.donaciones],
                           privadas: ['cargos privados', d.actividades_privadas]
                         };
