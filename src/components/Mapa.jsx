@@ -175,7 +175,7 @@ export default function Mapa({ onDiputados }) {
                 titulo: 'Derecha económica',
                 texto: 'El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación. Es el argumento de Hayek y Friedman.'
               }}
-              miramos={<>Si cada medida sube o baja el <strong>gasto público</strong>, si sube o baja los <strong>impuestos</strong>, y si añade o quita <strong>regulación</strong> a las empresas. Nada más.</>}
+              miramos={<>Gasto público, impuestos y regulación empresarial. Nada más.</>}
             />
           </div>
 
@@ -193,10 +193,10 @@ export default function Mapa({ onDiputados }) {
               <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
               <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
-              <text x="-1.32" y="-1.30" fill="#8E959C" fontSize="0.058" fontFamily="DM Mono, monospace">IZQUIERDA</text>
-              <text x="1.32" y="-1.30" fill="#8E959C" fontSize="0.058" textAnchor="end" fontFamily="DM Mono, monospace">DERECHA</text>
-              <text x="0" y="-1.38" fill="#8E959C" fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace">CONSERVADOR</text>
-              <text x="0" y="1.46" fill="#8E959C" fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace">PROGRESISTA</text>
+              <text x="-1.32" y="-1.28" fill="#F2F3F0" fontSize="0.078" fontWeight="600" fontFamily="DM Mono, monospace">IZQUIERDA</text>
+              <text x="1.32" y="-1.28" fill="#F2F3F0" fontSize="0.078" fontWeight="600" textAnchor="end" fontFamily="DM Mono, monospace">DERECHA</text>
+              <text x="0" y="-1.40" fill="#F2F3F0" fontSize="0.078" fontWeight="600" textAnchor="middle" fontFamily="DM Mono, monospace">CONSERVADOR</text>
+              <text x="0" y="1.48" fill="#F2F3F0" fontSize="0.078" fontWeight="600" textAnchor="middle" fontFamily="DM Mono, monospace">PROGRESISTA</text>
 
               {conEtiqueta.map(p => {
                 const on = !encima || encima === p.partido;
@@ -278,7 +278,7 @@ export default function Mapa({ onDiputados }) {
                 titulo: 'Progresista',
                 texto: 'Cada persona debe poder decidir sobre su vida mientras no dañe a otros, y las costumbres heredadas no bastan para justificar una restricción. Viene de Mill y del liberalismo de los derechos: ampliar la autonomía personal y quitar límites que no protegen a nadie.'
               }}
-              miramos={<>Si cada medida amplía o restringe <strong>derechos individuales</strong>, y si facilita o endurece la <strong>entrada y regularización de migrantes</strong>. Nada más.</>}
+              miramos={<>Derechos individuales y reglas de entrada/regularización de migrantes. Nada más.</>}
             />
           </div>
         </div>

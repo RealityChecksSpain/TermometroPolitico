@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { traerFeed } from '../lib/cliente.js';
+import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -20,16 +21,9 @@ function fechaCorta(f) {
   return `${d.getDate()} ${MESES[d.getMonth()]}${d.getFullYear() !== hoy.getFullYear() ? ' ' + d.getFullYear() : ''}`;
 }
 
-/** Una frase llana: prioriza campo corto de IA; si no, primera frase del resumen. */
+/** @deprecated usa fraseCortaDeNorma; se mantiene el export para Inicio. */
 export function fraseCorta(n) {
-  const corta = n?.frase_corta || n?.en_una_frase || n?.titular_corto;
-  if (corta && String(corta).trim()) {
-    const t = String(corta).trim();
-    return t.length > 160 ? t.slice(0, 157) + '…' : t;
-  }
-  if (!n?.resumen) return null;
-  const f = String(n.resumen).split(/(?<=\.)\s+/)[0];
-  return f.length > 160 ? f.slice(0, 157) + '…' : f;
+  return fraseCortaDeNorma(n, 52);
 }
 
 function MiniResultado({ si, no, abs, aprobada }) {
@@ -98,7 +92,7 @@ function BarrasVoto({ si, no, abs }) {
 
 function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
   const aprobada = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-  const frase = fraseCorta(n);
+  const frase = fraseCortaDeNorma(n, 52);
   const tituloLegal = limpiarTitular
     ? limpiarTitular(n.titular || n.subtitulo || n.titulo)
     : (n.titular || n.subtitulo || n.titulo);
@@ -108,7 +102,9 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
     <article onClick={() => onAbrir(n)} style={{
       background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3,
       padding: destacada ? 'clamp(16px, 2.5vw, 22px)' : '14px 15px',
-      cursor: 'pointer', transition: 'border-color 140ms ease, transform 140ms ease'
+      cursor: 'pointer', transition: 'border-color 140ms ease, transform 140ms ease',
+      borderLeft: `4px solid ${n.materia_color || C.linea}`,
+      position: 'relative'
     }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = C.tinta; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = C.linea; }}>
@@ -127,6 +123,11 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
           }}>Sin materia</span>
         )}
         <span className="em" style={{ fontSize: 10.5, color: C.tenue }}>{fechaCorta(n.fecha)}</span>
+        {n.votaciones_norma > 1 && (
+          <span className="em" style={{ fontSize: 10, color: C.media }}>
+            {n.votaciones_norma} votaciones
+          </span>
+        )}
         <span className="em" style={{
           fontSize: 10, fontWeight: 600, marginLeft: 'auto',
           color: aprobada ? C.si : C.no, textTransform: 'uppercase', letterSpacing: '.05em'

@@ -264,15 +264,21 @@ export async function traerPromesaVsVoto() {
 }
 
 export async function traerUltimas(limite = 6) {
+  const campos = 'clave_norma, votacion_principal, titular, fecha, materia, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen, frase_corta, colectivos, efectos';
   const { data, error } = await supabase
-    .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen, frase_corta')
+    .from('mv_normas').select(campos)
     .order('fecha', { ascending: false }).limit(limite);
   if (error) {
-    // frase_corta puede no existir aún en la vista
+    // columnas opcionales pueden faltar en la vista
     const { data: d2, error: e2 } = await supabase
-      .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen')
+      .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen, colectivos')
       .order('fecha', { ascending: false }).limit(limite);
-    if (e2) return [];
+    if (e2) {
+      const { data: d3 } = await supabase
+        .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen')
+        .order('fecha', { ascending: false }).limit(limite);
+      return d3 ?? [];
+    }
     return d2 ?? [];
   }
   return data ?? [];

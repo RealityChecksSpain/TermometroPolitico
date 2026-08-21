@@ -7,6 +7,8 @@ import Metodologia from './components/Metodologia.jsx';
 import Descargas from './components/Descargas.jsx';
 import Partidos from './components/Partidos.jsx';
 import Inicio from './components/Inicio.jsx';
+import AvatarPartido from './components/AvatarPartido.jsx';
+import { fraseCortaDeNorma } from './lib/fraseCorta.js';
 import {
   faltaConfig, problemasConfig, traerDiputados, traerVotaciones, traerVotos,
   traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
@@ -63,13 +65,13 @@ color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,co
 .ejesGuia{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:820px){.ejesGuia{grid-template-columns:1fr 1fr}}
 .split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
-@media(min-width:960px){.split{grid-template-columns:minmax(340px,.95fr) minmax(340px,1.05fr);gap:22px;align-items:start}
+@media(min-width:960px){.split{grid-template-columns:minmax(380px,1.15fr) minmax(300px,.9fr);gap:18px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
 @media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(420px,1.35fr) minmax(260px,.72fr);gap:18px}}
 .portada{display:grid;grid-template-columns:1fr;gap:20px;padding-top:6px}
 @media(min-width:900px){.portada{grid-template-columns:1.35fr 1fr;gap:32px;align-items:start}}
 .heroCols{display:grid;grid-template-columns:1fr;gap:14px}
-@media(min-width:760px){.heroCols.conPanel{grid-template-columns:148px 1fr;gap:16px;align-items:start}}
+@media(min-width:760px){.heroCols.conPanel{grid-template-columns:128px 1fr;gap:12px;align-items:start}}
 .panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
 .panelGrupos::-webkit-scrollbar{width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
@@ -316,11 +318,12 @@ export default function App() {
                 <button
                   onClick={() => setFPartido(null)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                    padding: '6px 7px', background: !fPartido ? '#2B3037' : 'transparent',
+                    display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 6,
+                    width: '100%', textAlign: 'left', padding: '5px 4px',
+                    background: !fPartido ? '#2B3037' : 'transparent',
                     border: 'none', borderRadius: 2, cursor: 'pointer', marginBottom: 2
                   }}>
-                  <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5' }}>Todos</span>
+                  <span style={{ fontSize: 11.5, color: '#DDE1E5' }}>Todos</span>
                   <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{enHemiciclo.length}</span>
                 </button>
                 {(votacionSel && votos ? posicionPartidos : partidos.map(([siglas, { n, color }]) => ({
@@ -329,19 +332,20 @@ export default function App() {
                   <button key={g.siglas}
                     onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                      padding: '6px 7px', background: fPartido === g.siglas ? '#2B3037' : 'transparent',
+                      display: 'grid', gridTemplateColumns: '3px 1fr auto', alignItems: 'center', gap: 6,
+                      width: '100%', textAlign: 'left', padding: '5px 4px',
+                      background: fPartido === g.siglas ? '#2B3037' : 'transparent',
                       border: 'none', borderRadius: 2, cursor: 'pointer', transition: 'background 140ms ease'
                     }}>
-                    <span style={{ width: 3, height: 20, background: g.color, borderRadius: 3, flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5', minWidth: 0 }}>{g.siglas}</span>
+                    <span style={{ width: 3, height: 16, background: g.color, borderRadius: 3 }} />
+                    <span style={{ fontSize: 11.5, color: '#DDE1E5', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.siglas}</span>
                     {g.voto ? (
-                      <span className="em" style={{ fontSize: 11, fontWeight: 500, flexShrink: 0,
+                      <span className="em" style={{ fontSize: 11, fontWeight: 500,
                         color: g.voto === 'si' ? '#5FBF92' : g.voto === 'no' ? '#E08278' : '#E0BB6A' }}>
-                        {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'} {g.n}
+                        {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'}{g.n}
                       </span>
                     ) : (
-                      <span className="em" style={{ fontSize: 11, color: '#8E959C', flexShrink: 0 }}>{g.n}</span>
+                      <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{g.n}</span>
                     )}
                   </button>
                 ))}
@@ -350,17 +354,19 @@ export default function App() {
                     <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
                       letterSpacing: '.07em', marginBottom: 7 }}>Autonomía</div>
                     <button onClick={() => setFCcaa(null)} style={{
-                      display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px',
+                      display: 'grid', gridTemplateColumns: '1fr auto', width: '100%', textAlign: 'left', padding: '4px 4px',
                       background: !fCcaa ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
-                      cursor: 'pointer', fontSize: 11, color: '#DDE1E5', marginBottom: 2
-                    }}>Toda España</button>
+                      cursor: 'pointer', fontSize: 11, color: '#DDE1E5', marginBottom: 2, gap: 6
+                    }}>
+                      <span>Toda España</span>
+                    </button>
                     {ccaa.map(c => (
                       <button key={c.slug} onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)} style={{
-                        display: 'flex', width: '100%', textAlign: 'left', padding: '4px 7px',
+                        display: 'grid', gridTemplateColumns: '1fr auto', width: '100%', textAlign: 'left', padding: '4px 4px',
                         background: fCcaa === c.slug ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
                         cursor: 'pointer', fontSize: 11, color: '#DDE1E5', gap: 6
                       }}>
-                        <span style={{ flex: 1, minWidth: 0 }}>{c.nombre}</span>
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nombre}</span>
                         <span className="em" style={{ color: '#8E959C' }}>{c.diputados}</span>
                       </button>
                     ))}
@@ -451,12 +457,7 @@ export default function App() {
                   </div>
                 )}
                 {votaciones.map((v, i) => {
-                  const frase = (() => {
-                    if (v.frase_corta) return String(v.frase_corta);
-                    if (!v.resumen) return null;
-                    const f = String(v.resumen).split(/(?<=\.)\s+/)[0];
-                    return f.length > 140 ? f.slice(0, 137) + '…' : f;
-                  })();
+                  const frase = fraseCortaDeNorma(v, 52);
                   const legal = limpiarTitular(v.titular || v.subtitulo || v.titulo);
                   return (
                   <button key={v.clave_norma ?? v.id} className="fila"
@@ -465,10 +466,10 @@ export default function App() {
                       const completa = (await traerVotaciones(1, { id }))[0];
                       if (completa) setVotacionSel({ ...completa, clave_norma: v.clave_norma, votaciones_norma: v.votaciones });
                     }} style={{
-                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '12px 13px',
+                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '11px 12px',
                     background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
                   }}>
-                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 5, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       {v.materia_nombre && (
                         <span style={{
                           background: v.materia_color || C.media, color: '#fff', padding: '2px 8px',
@@ -478,20 +479,20 @@ export default function App() {
                       <span>{v.fecha}</span>
                       {v.votaciones > 1 && (
                         <span style={{ color: C.media }}>
-                          {v.votaciones} votaciones{v.tramites > 0 ? ` · ${v.tramites} enmiendas` : ''}
+                          {v.votaciones} vot.{v.tramites > 0 ? ` · ${v.tramites} enm.` : ''}
                         </span>
                       )}
                     </div>
-                    <div className="ed" style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                      {frase || (String(legal).length > 110 ? String(legal).slice(0, 107) + '…' : legal)}
+                    <div className="ed" style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3 }}>
+                      {frase || (String(legal).length > 70 ? String(legal).slice(0, 67) + '…' : legal)}
                     </div>
                     {frase && (
-                      <div className="em" style={{ fontSize: 10.5, color: C.tenue, marginTop: 5, lineHeight: 1.4 }}>
-                        {String(legal).length > 120 ? String(legal).slice(0, 117) + '…' : legal}
+                      <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, lineHeight: 1.35 }}>
+                        {String(legal).length > 90 ? String(legal).slice(0, 87) + '…' : legal}
                       </div>
                     )}
-                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} alto={6} />
-                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 5, display: 'flex', gap: 10 }}>
+                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} alto={5} />
+                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, display: 'flex', gap: 10 }}>
                       <span style={{ color: C.si }}>Sí {v.total_si}</span>
                       <span style={{ color: C.no }}>No {v.total_no}</span>
                       {v.resultado_fiable === false && v.votaciones > 1 ? (
@@ -608,14 +609,14 @@ export default function App() {
                       border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none',
                       boxShadow: encimaEscano === d.mandato_id ? `inset 3px 0 0 ${d.color || '#8E9299'}` : 'none'
                     }}>
-                    {d.foto_url ? (
-                      <img src={d.foto_url} alt="" width={30} height={38} loading="lazy"
-                        onError={e => { e.currentTarget.style.visibility = 'hidden'; }}
-                        style={{ width: 30, height: 38, objectFit: 'cover', borderRadius: 2,
-                          flexShrink: 0, borderLeft: `3px solid ${d.color || '#8E9299'}`, background: '#E4E4DC' }} />
-                    ) : (
-                      <span style={{ width: 3, height: 30, background: d.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
-                    )}
+                    <AvatarPartido
+                      foto={d.foto_url}
+                      color={d.color}
+                      siglas={d.partido_siglas || d.grupo}
+                      nombre={d.nombre_completo}
+                      w={30}
+                      h={38}
+                    />
                     <span style={{ minWidth: 0 }}>
                       <span style={{
                         display: 'block', fontSize: 12.5, whiteSpace: 'nowrap',

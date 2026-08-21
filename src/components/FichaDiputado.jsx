@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
+import AvatarPartido from './AvatarPartido.jsx';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -60,16 +61,14 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
         <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.linea}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12, minWidth: 0 }}>
-              {d.foto_url ? (
-                <img src={d.foto_url} alt="" width={58} height={74} loading="lazy"
-                  onError={e => { e.currentTarget.style.display = 'none'; }}
-                  style={{
-                    width: 58, height: 74, objectFit: 'cover', borderRadius: 2, flexShrink: 0,
-                    borderLeft: `4px solid ${d.color || '#8E9299'}`, background: '#E4E4DC'
-                  }} />
-              ) : (
-                <span style={{ width: 4, background: d.color || '#8E9299', borderRadius: 4, flexShrink: 0 }} />
-              )}
+              <AvatarPartido
+                foto={d.foto_url}
+                color={d.color}
+                siglas={d.partido_siglas || d.grupo}
+                nombre={d.nombre_completo}
+                w={58}
+                h={74}
+              />
               <div>
                 <div className="ed" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{d.nombre_completo}</div>
                 <div className="em" style={{ fontSize: 11, color: C.tenue, marginTop: 3 }}>

@@ -41,7 +41,7 @@ REGLAS ESTRICTAS:
 - No repitas el título. Quien lee ya lo ha visto. Explica el CONTENIDO.
 
 CAMPOS:
-- frase_corta: UNA sola frase, máximo 18 palabras. Dice de qué va la norma en lenguaje de calle, sin jerga. Ejemplos buenos: "Amplía el cribado neonatal a más enfermedades." / "Tramita como ley un decreto sobre el mercado eléctrico." No copies el título oficial. No nombres al partido autor. Sin adjetivos (ni "polémica" ni "necesaria").
+- frase_corta: UNA sola frase, máximo 50 caracteres (~8-10 palabras). Empieza directo por el contenido: "Cribado neonatal cada dos años", "Plan de respuesta a Oriente Medio". PROHIBIDO empezar por "La norma", "regula", "establece", "aprueba", "modifica". Sin jerga. Sin partido autor. Sin adjetivos valorativos.
 - resumen: 3 a 5 frases. Qué establece la norma en la práctica. Concreto, no genérico.
 - puntos_clave: 3 a 5 medidas concretas que introduce, cada una en una frase. Con cifras, plazos o artículos si el texto los da.
 - que_cambia: 2 a 4 elementos con el formato "Antes X. Ahora Y." solo cuando el texto lo permita deducir. Lista vacía si no.
