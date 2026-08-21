@@ -25,22 +25,32 @@ export interface DeclaracionLeida {
   dudas: string[];
 }
 
-const NUM = { type: ['number', 'null'] };
-const TXT = { type: ['string', 'null'] };
+const NUM = { type: 'NUMBER', nullable: true };
+const TXT = { type: 'STRING', nullable: true };
+const INT = { type: 'INTEGER', nullable: true };
 
 const ESQUEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
     fecha_declaracion: TXT,
-    rendimientos_trabajo: NUM, rendimientos_capital: NUM, rendimientos_actividades: NUM,
-    rentas_detalle: TXT, irpf_pagado: NUM,
-    inmuebles_urbanos: NUM, inmuebles_rusticos: NUM, inmuebles_detalle: TXT,
-    depositos: NUM, valores: NUM, planes_pensiones: NUM,
-    vehiculos: NUM, vehiculos_detalle: TXT,
-    prestamos_concedido: NUM, deuda_pendiente: NUM,
+    rendimientos_trabajo: NUM,
+    rendimientos_capital: NUM,
+    rendimientos_actividades: NUM,
+    rentas_detalle: TXT,
+    irpf_pagado: NUM,
+    inmuebles_urbanos: INT,
+    inmuebles_rusticos: INT,
+    inmuebles_detalle: TXT,
+    depositos: NUM,
+    valores: NUM,
+    planes_pensiones: NUM,
+    vehiculos: INT,
+    vehiculos_detalle: TXT,
+    prestamos_concedido: NUM,
+    deuda_pendiente: NUM,
     observaciones: TXT,
-    confianza: { type: 'string', enum: ['alta', 'media', 'baja'] },
-    dudas: { type: 'array', items: { type: 'string' } }
+    confianza: { type: 'STRING', enum: ['alta', 'media', 'baja'] },
+    dudas: { type: 'ARRAY', items: { type: 'STRING' } }
   },
   required: ['confianza', 'dudas']
 };
@@ -136,7 +146,8 @@ async function textoDelPdf(buf: Buffer): Promise<{ paginas: number; texto: strin
 async function llamarModelo(
   modelo: string,
   clave: string,
-  parts: object[]
+  parts: object[],
+  conEsquema = true
 ): Promise<{ ok: true; datos: DeclaracionLeida } | { ok: false; error: string }> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
@@ -149,14 +160,18 @@ async function llamarModelo(
           temperature: 0,
           maxOutputTokens: 4096,
           responseMimeType: 'application/json',
-          ...(process.env.SIN_ESQUEMA === 'true' ? {} : { responseSchema: ESQUEMA })
+          ...(conEsquema && process.env.SIN_ESQUEMA !== 'true' ? { responseSchema: ESQUEMA } : {})
         }
       })
     }
   );
 
   if (!res.ok) {
-    const cuerpo = (await res.text()).slice(0, 220).replace(/\s+/g, ' ');
+    const cuerpo = (await res.text()).slice(0, 280).replace(/\s+/g, ' ');
+    // Si el esquema no gusta al modelo, reintentar sin él
+    if (conEsquema && res.status === 400 && /response_schema|responseSchema|Proto field/i.test(cuerpo)) {
+      return llamarModelo(modelo, clave, parts, false);
+    }
     return { ok: false, error: `${modelo}: HTTP ${res.status} ${cuerpo}` };
   }
 
