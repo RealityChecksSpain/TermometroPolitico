@@ -64,60 +64,92 @@ function esAbsurdo(d: Record<string, any>) {
 }
 
 async function pendientes() {
-  // Preferir RPC si existe
-  const { data: rpc, error: rpcErr } = await db().rpc('pendientes_bienes');
-  if (!rpcErr && Array.isArray(rpc) && rpc.length) {
-    const lista = rpc.filter((d: any) => d.url_bienes || true);
-    // rpc may not include url — join mandatos
-    const ids = lista.map((d: any) => d.mandato_id).filter(Boolean);
-    const urls = new Map<string, string>();
-    for (let i = 0; i < ids.length; i += 200) {
-      const chunk = ids.slice(i, i + 200);
-      const { data: m } = await db().from('mandatos').select('id, url_bienes, nombre_completo').in('id', chunk);
-      (m ?? []).forEach((x: any) => urls.set(x.id, x.url_bienes));
-    }
-    return lista
-      .map((d: any) => ({
-        id: d.mandato_id,
-        nombre_completo: d.nombre_completo,
-        url_bienes: urls.get(d.mandato_id) || d.url_bienes,
-        hecho: d.hecho
-      }))
-      .filter((d: any) => d.url_bienes && (!d.hecho || SOLO_OUTLIERS));
-  }
-
+  // Fuente de verdad: mandatos con PDF + filas de bienes aún sin dato útil.
+  // No fiarnos de pendientes_bienes.hecho: puede marcar "hecho" sin patrimonio.
   const { data: mandatos, error } = await db()
     .from('mandatos')
     .select('id, nombre_completo, url_bienes')
     .not('url_bienes', 'is', null);
   if (error) throw error;
 
+  const { count: nUrls } = await db()
+    .from('mandatos')
+    .select('id', { count: 'exact', head: true })
+    .not('url_bienes', 'is', null);
+
   const { data: hechos } = await db()
     .from('bienes_declarados')
-    .select('mandato_id, patrimonio_euros, inmuebles_urbanos, inmuebles_rusticos, confianza, verificado');
+    .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, confianza, verificado, depositos, valores');
 
   const mapa = new Map((hechos ?? []).map(h => [h.mandato_id, h]));
+  const conPatrimonio = (hechos ?? []).filter(h => h.patrimonio_euros != null).length;
+
+  console.log(`Diagnóstico: ${nUrls ?? 0} mandatos con URL de PDF · ${hechos?.length ?? 0} filas en bienes_declarados · ${conPatrimonio} con patrimonio_euros`);
+
+  if (!(nUrls > 0)) {
+    console.log('\nNo hay url_bienes en mandatos. Antes corre: npm run fichas\n');
+    return [];
+  }
+
+  const tieneDatoUtil = (h: any) => {
+    if (!h) return false;
+    if (h.patrimonio_euros != null) return true;
+    if (h.depositos != null || h.valores != null) return true;
+    if (h.inmuebles_urbanos != null || h.inmuebles_rusticos != null || h.n_inmuebles != null) return true;
+    return false;
+  };
 
   return (mandatos ?? []).filter(m => {
     const h = mapa.get(m.id);
-    if (!h) return true;
+    if (!tieneDatoUtil(h)) return true;
     if (SOLO_OUTLIERS) {
       const pat = h.patrimonio_euros;
-      const casas = (h.inmuebles_urbanos ?? 0) + (h.inmuebles_rusticos ?? 0);
+      const casas = h.n_inmuebles ?? ((h.inmuebles_urbanos ?? 0) + (h.inmuebles_rusticos ?? 0));
       if (pat != null && (pat < MIN_PATRIMONIO || pat > MAX_PATRIMONIO)) return true;
       if (casas > MAX_CASAS) return true;
       if (h.confianza === 'baja' && !h.verificado) return true;
       return false;
     }
-    if (h.verificado) return false;
+    // Reanudar: saltar verificados o confianza alta ya con patrimonio
+    if (h.verificado && h.patrimonio_euros != null) return false;
     if (h.confianza === 'alta' && h.patrimonio_euros != null) return false;
-    return true;
+    // Si hay fila pero sin patrimonio calculable, reintentar
+    if (h.patrimonio_euros == null && (h.depositos != null || h.valores != null)) return false;
+    return h.patrimonio_euros == null;
   }).map(m => ({ ...m, previo: mapa.get(m.id) }));
 }
 
 console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
+
+// Backfill: filas con depósitos/valores pero sin patrimonio_euros calculado
+{
+  const { data: sinPat } = await db()
+    .from('bienes_declarados')
+    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles, patrimonio_euros')
+    .is('patrimonio_euros', null);
+  let filled = 0;
+  for (const h of sinPat ?? []) {
+    const pat = patrimonioDe(h);
+    const casas = casasDe(h) ?? h.n_inmuebles;
+    if (pat == null && casas == null) continue;
+    const { error } = await db().from('bienes_declarados').update({
+      patrimonio_euros: pat,
+      n_inmuebles: casas
+    }).eq('mandato_id', h.mandato_id);
+    if (!error) filled++;
+  }
+  if (filled) console.log(`Backfill: ${filled} filas con patrimonio/inmuebles calculados sin re-leer PDF\n`);
+}
+
 const cola = (await pendientes()).slice(0, LIMITE === Infinity ? undefined : LIMITE);
 console.log(`Pendientes en esta corrida: ${cola.length}${SOLO_OUTLIERS ? ' (solo outliers)' : ''}\n`);
+if (cola.length === 0) {
+  console.log('Nada que procesar. Si en la app ves «—»:');
+  console.log('  1) npm run fichas          ← rellena url_bienes en mandatos');
+  console.log('  2) npm run bienes:auto -- --limite=5   ← prueba 5 PDFs');
+  console.log('  3) Recarga Diputados → Mayor patrimonio\n');
+  process.exit(0);
+}
 
 let ok = 0, fallos = 0, revisita = 0;
 

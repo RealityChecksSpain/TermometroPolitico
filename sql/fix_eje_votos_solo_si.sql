@@ -60,6 +60,7 @@ eco as (
     partido_id,
     n_gasto, n_impuestos, n_regulacion,
     ratio_gasto, ratio_impuestos, ratio_regulacion,
+    ratio_derechos, ratio_migracion,
     leyes_apoyadas,
     -- bruto: media de las tres dimensiones económicas disponibles
     (
@@ -86,7 +87,28 @@ medias as (
 select
   p.slug as partido,
   p.siglas,
-  p.color,
+  -- partidos no guarda color en BD; se mapea aquí (misma paleta que src/lib/partidos.ts)
+  case lower(p.slug)
+    when 'psoe' then '#C8102E'
+    when 'pp' then '#0B4DA2'
+    when 'vox' then '#5BC236'
+    when 'sumar' then '#B5227A'
+    when 'podemos' then '#6A2E7C'
+    when 'erc' then '#F2A81C'
+    when 'junts' then '#6FD3E8'
+    when 'bildu' then '#8A9B0F'
+    when 'eh-bildu' then '#8A9B0F'
+    when 'pnv' then '#00693C'
+    when 'bng' then '#1B9AD6'
+    when 'cc' then '#E8D019'
+    when 'upn' then '#8E9299'
+    when 'compromis' then '#F27A1A'
+    when 'compromís' then '#F27A1A'
+    when 'masmadrid' then '#00A99D'
+    when 'ciudadanos' then '#EB6109'
+    when 'mixto' then '#9AA0A6'
+    else '#8E9299'
+  end as color,
   e.leyes_apoyadas,
   e.leyes_apoyadas as leyes_valoradas,
   coalesce(e.n_gasto, 0) + coalesce(e.n_impuestos, 0) + coalesce(e.n_regulacion, 0) as base_economico,
