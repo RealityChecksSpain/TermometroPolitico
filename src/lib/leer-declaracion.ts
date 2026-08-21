@@ -91,7 +91,11 @@ OTROS BIENES O DERECHOS
 
 VEHÍCULOS, EMBARCACIONES Y AERONAVES
 - vehiculos: número de filas rellenas.
-- vehiculos_detalle: descripción de cada uno, separados por punto y coma.
+- vehiculos_detalle: UNA línea por vehículo, separadas por punto y coma, empezando por el tipo
+  literal del PDF. Ejemplos correctos:
+  "VEHÍCULO TODO TERRENO JEEP COMMANDER; MOTOCICLETA BMW R80RT"
+  "TURISMO SEAT LEÓN; EMBARCACIÓN LANCHA 5M"
+  Incluye la descripción completa de cada fila.
 
 DEUDAS Y OBLIGACIONES
 - prestamos_concedido: columna "IMPORTE CONCEDIDO".

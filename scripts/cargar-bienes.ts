@@ -9,6 +9,7 @@
  */
 import { db, exigirEnv } from '../src/lib/supabase';
 import { leerDeclaracion } from '../src/lib/leer-declaracion';
+import { clasificarVehiculos } from '../src/lib/vehiculos.js';
 
 exigirEnv('SUPABASE_URL');
 exigirEnv('GEMINI_API_KEY');
@@ -125,6 +126,28 @@ async function pendientes() {
 
 console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
 
+// Backfill: clasificar vehículos ya guardados sin re-leer PDF
+{
+  const { data: conDetalle } = await db()
+    .from('bienes_declarados')
+    .select('mandato_id, vehiculos, vehiculos_detalle, n_coches')
+    .not('vehiculos_detalle', 'is', null);
+  let filled = 0;
+  for (const h of conDetalle ?? []) {
+    if (h.n_coches != null) continue;
+    const veh = clasificarVehiculos(h.vehiculos_detalle, h.vehiculos);
+    const { error } = await db().from('bienes_declarados').update({
+      n_coches: veh.n_coches,
+      n_motos: veh.n_motos,
+      n_embarcaciones: veh.n_embarcaciones,
+      n_aeronaves: veh.n_aeronaves,
+      vehiculos: veh.n_vehiculos || h.vehiculos
+    }).eq('mandato_id', h.mandato_id);
+    if (!error) filled++;
+  }
+  if (filled) console.log(`Backfill vehículos: ${filled} filas clasificadas\n`);
+}
+
 // Backfill: filas con depósitos/valores pero sin patrimonio_euros calculado
 {
   const { data: sinPat } = await db()
@@ -181,6 +204,7 @@ for (let i = 0; i < cola.length; i++) {
   }
 
   const d = lectura.datos!;
+  const veh = clasificarVehiculos(d.vehiculos_detalle, d.vehiculos);
   const fila = {
     mandato_id: m.id,
     url_declaracion: url,
@@ -196,13 +220,17 @@ for (let i = 0; i < cola.length; i++) {
     depositos: d.depositos,
     valores: d.valores,
     planes_pensiones: d.planes_pensiones,
-    vehiculos: d.vehiculos,
+    vehiculos: veh.n_vehiculos || d.vehiculos,
     vehiculos_detalle: d.vehiculos_detalle,
     prestamos_concedido: d.prestamos_concedido,
     deuda_pendiente: d.deuda_pendiente,
     observaciones: d.observaciones,
     patrimonio_euros: patrimonioDe(d),
     n_inmuebles: casasDe(d),
+    n_coches: veh.n_coches,
+    n_motos: veh.n_motos,
+    n_embarcaciones: veh.n_embarcaciones,
+    n_aeronaves: veh.n_aeronaves,
     confianza: d.confianza,
     dudas: (d.dudas ?? []).join('; ') || null,
     introducido_por: motivo ? 'gemini_outlier' : 'gemini_auto',
@@ -212,23 +240,38 @@ for (let i = 0; i < cola.length; i++) {
 
   const { error } = await db().from('bienes_declarados').upsert(fila, { onConflict: 'mandato_id' });
   if (error) {
-    // columnas opcionales (patrimonio_euros / n_inmuebles) pueden no existir aún
-    if (/patrimonio_euros|n_inmuebles|confianza|dudas/i.test(error.message)) {
-      const { patrimonio_euros, n_inmuebles, confianza, dudas, ...basico } = fila;
-      const r2 = await db().from('bienes_declarados').upsert(basico, { onConflict: 'mandato_id' });
+    // columnas opcionales pueden no existir aún
+    if (/patrimonio_euros|n_inmuebles|n_coches|n_motos|n_embarcaciones|n_aeronaves|confianza|dudas/i.test(error.message)) {
+      const {
+        patrimonio_euros, n_inmuebles, n_coches, n_motos, n_embarcaciones, n_aeronaves,
+        confianza, dudas, ...basico
+      } = fila;
+      const r2 = await db().from('bienes_declarados').upsert({
+        ...basico,
+        patrimonio_euros,
+        n_inmuebles,
+        confianza,
+        dudas
+      }, { onConflict: 'mandato_id' });
       if (r2.error) {
-        console.log(`ERROR DB ${r2.error.message}`);
-        fallos++;
-        continue;
+        const r3 = await db().from('bienes_declarados').upsert(basico, { onConflict: 'mandato_id' });
+        if (r3.error) {
+          console.log(`ERROR DB ${r3.error.message}`);
+          fallos++;
+          continue;
+        }
       }
-      console.log(`ok (sin columnas extra) · casas ${casasDe(d) ?? '—'} · conf ${d.confianza}`);
+      console.log(`ok (parcial) · inm ${casasDe(d) ?? '—'} · veh ${veh.n_vehiculos} · conf ${d.confianza}`);
     } else {
       console.log(`ERROR DB ${error.message}`);
       fallos++;
       continue;
     }
   } else {
-    console.log(`ok · patrimonio ${fila.patrimonio_euros ?? '—'} · casas ${fila.n_inmuebles ?? '—'} · ${d.confianza}${motivo ? ' · revisar' : ''}`);
+    console.log(
+      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${fila.n_inmuebles ?? '—'} · ` +
+      `coches ${veh.n_coches} motos ${veh.n_motos} · ${d.confianza}${motivo ? ' · revisar' : ''}`
+    );
   }
   ok++;
 }

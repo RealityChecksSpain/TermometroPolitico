@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { clasificarVehiculos } from './vehiculos.js';
 
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
 const clave = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
@@ -75,16 +76,22 @@ export async function traerDiputados() {
     }
   }
 
-  // Patrimonio / inmuebles desde bienes_declarados (batch Gemini o revisión humana)
+  // Patrimonio / inmuebles / vehículos desde bienes_declarados
   const ids = lista.map(d => d.mandato_id).filter(Boolean);
   const bienes = [];
   for (let i = 0; i < ids.length; i += 200) {
     const chunk = ids.slice(i, i + 200);
-    const { data: filas } = await supabase
+    const { data: filas, error } = await supabase
       .from('bienes_declarados')
-      .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, depositos, valores, planes_pensiones, deuda_pendiente')
+      .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves')
       .in('mandato_id', chunk);
-    if (filas?.length) bienes.push(...filas);
+    if (error) {
+      const { data: filas2 } = await supabase
+        .from('bienes_declarados')
+        .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle')
+        .in('mandato_id', chunk);
+      if (filas2?.length) bienes.push(...filas2);
+    } else if (filas?.length) bienes.push(...filas);
   }
   if (bienes.length) {
     const bm = new Map(bienes.map(b => [b.mandato_id, b]));
@@ -105,12 +112,20 @@ export async function traerDiputados() {
           patrimonio = act - Number(b.deuda_pendiente ?? 0);
         }
       }
+      const veh = clasificarVehiculos(b.vehiculos_detalle, b.vehiculos);
       return {
         ...d,
         patrimonio_euros: d.patrimonio_euros ?? patrimonio,
         bienes_total: d.bienes_total ?? patrimonio,
         n_inmuebles: d.n_inmuebles ?? casas,
-        n_casas: d.n_casas ?? casas
+        n_casas: d.n_casas ?? casas,
+        n_coches: b.n_coches ?? veh.n_coches,
+        n_motos: b.n_motos ?? veh.n_motos,
+        n_embarcaciones: b.n_embarcaciones ?? veh.n_embarcaciones,
+        n_aeronaves: b.n_aeronaves ?? veh.n_aeronaves,
+        n_vehiculos: b.vehiculos ?? veh.n_vehiculos,
+        vehiculos_detalle: b.vehiculos_detalle ?? null,
+        vehiculos_lista: veh.vehiculos_lista
       };
     });
   }

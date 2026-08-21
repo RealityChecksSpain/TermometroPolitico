@@ -108,7 +108,15 @@ const ORDENES = [
   ['intervenciones', 'Más intervenciones', d => Number(d.intervenciones ?? 0), true],
   ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
   ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true],
-  ['patrimonio', 'Mayor patrimonio declarado', d => Number(d.patrimonio_euros ?? d.bienes_total ?? -1), true],
+  ['patrimonio', 'Mayor patrimonio (€)', d => Number(d.patrimonio_euros ?? d.bienes_total ?? -1), true],
+  ['inmuebles', 'Más inmuebles', d => {
+    const n = d.n_casas ?? d.n_inmuebles;
+    return n == null ? -1 : Number(n);
+  }, true],
+  ['vehiculos', 'Más vehículos', d => {
+    const n = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
+    return (d.vehiculos_detalle || n > 0) ? Number(n) : -1;
+  }, true],
   ['donaciones', 'Más donaciones recibidas', d => Number(d.donaciones ?? 0), true],
   ['privadas', 'Más cargos en el sector privado', d => Number(d.actividades_privadas ?? 0), true]
 ];
@@ -559,12 +567,27 @@ export default function App() {
               {orden === 'patrimonio' && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Patrimonio estimado (depósitos + valores + planes − deuda) e inmuebles del PDF oficial.
-                  Tras <code>npm run fichas</code> hay que digitalizar con{' '}
-                  <code>npm run bienes:auto</code> (prueba: <code>-- --limite=5</code>).
-                  {' '}Ahora mismo: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con patrimonio
-                  · {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con inmuebles.
-                  Si ves «—», esa declaración aún no se ha leído.
+                  Dinero declarado aproximado: depósitos + valores + planes − deuda.
+                  No incluye el valor de inmuebles (el PDF no lo trae). Digitaliza con{' '}
+                  <code>npm run bienes:auto</code>.
+                  {' '}Ahora: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con cifra.
+                </div>
+              )}
+
+              {orden === 'inmuebles' && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Número de filas de inmuebles (urbanos + rústicos) en la declaración de bienes.
+                  {' '}Ahora: {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con dato.
+                </div>
+              )}
+
+              {orden === 'vehiculos' && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Coches, motos, embarcaciones y aeronaves del PDF. Abre la ficha para ver el detalle
+                  (p. ej. «Jeep Commander», «BMW R80RT»).
+                  {' '}Ahora: {diputados.filter(d => (d.n_vehiculos ?? 0) > 0 || d.vehiculos_detalle).length} con vehículos.
                 </div>
               )}
 
@@ -651,6 +674,7 @@ export default function App() {
                           return String(Math.round(n));
                         };
                         const casas = d.n_casas ?? d.n_inmuebles;
+                        const nVeh = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
                         const etiquetas = {
                           nombre: ['min', d.minutos_tribuna],
                           ausencias: ['aus.', d.ausencias],
@@ -660,14 +684,27 @@ export default function App() {
                           abstenciones: ['abs.', d.abstenciones],
                           telematicos: ['tel.', d.telematicos],
                           patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
+                          inmuebles: ['inm.', casas ?? '—'],
+                          vehiculos: ['veh.', nVeh || '—'],
                           donaciones: ['don.', d.donaciones],
                           privadas: ['priv.', d.actividades_privadas]
                         };
                         const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
+                        let sub = et;
+                        if (cfg[0] === 'inmuebles' && casas != null) sub = 'inmuebles';
+                        if (cfg[0] === 'vehiculos') {
+                          const partes = [];
+                          if (d.n_coches) partes.push(`${d.n_coches} coche${d.n_coches === 1 ? '' : 's'}`);
+                          if (d.n_motos) partes.push(`${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}`);
+                          if (d.n_embarcaciones) partes.push(`${d.n_embarcaciones} emb.`);
+                          if (d.n_aeronaves) partes.push(`${d.n_aeronaves} aer.`);
+                          sub = partes.length ? partes.join(' · ') : 'vehículos';
+                        }
+                        if (cfg[0] === 'patrimonio' && casas != null) sub = `${casas} inm.`;
                         return (<>
                           <span className="ed" style={{ display: 'block', fontSize: 14, fontWeight: 600, lineHeight: 1.1 }}>{val ?? 0}</span>
-                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue }}>
-                            {cfg[0] === 'patrimonio' && casas != null ? `${casas} inm.` : et}
+                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {sub}
                           </span>
                         </>);
                       })()}
