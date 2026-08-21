@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { clasificarVehiculos } from './vehiculos.js';
+import { contarInmuebles } from './inmuebles.js';
+import { sanearImporte, patrimonioLiquido } from './euros.js';
 
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
 const clave = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
@@ -83,12 +85,12 @@ export async function traerDiputados() {
     const chunk = ids.slice(i, i + 200);
     const { data: filas, error } = await supabase
       .from('bienes_declarados')
-      .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves')
+      .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
       .in('mandato_id', chunk);
     if (error) {
       const { data: filas2 } = await supabase
         .from('bienes_declarados')
-        .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle')
+        .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle')
         .in('mandato_id', chunk);
       if (filas2?.length) bienes.push(...filas2);
     } else if (filas?.length) bienes.push(...filas);
@@ -98,20 +100,39 @@ export async function traerDiputados() {
     lista = lista.map(d => {
       const b = bm.get(d.mandato_id);
       if (!b) return d;
-      const casas = b.n_inmuebles ?? (
+      const inm = contarInmuebles(b.inmuebles_detalle, b.inmuebles_urbanos, b.inmuebles_rusticos);
+      const casas = Math.max(
+        b.n_inmuebles ?? 0,
+        inm.n_inmuebles ?? 0,
+        (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
+          ? (Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0))
+          : 0
+      ) || (b.n_inmuebles ?? inm.n_inmuebles ?? (
         (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
           ? (Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0))
           : null
-      );
-      let patrimonio = b.patrimonio_euros;
-      if (patrimonio == null) {
-        const act = [b.depositos, b.valores, b.planes_pensiones]
-          .filter(v => v != null)
-          .reduce((a, v) => a + Number(v), 0);
-        if (act || b.deuda_pendiente != null) {
-          patrimonio = act - Number(b.deuda_pendiente ?? 0);
-        }
+      ));
+
+      // Saneo en cliente por si el backfill aún no corrió (evita mostrar 187 M)
+      const dep = sanearImporte(b.depositos);
+      const val = sanearImporte(b.valores);
+      const plan = sanearImporte(b.planes_pensiones);
+      const deu = sanearImporte(b.deuda_pendiente);
+      let patrimonio = b.patrimonio_euros != null ? sanearImporte(b.patrimonio_euros) : null;
+      const patCalc = patrimonioLiquido({
+        depositos: dep ?? b.depositos,
+        valores: val ?? b.valores,
+        planes_pensiones: plan ?? b.planes_pensiones,
+        deuda_pendiente: deu ?? b.deuda_pendiente
+      });
+      if (patrimonio == null) patrimonio = patCalc;
+      else if (patCalc != null && Math.abs(patrimonio) > 10_000_000 && Math.abs(patCalc) < Math.abs(patrimonio)) {
+        patrimonio = patCalc;
       }
+
+      const outlier = b.introducido_por === 'gemini_outlier' ||
+        (patrimonio != null && (patrimonio > 10_000_000 || patrimonio < -1_000_000));
+
       const veh = clasificarVehiculos(b.vehiculos_detalle, b.vehiculos);
       return {
         ...d,
@@ -119,13 +140,17 @@ export async function traerDiputados() {
         bienes_total: d.bienes_total ?? patrimonio,
         n_inmuebles: d.n_inmuebles ?? casas,
         n_casas: d.n_casas ?? casas,
+        n_viviendas: inm.n_viviendas,
         n_coches: b.n_coches ?? veh.n_coches,
         n_motos: b.n_motos ?? veh.n_motos,
         n_embarcaciones: b.n_embarcaciones ?? veh.n_embarcaciones,
         n_aeronaves: b.n_aeronaves ?? veh.n_aeronaves,
         n_vehiculos: b.vehiculos ?? veh.n_vehiculos,
         vehiculos_detalle: b.vehiculos_detalle ?? null,
-        vehiculos_lista: veh.vehiculos_lista
+        vehiculos_lista: veh.vehiculos_lista,
+        inmuebles_detalle: b.inmuebles_detalle ?? null,
+        bienes_outlier: outlier,
+        bienes_confianza: b.confianza ?? null
       };
     });
   }

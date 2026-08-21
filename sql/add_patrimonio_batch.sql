@@ -14,7 +14,7 @@ alter table bienes_declarados
 comment on column bienes_declarados.patrimonio_euros is
   'Estimación: depósitos + valores + planes − deuda pendiente. Los inmuebles no tienen valoración en el PDF.';
 comment on column bienes_declarados.n_inmuebles is
-  'Suma de filas de inmuebles urbanos + rústicos declarados.';
+  'Unidades inmobiliarias (cantidades del detalle: 2 VIVIENDAS=2, 13 FINCAS=13), no solo filas.';
 comment on column bienes_declarados.n_coches is
   'Vehículos tipo coche/turismo/todoterreno clasificados del detalle del PDF.';
 comment on column bienes_declarados.n_motos is

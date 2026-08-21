@@ -108,7 +108,10 @@ const ORDENES = [
   ['intervenciones', 'Más intervenciones', d => Number(d.intervenciones ?? 0), true],
   ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
   ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true],
-  ['patrimonio', 'Mayor patrimonio (€)', d => Number(d.patrimonio_euros ?? d.bienes_total ?? -1), true],
+  ['patrimonio', 'Mayor patrimonio (€)', d => {
+    if (d.bienes_outlier) return -1; // no liderar el ranking con cifras anómalas
+    return Number(d.patrimonio_euros ?? d.bienes_total ?? -1);
+  }, true],
   ['inmuebles', 'Más inmuebles', d => {
     const n = d.n_casas ?? d.n_inmuebles;
     return n == null ? -1 : Number(n);
@@ -568,16 +571,21 @@ export default function App() {
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
                   Dinero declarado aproximado: depósitos + valores + planes − deuda.
-                  No incluye el valor de inmuebles (el PDF no lo trae). Digitaliza con{' '}
-                  <code>npm run bienes:auto</code>.
-                  {' '}Ahora: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con cifra.
+                  No incluye el valor de inmuebles (el PDF no lo trae).
+                  Cifras &gt;10 M o depósitos &gt;5 M se marcan para revisión (errores de coma/punto).
+                  Digitaliza con <code>npm run bienes:auto</code>
+                  {' '}· ahora: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con cifra
+                  {diputados.filter(d => d.bienes_outlier).length
+                    ? ` · ${diputados.filter(d => d.bienes_outlier).length} en revisión`
+                    : ''}.
                 </div>
               )}
 
               {orden === 'inmuebles' && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Número de filas de inmuebles (urbanos + rústicos) en la declaración de bienes.
+                  Unidades del PDF (no solo filas): «2 VIVIENDAS» = 2, «13 FINCAS» = 13,
+                  plazas, locales y naves incluidas. Si el detalle está vacío, se usan las filas.
                   {' '}Ahora: {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con dato.
                 </div>
               )}

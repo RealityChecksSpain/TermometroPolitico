@@ -2,6 +2,7 @@ import { exigirEnv } from './supabase';
 import { modelosDisponibles, Cadencia } from './gemini';
 import { UA } from './descubrir';
 import { extractText, getDocumentProxy } from 'unpdf';
+import { sanearDeclaracion } from './euros.js';
 
 export interface DeclaracionLeida {
   fecha_declaracion: string | null;
@@ -60,8 +61,10 @@ Es un documento escaneado o con texto. Extrae los valores EXACTAMENTE como apare
 
 REGLAS CRÍTICAS:
 - Si una casilla está VACÍA, devuelve null. NUNCA pongas 0. Vacío y cero son cosas distintas.
-- Los importes están en formato español: 37.357,80 significa treinta y siete mil. Devuélvelos como
-  número decimal con punto: 37357.80
+- Importes en formato español: 37.357,80 = 37357.80 (punto decimal, MÁXIMO 2 decimales).
+  3.122.070,00 → 3122070.00. El punto es de miles; la coma, de decimales.
+- Si el PDF muestra 3 decimales por errata (ej. 187.425,535), redondea a 2: 187425.54.
+  NUNCA conviertas eso en 187425535 ni en 187 millones.
 - Nunca inventes una cifra. Si no la lees con seguridad, ponla en "dudas" y devuelve null.
 - No sumes ni calcules nada que no esté escrito, salvo lo indicado abajo.
 
@@ -76,14 +79,19 @@ RENTAS PERCIBIDAS POR EL PARLAMENTARIO
 - rentas_detalle: los conceptos escritos, literales, separados por punto y coma.
 - irpf_pagado: recuadro "CANTIDAD PAGADA POR IRPF".
 
-BIENES PATRIMONIALES
-- inmuebles_urbanos: número de filas rellenas en "Bienes Inmuebles de naturaleza urbana".
-- inmuebles_rusticos: número de filas rellenas en "de naturaleza rústica".
-- inmuebles_detalle: clase, provincia, fecha y porcentaje de cada uno. Ej:
-  "Vivienda, Madrid, 2020, 40% de propiedad"
+BIENES PATRIMONIALES (urbanos + rústicos + inmuebles de sociedad si aparecen)
+- NO cuentes solo filas. Suma las CANTIDADES escritas en cada celda:
+  "2 VIVIENDAS" = 2, "13 FINCAS RUSTICAS" = 13, "4 FINCAS URBANAS" = 4,
+  "PLAZA DE GARAJE" sin número = 1, "VIVIENDA" + "VIVIENDA" en la misma fila = 2.
+- inmuebles_urbanos: total de unidades urbanas (viviendas, casas, plazas, locales, naves…).
+- inmuebles_rusticos: total de unidades rústicas (fincas rústicas, terrenos…).
+- Incluye también los inmuebles listados como propiedad de una sociedad.
+- inmuebles_detalle: UNA entrada por grupo, con la cantidad al inicio, separadas por "; ".
+  Ej: "2 VIVIENDAS Madrid 2011 25%; 13 FINCAS RUSTICAS León 2021 25%"
 
 DEPÓSITOS
-- depositos: el "SALDO de todos los depósitos".
+- depositos: el "SALDO de todos los depósitos" (máx. 2 decimales). Cifras > 5 millones son
+  rarísimas aquí: revisa puntos/comas antes de devolverlas.
 
 OTROS BIENES O DERECHOS
 - valores: suma de la columna VALOR de deuda pública, acciones y participaciones.
@@ -185,11 +193,120 @@ async function llamarModelo(
   if (!texto) return { ok: false, error: `${modelo}: respuesta vacia` };
 
   try {
-    const datos = JSON.parse(texto.replace(/```json|```/g, '').trim()) as DeclaracionLeida;
+    const datos = sanearDeclaracion(
+      JSON.parse(texto.replace(/```json|```/g, '').trim())
+    ) as DeclaracionLeida;
     return { ok: true, datos };
   } catch (e: any) {
     return { ok: false, error: `${modelo}: JSON invalido (${e.message})` };
   }
+}
+
+const ESQUEMA_CORRECCION = {
+  type: 'OBJECT',
+  properties: {
+    depositos: NUM,
+    valores: NUM,
+    planes_pensiones: NUM,
+    deuda_pendiente: NUM,
+    inmuebles_urbanos: INT,
+    inmuebles_rusticos: INT,
+    inmuebles_detalle: TXT,
+    explicacion: TXT,
+    cifras_confirmadas: { type: 'BOOLEAN', nullable: true }
+  },
+  required: ['explicacion']
+};
+
+/**
+ * Segunda pasada cuando depósitos/patrimonio salen anómalos (p. ej. 187 M por mala lectura ES).
+ */
+export async function revalidarCifrasAnomalas(
+  url: string,
+  sospecha: DeclaracionLeida,
+  motivo: string
+): Promise<{ ok: boolean; datos?: DeclaracionLeida; error?: string }> {
+  const clave = exigirEnv('GEMINI_API_KEY');
+  const r = await fetch(url, { headers: { 'User-Agent': UA } });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const buf = Buffer.from(await r.arrayBuffer());
+  const { texto } = await textoDelPdf(buf);
+  const resumen = JSON.stringify({
+    depositos: sospecha.depositos,
+    valores: sospecha.valores,
+    planes_pensiones: sospecha.planes_pensiones,
+    deuda_pendiente: sospecha.deuda_pendiente,
+    inmuebles_urbanos: sospecha.inmuebles_urbanos,
+    inmuebles_rusticos: sospecha.inmuebles_rusticos
+  });
+
+  const prompt =
+    `Revisas una declaración de bienes del Congreso. Motivo de alarma: ${motivo}.\n` +
+    `Valores extraídos antes (pueden estar MAL por puntos/comas o 3 decimales):\n${resumen}\n\n` +
+    `REGLAS: formato español 187.425,53 = 187425.53 euros (NO 187 millones). ` +
+    `Máximo 2 decimales. Si hay ,535 trunca a ,53.\n` +
+    `Inmuebles: suma cantidades ("13 FINCAS" = 13), no solo filas.\n` +
+    `Devuelve JSON con depositos, valores, planes_pensiones, deuda_pendiente, ` +
+    `inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, explicacion, cifras_confirmadas.\n` +
+    (texto.length >= 400
+      ? `\n--- TEXTO PDF ---\n${texto.slice(0, 50_000)}`
+      : '\n(El PDF va adjunto; léelo con cuidado en depósitos e inmuebles.)');
+
+  const parts: object[] = texto.length >= 400
+    ? [{ text: prompt }]
+    : [
+        { inline_data: { mime_type: 'application/pdf', data: buf.toString('base64') } },
+        { text: prompt }
+      ];
+
+  const modelos = texto.length >= 400 ? modelosParaTexto() : modelosParaPdf();
+  const cadencia = new Cadencia(modelos[0]);
+  for (const modelo of modelos) {
+    await cadencia.esperar();
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 2048,
+            responseMimeType: 'application/json',
+            responseSchema: ESQUEMA_CORRECCION
+          }
+        })
+      }
+    );
+    if (!res.ok) continue;
+    const cuerpo = await res.json();
+    const raw = (cuerpo.candidates?.[0]?.content?.parts ?? [])
+      .map((p: any) => p.text ?? '').join('');
+    if (!raw) continue;
+    try {
+      const corr = sanearDeclaracion(JSON.parse(raw.replace(/```json|```/g, '').trim()));
+      const datos: DeclaracionLeida = {
+        ...sospecha,
+        depositos: corr.depositos ?? sospecha.depositos,
+        valores: corr.valores ?? sospecha.valores,
+        planes_pensiones: corr.planes_pensiones ?? sospecha.planes_pensiones,
+        deuda_pendiente: corr.deuda_pendiente ?? sospecha.deuda_pendiente,
+        inmuebles_urbanos: corr.inmuebles_urbanos ?? sospecha.inmuebles_urbanos,
+        inmuebles_rusticos: corr.inmuebles_rusticos ?? sospecha.inmuebles_rusticos,
+        inmuebles_detalle: corr.inmuebles_detalle ?? sospecha.inmuebles_detalle,
+        confianza: corr.cifras_confirmadas === false ? 'baja' : 'media',
+        dudas: [
+          ...(sospecha.dudas ?? []),
+          `revalidación: ${corr.explicacion || motivo}`
+        ]
+      };
+      return { ok: true, datos };
+    } catch {
+      /* siguiente modelo */
+    }
+  }
+  return { ok: false, error: 'revalidación fallida' };
 }
 
 export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos?: DeclaracionLeida; error?: string; modelo?: string }> {

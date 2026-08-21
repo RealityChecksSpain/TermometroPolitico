@@ -1,15 +1,23 @@
 /**
- * Batch anual: lee PDFs de declaración de bienes (Gemini vision) y guarda en bienes_declarados.
- * Si el dato falta o es absurdo, reintenta. Puede tardar días; es seguro interrumpir y reanudar.
+ * Batch: lee PDFs de declaración de bienes (Gemini) y guarda en bienes_declarados.
+ * Seguro interrumpir y reanudar. Corrige outliers de escala (€) y subconteo de inmuebles.
  *
- * Uso:
  *   npm run bienes:auto
  *   npm run bienes:auto -- --limite=20
  *   npm run bienes:auto -- --solo-outliers
+ *   npm run bienes:auto -- --reescribir-altos
  */
 import { db, exigirEnv } from '../src/lib/supabase';
-import { leerDeclaracion } from '../src/lib/leer-declaracion';
+import { leerDeclaracion, revalidarCifrasAnomalas } from '../src/lib/leer-declaracion';
 import { clasificarVehiculos } from '../src/lib/vehiculos.js';
+import { contarInmuebles } from '../src/lib/inmuebles.js';
+import {
+  sanearDeclaracion,
+  sanearImporte,
+  patrimonioLiquido,
+  motivoAnomalia,
+  UMBRAL
+} from '../src/lib/euros.js';
 
 exigirEnv('SUPABASE_URL');
 exigirEnv('GEMINI_API_KEY');
@@ -23,50 +31,34 @@ const args = Object.fromEntries(
 
 const LIMITE = Number(args.limite ?? 0) || Infinity;
 const SOLO_OUTLIERS = args['solo-outliers'] === 'true';
-
-/** Umbrales de sensatez (euros). Fuera → segunda lectura. */
-const MIN_PATRIMONIO = -5_000_000;
-const MAX_PATRIMONIO = 80_000_000;
-const MAX_CASAS = 40;
-
-function sumar(...vals: Array<number | null | undefined>) {
-  let t = 0;
-  let hay = false;
-  for (const v of vals) {
-    if (v == null || Number.isNaN(Number(v))) continue;
-    t += Number(v);
-    hay = true;
-  }
-  return hay ? t : null;
-}
-
-function patrimonioDe(d: Record<string, any>) {
-  // Activos líquidos + valores − deuda pendiente. Los inmuebles no traen valoración en el PDF.
-  const activos = sumar(d.depositos, d.valores, d.planes_pensiones);
-  const deuda = d.deuda_pendiente != null ? Number(d.deuda_pendiente) : 0;
-  if (activos == null) return null;
-  return Math.round((activos - deuda) * 100) / 100;
-}
+const REESCRIBIR_ALTOS = args['reescribir-altos'] === 'true';
 
 function casasDe(d: Record<string, any>) {
-  const u = d.inmuebles_urbanos != null ? Number(d.inmuebles_urbanos) : 0;
-  const r = d.inmuebles_rusticos != null ? Number(d.inmuebles_rusticos) : 0;
-  if (d.inmuebles_urbanos == null && d.inmuebles_rusticos == null) return null;
-  return u + r;
+  return contarInmuebles(d.inmuebles_detalle, d.inmuebles_urbanos, d.inmuebles_rusticos).n_inmuebles;
 }
 
 function esAbsurdo(d: Record<string, any>) {
-  const pat = patrimonioDe(d);
+  const m = motivoAnomalia(d);
+  if (m) return m;
   const casas = casasDe(d);
-  if (pat != null && (pat < MIN_PATRIMONIO || pat > MAX_PATRIMONIO)) return 'patrimonio fuera de rango';
-  if (casas != null && (casas < 0 || casas > MAX_CASAS)) return 'número de inmuebles imposible';
+  if (casas != null && (casas < 0 || casas > UMBRAL.inmueblesAbsurdo)) {
+    return 'número de inmuebles imposible';
+  }
   if (d.confianza === 'baja') return 'confianza baja';
   return null;
 }
 
+function esAltoSospechoso(h: any) {
+  if (!h || h.verificado) return false;
+  const pat = h.patrimonio_euros != null ? Number(h.patrimonio_euros) : null;
+  const dep = h.depositos != null ? Number(h.depositos) : null;
+  if (pat != null && (pat > UMBRAL.patrimonioAlto || pat < UMBRAL.patrimonioBajo)) return true;
+  if (dep != null && dep > UMBRAL.depositosSospechosos) return true;
+  if (h.introducido_por === 'gemini_outlier') return true;
+  return false;
+}
+
 async function pendientes() {
-  // Fuente de verdad: mandatos con PDF + filas de bienes aún sin dato útil.
-  // No fiarnos de pendientes_bienes.hecho: puede marcar "hecho" sin patrimonio.
   const { data: mandatos, error } = await db()
     .from('mandatos')
     .select('id, url_bienes, politicos(nombre_completo)')
@@ -86,19 +78,18 @@ async function pendientes() {
 
   const { data: hechos } = await db()
     .from('bienes_declarados')
-    .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, confianza, verificado, depositos, valores');
+    .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, confianza, verificado, depositos, valores, introducido_por');
 
   const mapa = new Map((hechos ?? []).map(h => [h.mandato_id, h]));
-  const conPatrimonio = (hechos ?? []).filter(h => h.patrimonio_euros != null).length;
-
-  console.log(`Diagnóstico: ${nUrls ?? 0} mandatos con URL de PDF · ${hechos?.length ?? 0} filas en bienes_declarados · ${conPatrimonio} con patrimonio_euros`);
+  const conPat = (hechos ?? []).filter(h => h.patrimonio_euros != null).length;
+  console.log(`Diagnóstico: ${nUrls ?? 0} mandatos con PDF · ${hechos?.length ?? 0} filas · ${conPat} con patrimonio_euros`);
 
   if (!(nUrls > 0)) {
-    console.log('\nNo hay url_bienes en mandatos. Antes corre: npm run fichas\n');
+    console.log('\nNo hay url_bienes. Antes: npm run fichas\n');
     return [];
   }
 
-  const tieneDatoUtil = (h: any) => {
+  const tieneDato = (h: any) => {
     if (!h) return false;
     if (h.patrimonio_euros != null) return true;
     if (h.depositos != null || h.valores != null) return true;
@@ -108,15 +99,13 @@ async function pendientes() {
 
   return lista.filter(m => {
     const h = mapa.get(m.id);
-    if (!tieneDatoUtil(h)) return true;
-    if (SOLO_OUTLIERS) {
-      const pat = h.patrimonio_euros;
-      const casas = h.n_inmuebles ?? ((h.inmuebles_urbanos ?? 0) + (h.inmuebles_rusticos ?? 0));
-      if (pat != null && (pat < MIN_PATRIMONIO || pat > MAX_PATRIMONIO)) return true;
-      if (casas > MAX_CASAS) return true;
-      if (h.confianza === 'baja' && !h.verificado) return true;
+    if (REESCRIBIR_ALTOS || SOLO_OUTLIERS) {
+      if (esAltoSospechoso(h)) return true;
+      if (SOLO_OUTLIERS && h?.confianza === 'baja' && !h.verificado) return true;
       return false;
     }
+    if (!tieneDato(h)) return true;
+    if (esAltoSospechoso(h)) return true;
     if (h.verificado && h.patrimonio_euros != null) return false;
     if (h.confianza === 'alta' && h.patrimonio_euros != null) return false;
     if (h.patrimonio_euros == null && (h.depositos != null || h.valores != null)) return false;
@@ -126,7 +115,65 @@ async function pendientes() {
 
 console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
 
-// Backfill: clasificar vehículos ya guardados sin re-leer PDF
+// Backfill: sanear € e inmuebles ya guardados (arregla 187 M sin re-leer PDF)
+{
+  const { data: filas } = await db()
+    .from('bienes_declarados')
+    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, patrimonio_euros, inmuebles_detalle, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles');
+
+  let filled = 0;
+  for (const h of filas ?? []) {
+    const dep = sanearImporte(h.depositos);
+    const val = sanearImporte(h.valores);
+    const plan = sanearImporte(h.planes_pensiones);
+    const deu = sanearImporte(h.deuda_pendiente);
+    const saneado = { depositos: dep, valores: val, planes_pensiones: plan, deuda_pendiente: deu };
+    const pat = patrimonioLiquido(saneado);
+    const inm = contarInmuebles(h.inmuebles_detalle, h.inmuebles_urbanos, h.inmuebles_rusticos);
+
+    const cambioEuro =
+      (h.depositos != null && dep !== null && dep !== Number(h.depositos)) ||
+      (h.valores != null && val !== null && val !== Number(h.valores)) ||
+      (pat != null && h.patrimonio_euros == null) ||
+      (pat != null && h.patrimonio_euros != null && Math.abs(pat - Number(h.patrimonio_euros)) > 0.02);
+
+    const cambioInm =
+      inm.n_inmuebles != null &&
+      (h.n_inmuebles == null || inm.n_inmuebles > Number(h.n_inmuebles));
+
+    if (!cambioEuro && !cambioInm) continue;
+
+    const patch: Record<string, any> = {};
+    if (cambioEuro) {
+      if (dep != null) patch.depositos = dep;
+      if (val != null) patch.valores = val;
+      if (plan != null) patch.planes_pensiones = plan;
+      if (deu != null) patch.deuda_pendiente = deu;
+      if (pat != null) patch.patrimonio_euros = pat;
+    }
+    if (cambioInm) patch.n_inmuebles = inm.n_inmuebles;
+
+    if (pat != null && (pat > UMBRAL.patrimonioAlto || pat < UMBRAL.patrimonioBajo)) {
+      patch.introducido_por = 'gemini_outlier';
+      patch.confianza = 'baja';
+    } else if (
+      cambioEuro &&
+      h.patrimonio_euros != null &&
+      Number(h.patrimonio_euros) > UMBRAL.patrimonioAlto &&
+      pat != null &&
+      pat <= UMBRAL.patrimonioAlto
+    ) {
+      patch.introducido_por = 'gemini_corrected';
+      patch.confianza = 'media';
+    }
+
+    const { error } = await db().from('bienes_declarados').update(patch).eq('mandato_id', h.mandato_id);
+    if (!error) filled++;
+  }
+  if (filled) console.log(`Backfill saneo € / inmuebles: ${filled} filas\n`);
+}
+
+// Backfill vehículos
 {
   const { data: conDetalle } = await db()
     .from('bienes_declarados')
@@ -145,69 +192,72 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
     }).eq('mandato_id', h.mandato_id);
     if (!error) filled++;
   }
-  if (filled) console.log(`Backfill vehículos: ${filled} filas clasificadas\n`);
-}
-
-// Backfill: filas con depósitos/valores pero sin patrimonio_euros calculado
-{
-  const { data: sinPat } = await db()
-    .from('bienes_declarados')
-    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles, patrimonio_euros')
-    .is('patrimonio_euros', null);
-  let filled = 0;
-  for (const h of sinPat ?? []) {
-    const pat = patrimonioDe(h);
-    const casas = casasDe(h) ?? h.n_inmuebles;
-    if (pat == null && casas == null) continue;
-    const { error } = await db().from('bienes_declarados').update({
-      patrimonio_euros: pat,
-      n_inmuebles: casas
-    }).eq('mandato_id', h.mandato_id);
-    if (!error) filled++;
-  }
-  if (filled) console.log(`Backfill: ${filled} filas con patrimonio/inmuebles calculados sin re-leer PDF\n`);
+  if (filled) console.log(`Backfill vehículos: ${filled} filas\n`);
 }
 
 const cola = (await pendientes()).slice(0, LIMITE === Infinity ? undefined : LIMITE);
-console.log(`Pendientes en esta corrida: ${cola.length}${SOLO_OUTLIERS ? ' (solo outliers)' : ''}\n`);
+console.log(`Pendientes: ${cola.length}${SOLO_OUTLIERS || REESCRIBIR_ALTOS ? ' (outliers/altos)' : ''}\n`);
+
 if (cola.length === 0) {
-  console.log('Nada que procesar. Si en la app ves «—»:');
-  console.log('  1) npm run fichas          ← rellena url_bienes en mandatos');
-  console.log('  2) npm run bienes:auto -- --limite=5   ← prueba 5 PDFs');
-  console.log('  3) Recarga Diputados → Mayor patrimonio\n');
+  console.log('Nada que procesar.');
+  console.log('  Outliers de escala: npm run bienes:auto -- --reescribir-altos');
+  console.log('  Prueba: npm run bienes:auto -- --limite=5\n');
   process.exit(0);
 }
 
-let ok = 0, fallos = 0, revisita = 0;
+let ok = 0, fallos = 0, revisita = 0, corregidos = 0;
 
 for (let i = 0; i < cola.length; i++) {
   const m = cola[i];
-  const url = m.url_bienes;
   process.stdout.write(`[${i + 1}/${cola.length}] ${m.nombre_completo}… `);
 
-  let lectura = await leerDeclaracion(url);
+  let lectura = await leerDeclaracion(m.url_bienes);
   if (!lectura.ok || !lectura.datos) {
     console.log(`ERROR ${lectura.error}`);
     fallos++;
     continue;
   }
 
+  lectura.datos = sanearDeclaracion(lectura.datos);
   let motivo = esAbsurdo(lectura.datos);
+  let corregido = false;
+
   if (motivo) {
-    process.stdout.write(`dudoso (${motivo}) → reintento… `);
+    process.stdout.write(`dudoso (${motivo}) → revalidar… `);
     revisita++;
-    const segunda = await leerDeclaracion(url);
-    if (segunda.ok && segunda.datos && !esAbsurdo(segunda.datos)) {
-      lectura = segunda;
-      motivo = null;
+    const rev = await revalidarCifrasAnomalas(m.url_bienes, lectura.datos, motivo);
+    if (rev.ok && rev.datos) {
+      lectura.datos = sanearDeclaracion(rev.datos);
+      const m2 = esAbsurdo(lectura.datos);
+      if (!m2) {
+        motivo = null;
+        corregido = true;
+        corregidos++;
+      } else {
+        motivo = m2;
+      }
+    } else {
+      const segunda = await leerDeclaracion(m.url_bienes);
+      if (segunda.ok && segunda.datos) {
+        lectura.datos = sanearDeclaracion(segunda.datos);
+        const m2 = esAbsurdo(lectura.datos);
+        if (!m2) {
+          motivo = null;
+          corregido = true;
+          corregidos++;
+        } else motivo = m2;
+      }
     }
   }
 
   const d = lectura.datos!;
   const veh = clasificarVehiculos(d.vehiculos_detalle, d.vehiculos);
+  const inm = contarInmuebles(d.inmuebles_detalle, d.inmuebles_urbanos, d.inmuebles_rusticos);
+  const pat = patrimonioLiquido(d);
+
   const fila = {
     mandato_id: m.id,
-    url_declaracion: url,
+    url_declaracion: m.url_bienes,
     fecha_declaracion: d.fecha_declaracion,
     rendimientos_trabajo: d.rendimientos_trabajo,
     rendimientos_capital: d.rendimientos_capital,
@@ -225,33 +275,28 @@ for (let i = 0; i < cola.length; i++) {
     prestamos_concedido: d.prestamos_concedido,
     deuda_pendiente: d.deuda_pendiente,
     observaciones: d.observaciones,
-    patrimonio_euros: patrimonioDe(d),
-    n_inmuebles: casasDe(d),
+    patrimonio_euros: pat,
+    n_inmuebles: inm.n_inmuebles,
     n_coches: veh.n_coches,
     n_motos: veh.n_motos,
     n_embarcaciones: veh.n_embarcaciones,
     n_aeronaves: veh.n_aeronaves,
     confianza: d.confianza,
     dudas: (d.dudas ?? []).join('; ') || null,
-    introducido_por: motivo ? 'gemini_outlier' : 'gemini_auto',
+    introducido_por: motivo ? 'gemini_outlier' : (corregido ? 'gemini_corrected' : 'gemini_auto'),
     introducido_at: new Date().toISOString(),
     verificado: false
   };
 
   const { error } = await db().from('bienes_declarados').upsert(fila, { onConflict: 'mandato_id' });
   if (error) {
-    // columnas opcionales pueden no existir aún
-    if (/patrimonio_euros|n_inmuebles|n_coches|n_motos|n_embarcaciones|n_aeronaves|confianza|dudas/i.test(error.message)) {
+    if (/patrimonio_euros|n_inmuebles|n_coches|confianza|dudas/i.test(error.message)) {
       const {
         patrimonio_euros, n_inmuebles, n_coches, n_motos, n_embarcaciones, n_aeronaves,
         confianza, dudas, ...basico
       } = fila;
       const r2 = await db().from('bienes_declarados').upsert({
-        ...basico,
-        patrimonio_euros,
-        n_inmuebles,
-        confianza,
-        dudas
+        ...basico, patrimonio_euros, n_inmuebles, confianza, dudas
       }, { onConflict: 'mandato_id' });
       if (r2.error) {
         const r3 = await db().from('bienes_declarados').upsert(basico, { onConflict: 'mandato_id' });
@@ -261,7 +306,7 @@ for (let i = 0; i < cola.length; i++) {
           continue;
         }
       }
-      console.log(`ok (parcial) · inm ${casasDe(d) ?? '—'} · veh ${veh.n_vehiculos} · conf ${d.confianza}`);
+      console.log(`ok (parcial) · inm ${inm.n_inmuebles ?? '—'} · ${d.confianza}`);
     } else {
       console.log(`ERROR DB ${error.message}`);
       fallos++;
@@ -270,11 +315,12 @@ for (let i = 0; i < cola.length; i++) {
   } else {
     console.log(
       `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${fila.n_inmuebles ?? '—'} · ` +
-      `coches ${veh.n_coches} motos ${veh.n_motos} · ${d.confianza}${motivo ? ' · revisar' : ''}`
+      `coches ${veh.n_coches} motos ${veh.n_motos} · ${d.confianza}` +
+      `${corregido ? ' · corregido' : ''}${motivo ? ' · revisar' : ''}`
     );
   }
   ok++;
 }
 
-console.log(`\nListo: ${ok} guardados, ${fallos} fallos, ${revisita} reintentos por outlier.\n`);
-console.log('Revisa los de confianza baja o gemini_outlier en npm run bienes\n');
+console.log(`\nListo: ${ok} guardados, ${fallos} fallos, ${revisita} revalidaciones, ${corregidos} corregidos.\n`);
+console.log('Para rehacer los >10 M: npm run bienes:auto -- --reescribir-altos\n');
