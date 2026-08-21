@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { DestelloSuave } from './Destello.jsx';
 import { traerMapaPartidos, traerSesgo } from '../lib/cliente.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
@@ -10,21 +11,27 @@ const C = {
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3'
 };
 
-function GuiaEje({ titulo, intro, a, b, miramos }) {
+function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
   return (
     <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15, height: '100%' }}>
       <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>{titulo}</div>
       <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>{intro}</div>
 
       <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-        <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+        <div className="em" style={{
+          fontSize: 11, color: colorA || C.tinta, textTransform: 'uppercase',
+          letterSpacing: '.06em', fontWeight: 700
+        }}>
           {a.titulo}
         </div>
         <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>{a.texto}</div>
       </div>
 
       <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
-        <div className="em" style={{ fontSize: 10, color: C.tenue, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>
+        <div className="em" style={{
+          fontSize: 11, color: colorB || C.tinta, textTransform: 'uppercase',
+          letterSpacing: '.06em', fontWeight: 700
+        }}>
           {b.titulo}
         </div>
         <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>{b.texto}</div>
@@ -71,12 +78,24 @@ export default function Mapa({ onDiputados }) {
       const psoeV = list.find(p => p.siglas === 'PSOE');
       const ppP = datos.find(d => d.siglas === 'PP');
       const psoeP = datos.find(d => d.siglas === 'PSOE');
-      const votosInvertidos = ppV && psoeV && Number(ppV.x) < Number(psoeV.x);
-      const programaOk = ppP && psoeP
+      const votosEcoInvertidos = ppV && psoeV && Number(ppV.x) < Number(psoeV.x);
+      const programaEcoOk = ppP && psoeP
         && ppP.prog_economico != null && psoeP.prog_economico != null
         && Number(ppP.prog_economico) > Number(psoeP.prog_economico);
-      if (votosInvertidos && programaOk) {
+      if (votosEcoInvertidos && programaEcoOk) {
         list = list.map(p => ({ ...p, x: -Number(p.x), cx: -Number(p.x) }));
+      }
+
+      // Misma salvaguarda en el eje social: PP debería quedar más conservador que PSOE
+      // si el programa ya lo dice así.
+      const ppVs = list.find(p => p.siglas === 'PP');
+      const psoeVs = list.find(p => p.siglas === 'PSOE');
+      const votosSocInvertidos = ppVs && psoeVs && Number(ppVs.y) < Number(psoeVs.y);
+      const programaSocOk = ppP && psoeP
+        && ppP.prog_social != null && psoeP.prog_social != null
+        && Number(ppP.prog_social) > Number(psoeP.prog_social);
+      if (votosSocInvertidos && programaSocOk) {
+        list = list.map(p => ({ ...p, y: -Number(p.y), cy: Number(p.y) }));
       }
     }
     return list;
@@ -167,6 +186,8 @@ export default function Mapa({ onDiputados }) {
             <GuiaEje
               titulo="Eje económico"
               intro="Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades."
+              colorA="#C45C52"
+              colorB="#3D7AB8"
               a={{
                 titulo: 'Izquierda económica',
                 texto: 'El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto público, impuestos progresivos y reglas que limiten el poder de las empresas. Es la línea que va de Marx a la socialdemocracia de posguerra.'
@@ -179,7 +200,11 @@ export default function Mapa({ onDiputados }) {
             />
           </div>
 
-          <div style={{ background: C.pizarra, borderRadius: 3, padding: 'clamp(14px, 2.5vw, 22px)', minWidth: 0 }}>
+          <div style={{
+            position: 'relative',
+            background: C.pizarra, borderRadius: 3, padding: 'clamp(14px, 2.5vw, 22px)', minWidth: 0
+          }}>
+            <DestelloSuave color="rgba(232,197,106,0.35)" n={6} />
             <svg ref={svgRef}
               viewBox="-1.45 -1.5 2.9 3.05"
               preserveAspectRatio="xMidYMid meet"
@@ -193,10 +218,15 @@ export default function Mapa({ onDiputados }) {
               <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
               <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
-              <text x="-1.32" y="-1.28" fill="#F2F3F0" fontSize="0.078" fontWeight="600" fontFamily="DM Mono, monospace">IZQUIERDA</text>
-              <text x="1.32" y="-1.28" fill="#F2F3F0" fontSize="0.078" fontWeight="600" textAnchor="end" fontFamily="DM Mono, monospace">DERECHA</text>
-              <text x="0" y="-1.40" fill="#F2F3F0" fontSize="0.078" fontWeight="600" textAnchor="middle" fontFamily="DM Mono, monospace">CONSERVADOR</text>
-              <text x="0" y="1.48" fill="#F2F3F0" fontSize="0.078" fontWeight="600" textAnchor="middle" fontFamily="DM Mono, monospace">PROGRESISTA</text>
+              {/* Ejes resaltados: color + peso para leer el mapa de un vistazo */}
+              <text x="-1.32" y="-1.28" fill="#F2A7A0" fontSize="0.092" fontWeight="700"
+                fontFamily="DM Mono, monospace" letterSpacing="0.02">IZQUIERDA</text>
+              <text x="1.32" y="-1.28" fill="#8EB8F0" fontSize="0.092" fontWeight="700"
+                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">DERECHA</text>
+              <text x="0" y="-1.40" fill="#E8C56A" fontSize="0.092" fontWeight="700"
+                textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">CONSERVADOR</text>
+              <text x="0" y="1.48" fill="#6ECFBC" fontSize="0.092" fontWeight="700"
+                textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">PROGRESISTA</text>
 
               {conEtiqueta.map(p => {
                 const on = !encima || encima === p.partido;
@@ -259,7 +289,9 @@ export default function Mapa({ onDiputados }) {
             Cada círculo es un partido y su tamaño es el número de escaños.
             {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
             {fuente === 'votos' && (
-              <span> La posición por votos cuenta solo los <em>sí</em>: votar en contra no empuja al partido al otro lado del eje.</span>
+              <span> La posición por votos cuenta solo los <em>sí</em> a normas ya codificadas:
+                es una aproximación y puede diferir del sentido político habitual.
+                El mapa de <em>programa</em> es la referencia más estable.</span>
             )}
           </div>
               )}
@@ -270,6 +302,8 @@ export default function Mapa({ onDiputados }) {
             <GuiaEje
               titulo="Eje social"
               intro="Es un eje independiente del económico. Se puede situar a un lado en economía y al otro en este. En España se confunden a menudo; por eso el mapa los separa."
+              colorA="#B8912E"
+              colorB="#2A9A86"
               a={{
                 titulo: 'Conservador',
                 texto: 'Las instituciones y costumbres heredadas acumulan una sabiduría que nadie diseñó y que conviene no desmontar a la ligera. Es la tesis de Burke: prudencia frente al cambio rápido, y prioridad de la comunidad, la familia y la nación sobre la elección individual.'

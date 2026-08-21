@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DestelloSuave, EntradaSuave } from './Destello.jsx';
 import Feed from './Feed.jsx';
 import GraficoBrecha from './GraficoBrecha.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
@@ -8,7 +9,7 @@ import {
   marcarVistoAhora, ultimaVista, filtrarNovedades
 } from '../lib/alertas.js';
 import { traerUltimas, traerLideres } from '../lib/cliente.js';
-import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
+import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -145,9 +146,6 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
     setNovedades([]);
   }
 
-  const destacada = ultimas[0];
-  const restoUltimas = ultimas.slice(1, 7);
-
   return (
     <div>
       <section style={{
@@ -162,7 +160,9 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
           position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.35,
           background: 'radial-gradient(ellipse at 85% 20%, rgba(94,191,146,0.35), transparent 45%), radial-gradient(ellipse at 10% 90%, rgba(176,140,60,0.2), transparent 40%)'
         }} />
+        <DestelloSuave color="rgba(242,243,240,0.45)" n={10} />
 
+        <EntradaSuave>
         <div style={{
           position: 'relative',
           display: 'grid',
@@ -295,7 +295,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             background: 'rgba(255,255,255,0.07)',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 3,
-            padding: '14px 14px 8px',
+            padding: '14px 14px 10px',
             backdropFilter: 'blur(8px)'
           }}>
             <div style={{
@@ -309,55 +309,56 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
               }}>Ver todas →</button>
             </div>
 
-            {destacada && (
-              <button onClick={() => onVotacion(destacada)} style={{
-                display: 'block', width: '100%', textAlign: 'left', background: 'rgba(0,0,0,0.2)',
-                border: 'none', borderRadius: 2, cursor: 'pointer', padding: '12px 12px', marginBottom: 6
-              }}>
-                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {destacada.materia_nombre && (
-                    <span style={{
-                      background: destacada.materia_color || '#5A6067', color: '#fff',
-                      padding: '2px 7px', borderRadius: 2, fontWeight: 700, letterSpacing: '.04em'
-                    }}>{destacada.materia_nombre}</span>
-                  )}
-                  <span>{corta(destacada.fecha)}</span>
-                  <span style={{
-                    marginLeft: 'auto',
-                    color: (destacada.resultado_final ?? destacada.resultado_ultima) === 'aprobada' ? '#5FBF92' : '#E08278',
-                    fontWeight: 600
-                  }}>
-                    {(destacada.resultado_final ?? destacada.resultado_ultima) === 'aprobada' ? '✓' : '✕'}
-                  </span>
-                </div>
-                <div className="ed" style={{ fontSize: 15, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3 }}>
-                  {fraseCortaDeNorma(destacada, 52) || String(limpiarTitular(destacada.titular)).slice(0, 52)}
-                </div>
-              </button>
-            )}
-
-            {restoUltimas.map((n, i) => {
+            {ultimas.slice(0, 5).map((n, i) => {
               const ok = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-              const txt = fraseCortaDeNorma(n, 48) || String(limpiarTitular(n.titular)).slice(0, 48);
+              const frase = fraseCortaDeNorma(n, 42) || String(nombreOficialNorma(n)).slice(0, 42);
+              const oficial = nombreOficialNorma(n);
+              const efectos = Array.isArray(n.efectos) ? n.efectos
+                : (Array.isArray(n.colectivos) ? n.colectivos.map(s => ({ slug: s, nombre: s })) : []);
               return (
                 <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
-                  display: 'block', width: '100%', textAlign: 'left', background: 'none',
-                  border: 'none', borderTop: i || destacada ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                  cursor: 'pointer', padding: '10px 4px'
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: i === 0 ? 'rgba(0,0,0,0.22)' : 'transparent',
+                  border: 'none',
+                  borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderRadius: i === 0 ? 2 : 0,
+                  cursor: 'pointer',
+                  padding: i === 0 ? '12px' : '11px 4px'
                 }}>
-                  <div className="em" style={{ fontSize: 9.5, marginBottom: 3, display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div className="em" style={{
+                    fontSize: 9.5, marginBottom: 5, display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap'
+                  }}>
                     {n.materia_nombre && (
                       <span style={{
                         color: '#fff', background: n.materia_color || '#5A6067',
-                        padding: '1px 6px', borderRadius: 2, fontWeight: 600
+                        padding: '2px 7px', borderRadius: 2, fontWeight: 700, letterSpacing: '.04em',
+                        textTransform: 'uppercase'
                       }}>{n.materia_nombre}</span>
                     )}
-                    <span style={{ color: '#7C8288' }}>{corta(n.fecha)}</span>
-                    <span style={{ marginLeft: 'auto', color: ok ? '#5FBF92' : '#E08278', fontWeight: 600 }}>
-                      {ok ? '✓' : '✕'}
-                    </span>
+                    <span style={{ color: '#8E959C' }}>{corta(n.fecha)}</span>
+                    <span style={{
+                      marginLeft: 'auto', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
+                      color: ok ? '#5FBF92' : '#E08278'
+                    }}>{ok ? 'Aprobada' : 'Rechazada'}</span>
                   </div>
-                  <div style={{ fontSize: 12.5, lineHeight: 1.35, color: '#DDE1E5' }}>{txt}</div>
+                  <div className="ed" style={{
+                    fontSize: i === 0 ? 15 : 13.5, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3
+                  }}>{frase}</div>
+                  <div className="em" style={{
+                    fontSize: 10, color: '#8E959C', lineHeight: 1.4, marginTop: 5
+                  }} title={oficial}>
+                    {oficial.length > 110 ? oficial.slice(0, 107) + '…' : oficial}
+                  </div>
+                  {efectos.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+                      {efectos.slice(0, 3).map(e => (
+                        <span key={e.slug || e.nombre} className="em" style={{
+                          fontSize: 9.5, padding: '2px 7px', borderRadius: 2,
+                          border: '1px solid rgba(255,255,255,0.18)', color: '#C9CDD2'
+                        }}>{e.nombre || e.slug}</span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -367,6 +368,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             )}
           </aside>
         </div>
+        </EntradaSuave>
       </section>
 
       {novedades.length > 0 && (

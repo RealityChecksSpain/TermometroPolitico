@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { traerFeed } from '../lib/cliente.js';
-import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
+import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -92,22 +92,30 @@ function BarrasVoto({ si, no, abs }) {
 
 function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
   const aprobada = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-  const frase = fraseCortaDeNorma(n, 52);
+  const frase = fraseCortaDeNorma(n, 46);
   const tituloLegal = limpiarTitular
     ? limpiarTitular(n.titular || n.subtitulo || n.titulo)
-    : (n.titular || n.subtitulo || n.titulo);
+    : nombreOficialNorma(n);
   const efectos = Array.isArray(n.efectos) ? n.efectos : [];
 
   return (
     <article onClick={() => onAbrir(n)} style={{
       background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3,
       padding: destacada ? 'clamp(16px, 2.5vw, 22px)' : '14px 15px',
-      cursor: 'pointer', transition: 'border-color 140ms ease, transform 140ms ease',
+      cursor: 'pointer', transition: 'border-color 140ms ease, transform 140ms ease, box-shadow 180ms ease',
       borderLeft: `4px solid ${n.materia_color || C.linea}`,
       position: 'relative'
     }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = C.tinta; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = C.linea; }}>
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = C.tinta;
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(20,22,26,0.06)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = C.linea;
+        e.currentTarget.style.transform = 'none';
+        e.currentTarget.style.boxShadow = 'none';
+      }}>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         {n.materia_nombre ? (
@@ -129,7 +137,7 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
           </span>
         )}
         <span className="em" style={{
-          fontSize: 10, fontWeight: 600, marginLeft: 'auto',
+          fontSize: 10, fontWeight: 700, marginLeft: 'auto',
           color: aprobada ? C.si : C.no, textTransform: 'uppercase', letterSpacing: '.05em'
         }}>{aprobada ? 'Aprobada' : 'Rechazada'}</span>
       </div>
@@ -138,16 +146,14 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
         fontSize: destacada ? 'clamp(20px, 2.8vw, 28px)' : 'clamp(16px, 2vw, 19px)',
         fontWeight: 600, lineHeight: 1.25, letterSpacing: '-0.015em', margin: 0, color: C.tinta
       }}>
-        {frase || (String(tituloLegal).length > 110 ? String(tituloLegal).slice(0, 107) + '…' : tituloLegal)}
+        {frase || (String(tituloLegal).length > 90 ? String(tituloLegal).slice(0, 87) + '…' : tituloLegal)}
       </h3>
 
-      {frase && (
-        <div className="em" style={{
-          fontSize: 11, color: C.tenue, lineHeight: 1.45, marginTop: 8
-        }} title={tituloLegal}>
-          {String(tituloLegal).length > 140 ? String(tituloLegal).slice(0, 137) + '…' : tituloLegal}
-        </div>
-      )}
+      <div className="em" style={{
+        fontSize: 11, color: C.tenue, lineHeight: 1.45, marginTop: 8
+      }} title={tituloLegal}>
+        {String(tituloLegal).length > 150 ? String(tituloLegal).slice(0, 147) + '…' : tituloLegal}
+      </div>
 
       <div style={{
         display: 'flex', gap: 14, alignItems: 'center', marginTop: 14,
@@ -161,7 +167,7 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 12 }}>
           {efectos.slice(0, destacada ? 4 : 3).map(e => (
             <span key={e.slug} className="em" style={{
-              fontSize: 10, padding: '3px 8px', borderRadius: 20,
+              fontSize: 10, padding: '3px 8px', borderRadius: 2,
               background: C.superficie, color: C.media, border: `1px solid ${C.linea}`
             }}>{e.nombre}</span>
           ))}

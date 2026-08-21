@@ -552,8 +552,10 @@ export default function App() {
               {orden === 'patrimonio' && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Patrimonio declarado en la declaración de bienes del Congreso. Solo aparece si ya se
-                  ha cargado el PDF (npm run bienes). Si ves ceros, faltan declaraciones digitalizadas.
+                  Patrimonio estimado (depósitos + valores + planes − deuda) e inmuebles contados
+                  desde el PDF oficial. Ejecuta <code>npm run bienes:auto</code> para digitalizar
+                  en lote (puede tardar días). Los outliers se reintentan con Gemini. Si ves «—»,
+                  aún falta esa declaración.
                 </div>
               )}
 
@@ -629,9 +631,17 @@ export default function App() {
                         {d.partido_siglas || d.grupo || '—'} · {d.circunscripcion ?? '—'}
                       </span>
                     </span>
-                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 72 }}>
+                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 88 }}>
                       {(() => {
                         const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
+                        const fmtEuro = v => {
+                          if (v == null || v === '—' || Number.isNaN(Number(v))) return '—';
+                          const n = Number(v);
+                          if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' M';
+                          if (Math.abs(n) >= 1000) return Math.round(n / 1000) + ' mil';
+                          return String(Math.round(n));
+                        };
+                        const casas = d.n_casas ?? d.n_inmuebles;
                         const etiquetas = {
                           nombre: ['min', d.minutos_tribuna],
                           ausencias: ['aus.', d.ausencias],
@@ -640,14 +650,16 @@ export default function App() {
                           intervenciones: ['int.', d.intervenciones],
                           abstenciones: ['abs.', d.abstenciones],
                           telematicos: ['tel.', d.telematicos],
-                          patrimonio: ['€', d.patrimonio_euros ?? d.bienes_total ?? '—'],
+                          patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
                           donaciones: ['don.', d.donaciones],
                           privadas: ['priv.', d.actividades_privadas]
                         };
                         const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
                         return (<>
                           <span className="ed" style={{ display: 'block', fontSize: 14, fontWeight: 600, lineHeight: 1.1 }}>{val ?? 0}</span>
-                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue }}>{et}</span>
+                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue }}>
+                            {cfg[0] === 'patrimonio' && casas != null ? `${casas} inm.` : et}
+                          </span>
                         </>);
                       })()}
                     </span>

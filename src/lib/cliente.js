@@ -42,38 +42,80 @@ export async function traerDiputados() {
     .select('*')
     .order('eje1', { ascending: true, nullsFirst: false });
   if (error) throw error;
-  const lista = data ?? [];
+  let lista = data ?? [];
 
   // mv_diputados a veces se queda sin foto_url tras un refresh fallido;
   // las fotos viven en mandatos.
   const sinFoto = lista.filter(d => !d.foto_url).map(d => d.mandato_id).filter(Boolean);
-  if (!sinFoto.length) return lista;
-
-  const fotos = [];
-  for (let i = 0; i < sinFoto.length; i += 200) {
-    const chunk = sinFoto.slice(i, i + 200);
-    const { data: filas } = await supabase
-      .from('mandatos')
-      .select('id, foto_url, cod_parlamentario, url_ficha, url_bienes')
-      .in('id', chunk);
-    if (filas?.length) fotos.push(...filas);
+  if (sinFoto.length) {
+    const fotos = [];
+    for (let i = 0; i < sinFoto.length; i += 200) {
+      const chunk = sinFoto.slice(i, i + 200);
+      const { data: filas } = await supabase
+        .from('mandatos')
+        .select('id, foto_url, cod_parlamentario, url_ficha, url_bienes')
+        .in('id', chunk);
+      if (filas?.length) fotos.push(...filas);
+    }
+    if (fotos.length) {
+      const mapa = new Map(fotos.map(f => [f.id, f]));
+      lista = lista.map(d => {
+        const m = mapa.get(d.mandato_id);
+        if (!m) return d;
+        return {
+          ...d,
+          foto_url: d.foto_url || m.foto_url || (m.cod_parlamentario
+            ? `https://www.congreso.es/docu/imgweb/diputados/${m.cod_parlamentario}_15.jpg`
+            : null),
+          cod_parlamentario: d.cod_parlamentario ?? m.cod_parlamentario,
+          url_ficha: d.url_ficha || m.url_ficha,
+          url_bienes: d.url_bienes || m.url_bienes
+        };
+      });
+    }
   }
-  if (!fotos.length) return lista;
 
-  const mapa = new Map(fotos.map(f => [f.id, f]));
-  return lista.map(d => {
-    const m = mapa.get(d.mandato_id);
-    if (!m) return d;
-    return {
-      ...d,
-      foto_url: d.foto_url || m.foto_url || (m.cod_parlamentario
-        ? `https://www.congreso.es/docu/imgweb/diputados/${m.cod_parlamentario}_15.jpg`
-        : null),
-      cod_parlamentario: d.cod_parlamentario ?? m.cod_parlamentario,
-      url_ficha: d.url_ficha || m.url_ficha,
-      url_bienes: d.url_bienes || m.url_bienes
-    };
-  });
+  // Patrimonio / inmuebles desde bienes_declarados (batch Gemini o revisión humana)
+  const ids = lista.map(d => d.mandato_id).filter(Boolean);
+  const bienes = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const { data: filas } = await supabase
+      .from('bienes_declarados')
+      .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, depositos, valores, planes_pensiones, deuda_pendiente')
+      .in('mandato_id', chunk);
+    if (filas?.length) bienes.push(...filas);
+  }
+  if (bienes.length) {
+    const bm = new Map(bienes.map(b => [b.mandato_id, b]));
+    lista = lista.map(d => {
+      const b = bm.get(d.mandato_id);
+      if (!b) return d;
+      const casas = b.n_inmuebles ?? (
+        (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
+          ? (Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0))
+          : null
+      );
+      let patrimonio = b.patrimonio_euros;
+      if (patrimonio == null) {
+        const act = [b.depositos, b.valores, b.planes_pensiones]
+          .filter(v => v != null)
+          .reduce((a, v) => a + Number(v), 0);
+        if (act || b.deuda_pendiente != null) {
+          patrimonio = act - Number(b.deuda_pendiente ?? 0);
+        }
+      }
+      return {
+        ...d,
+        patrimonio_euros: d.patrimonio_euros ?? patrimonio,
+        bienes_total: d.bienes_total ?? patrimonio,
+        n_inmuebles: d.n_inmuebles ?? casas,
+        n_casas: d.n_casas ?? casas
+      };
+    });
+  }
+
+  return lista;
 }
 
 export async function traerVotaciones(limite = 200, filtros = {}) {
