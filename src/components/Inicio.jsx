@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Feed from './Feed.jsx';
 import GraficoBrecha from './GraficoBrecha.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
-import { traerUltimas } from '../lib/cliente.js';
+import { traerUltimas, traerLideres } from '../lib/cliente.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -19,6 +19,14 @@ function corta(f) {
   if (dias === 1) return 'ayer';
   if (dias < 8) return `hace ${dias} d`;
   return `${d.getDate()} ${MESES[d.getMonth()]}`;
+}
+
+function limpiarTitular(t) {
+  if (!t) return t;
+  return String(t)
+    .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
+    .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
+    .trim() || t;
 }
 
 function Seccion({ titulo, texto, pie, onClick }) {
@@ -45,8 +53,12 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   const [filtro, setFiltro] = useState(null);
   const [etiqueta, setEtiqueta] = useState(null);
   const [ultimas, setUltimas] = useState([]);
+  const [ausentes, setAusentes] = useState([]);
 
-  useEffect(() => { traerUltimas(6).then(setUltimas).catch(() => setUltimas([])); }, []);
+  useEffect(() => {
+    traerUltimas(7).then(setUltimas).catch(() => setUltimas([]));
+    traerLideres('ausencias').then(setAusentes).catch(() => setAusentes([]));
+  }, []);
 
   const nombreColectivo = s => (colectivos ?? []).find(c => c.slug === s)?.nombre ?? s;
 
@@ -72,94 +84,181 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
     setFiltro(null); setEtiqueta(null);
   }
 
+  const destacada = ultimas[0];
+  const restoUltimas = ultimas.slice(1);
+
   return (
     <div>
-      <div className="portada">
-        <div>
-          <h1 className="ed" style={{
-            fontSize: 'clamp(30px, 5.4vw, 52px)', fontWeight: 600, lineHeight: 1.03,
-            letterSpacing: '-0.025em', margin: 0
-          }}>
-            ¿Qué acaba de<br />aprobar el Congreso?
-          </h1>
-          <p style={{ fontSize: 'clamp(15px, 2vw, 18px)', color: C.media, lineHeight: 1.5, margin: '16px 0 0', maxWidth: 460 }}>
-            Cada ley votada, quién la apoyó y a quién afecta. Escribe tu situación
-            y te enseño solo las que te tocan a ti.
-          </p>
+      <section style={{
+        position: 'relative',
+        borderRadius: 4,
+        overflow: 'hidden',
+        background: `linear-gradient(135deg, ${C.pizarra} 0%, #2A3038 55%, #1A3A32 100%)`,
+        padding: 'clamp(22px, 4vw, 40px)',
+        marginBottom: 22
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.35,
+          background: 'radial-gradient(ellipse at 85% 20%, rgba(94,191,146,0.35), transparent 45%), radial-gradient(ellipse at 10% 90%, rgba(176,140,60,0.2), transparent 40%)'
+        }} />
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
-            <input
-              value={perfil}
-              onChange={e => { setPerfil(e.target.value); setDeteccion(detectarPerfil(e.target.value)); }}
-              onKeyDown={e => e.key === 'Enter' && buscar()}
-              placeholder="Soy autónoma y vivo de alquiler…"
-              style={{
-                flex: '1 1 240px', padding: '14px 16px', fontSize: 15,
-                border: `1px solid ${deteccion.colectivos.length ? C.tinta : C.linea}`,
-                borderRadius: 3, background: C.superficie
-              }} />
-            <button onClick={buscar} disabled={pensando} style={{
-              padding: '14px 22px', fontSize: 14.5, fontWeight: 600, cursor: 'pointer',
-              background: C.tinta, color: C.papel, border: 'none', borderRadius: 3,
-              opacity: pensando ? 0.6 : 1
-            }}>{pensando ? 'pensando…' : 'Ver mis leyes'}</button>
+        <div style={{
+          position: 'relative',
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: 22,
+          alignItems: 'start'
+        }} className="inicioHero">
+          <style>{`
+            @media(min-width:900px){
+              .inicioHero{grid-template-columns:1.25fr minmax(280px,.85fr)!important;gap:32px!important}
+            }
+          `}</style>
+
+          <div>
+            <div className="em" style={{
+              fontSize: 10.5, color: '#9AA0A6', letterSpacing: '.08em', textTransform: 'uppercase',
+              fontWeight: 600, marginBottom: 14
+            }}>
+              Congreso · lo que acaba de votarse
+              {cobertura?.ultima_sesion ? ` · ${cobertura.ultima_sesion}` : ''}
+            </div>
+
+            <h1 className="ed" style={{
+              fontSize: 'clamp(32px, 5.6vw, 54px)', fontWeight: 600, lineHeight: 1.02,
+              letterSpacing: '-0.028em', margin: 0, color: '#F2F3F0'
+            }}>
+              ¿Qué acaba de<br />aprobar el Congreso?
+            </h1>
+            <p style={{
+              fontSize: 'clamp(15px, 2vw, 18px)', color: '#B4BAC0', lineHeight: 1.5,
+              margin: '16px 0 0', maxWidth: 480
+            }}>
+              Cada ley votada, quién la apoyó y a quién afecta. Escribe tu situación
+              y te enseño solo las que te tocan a ti.
+            </p>
+
+            <div style={{
+              display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 22,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 3, padding: 8
+            }}>
+              <input
+                value={perfil}
+                onChange={e => { setPerfil(e.target.value); setDeteccion(detectarPerfil(e.target.value)); }}
+                onKeyDown={e => e.key === 'Enter' && buscar()}
+                placeholder="Soy autónoma y vivo de alquiler…"
+                style={{
+                  flex: '1 1 220px', padding: '13px 14px', fontSize: 15,
+                  border: 'none', borderRadius: 2, background: '#F7F7F2', color: C.tinta, outline: 'none'
+                }} />
+              <button onClick={buscar} disabled={pensando} style={{
+                padding: '13px 20px', fontSize: 14.5, fontWeight: 600, cursor: 'pointer',
+                background: '#F2F3F0', color: C.tinta, border: 'none', borderRadius: 2,
+                opacity: pensando ? 0.6 : 1
+              }}>{pensando ? 'pensando…' : 'Ver mis leyes'}</button>
+            </div>
+
+            {!etiqueta && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+                {EJEMPLOS.slice(0, 4).map(e => (
+                  <button key={e} onClick={() => { setPerfil(e); const d = detectarPerfil(e); setDeteccion(d); aplicar(d); }}
+                    style={{
+                      padding: '6px 12px', fontSize: 12, cursor: 'pointer',
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.18)',
+                      borderRadius: 20, color: '#C9CDD2'
+                    }}>{e}</button>
+                ))}
+              </div>
+            )}
+
+            {etiqueta && (
+              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: '#F2F3F0', fontSize: 14 }}>Filtro: <strong>{etiqueta}</strong></span>
+                <button onClick={limpiar} style={{
+                  background: 'none', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 20,
+                  color: '#C9CDD2', fontSize: 12, padding: '4px 10px', cursor: 'pointer'
+                }}>× quitar</button>
+              </div>
+            )}
           </div>
 
-          {!etiqueta && (
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 11 }}>
-              {EJEMPLOS.slice(0, 4).map(e => (
-                <button key={e} onClick={() => { setPerfil(e); const d = detectarPerfil(e); setDeteccion(d); aplicar(d); }}
-                  style={{
-                    padding: '5px 11px', fontSize: 12, cursor: 'pointer', background: 'transparent',
-                    border: `1px solid ${C.linea}`, borderRadius: 20, color: C.media
-                  }}>{e}</button>
-              ))}
+          <aside style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 3,
+            padding: '14px 14px 8px',
+            backdropFilter: 'blur(8px)'
+          }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10
+            }}>
+              <div className="em" style={{
+                fontSize: 10, color: '#9AA0A6', letterSpacing: '.07em', textTransform: 'uppercase', fontWeight: 600
+              }}>Lo último votado</div>
+              <button onClick={() => onIr('leyes')} className="em" style={{
+                background: 'none', border: 'none', color: '#C9CDD2', fontSize: 11, cursor: 'pointer', padding: 0
+              }}>Ver todas →</button>
             </div>
-          )}
 
-          {cobertura && (
-            <div className="em" style={{ fontSize: 10.5, color: C.tenue, marginTop: 18 }}>
-              {Number(cobertura.votaciones).toLocaleString('es')} votaciones ·
-              {' '}{Number(cobertura.votos_individuales).toLocaleString('es')} votos individuales ·
-              {' '}última sesión {cobertura.ultima_sesion}
-            </div>
-          )}
-        </div>
-
-        <aside style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 16 }}>
-          <div className="rot" style={{ marginBottom: 12 }}>Lo último votado</div>
-          {ultimas.length === 0 && (
-            <div className="em" style={{ fontSize: 11.5, color: C.tenue }}>cargando…</div>
-          )}
-          {ultimas.map((n, i) => {
-            const ok = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-            return (
-              <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
-                display: 'block', width: '100%', textAlign: 'left', background: 'none',
-                border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none',
-                cursor: 'pointer', padding: '10px 0'
+            {destacada && (
+              <button onClick={() => onVotacion(destacada)} style={{
+                display: 'block', width: '100%', textAlign: 'left', background: 'rgba(0,0,0,0.2)',
+                border: 'none', borderRadius: 2, cursor: 'pointer', padding: '12px 12px', marginBottom: 6
               }}>
-                <div className="em" style={{ fontSize: 9.5, marginBottom: 4, display: 'flex', gap: 7, alignItems: 'center' }}>
-                  {n.materia_nombre && (
-                    <span style={{ color: n.materia_color || C.media, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                      {n.materia_nombre}
-                    </span>
+                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', marginBottom: 6, display: 'flex', gap: 8 }}>
+                  {destacada.materia_nombre && (
+                    <span style={{ color: destacada.materia_color || '#C9CDD2' }}>{destacada.materia_nombre}</span>
                   )}
-                  <span style={{ color: C.tenue }}>{corta(n.fecha)}</span>
-                  <span style={{ marginLeft: 'auto', color: ok ? C.si : C.no, fontWeight: 600 }}>
-                    {ok ? '✓' : '✕'}
+                  <span>{corta(destacada.fecha)}</span>
+                  <span style={{
+                    marginLeft: 'auto',
+                    color: (destacada.resultado_final ?? destacada.resultado_ultima) === 'aprobada' ? '#5FBF92' : '#E08278',
+                    fontWeight: 600
+                  }}>
+                    {(destacada.resultado_final ?? destacada.resultado_ultima) === 'aprobada' ? '✓' : '✕'}
                   </span>
                 </div>
-                <div style={{ fontSize: 13, lineHeight: 1.35 }}>
-                  {String(n.titular).slice(0, 92)}{String(n.titular).length > 92 ? '…' : ''}
+                <div className="ed" style={{ fontSize: 15, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3 }}>
+                  {String(limpiarTitular(destacada.titular)).slice(0, 110)}
+                  {String(destacada.titular).length > 110 ? '…' : ''}
                 </div>
               </button>
-            );
-          })}
-        </aside>
-      </div>
+            )}
 
-      <div id="resultados" style={{ marginTop: 30, scrollMarginTop: 20 }}>
+            {restoUltimas.map((n, i) => {
+              const ok = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
+              return (
+                <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
+                  display: 'block', width: '100%', textAlign: 'left', background: 'none',
+                  border: 'none', borderTop: i || destacada ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  cursor: 'pointer', padding: '10px 4px'
+                }}>
+                  <div className="em" style={{ fontSize: 9.5, marginBottom: 3, display: 'flex', gap: 7, alignItems: 'center' }}>
+                    {n.materia_nombre && (
+                      <span style={{ color: n.materia_color || '#A8AEB4' }}>{n.materia_nombre}</span>
+                    )}
+                    <span style={{ color: '#7C8288' }}>{corta(n.fecha)}</span>
+                    <span style={{ marginLeft: 'auto', color: ok ? '#5FBF92' : '#E08278', fontWeight: 600 }}>
+                      {ok ? '✓' : '✕'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.35, color: '#DDE1E5' }}>
+                    {String(limpiarTitular(n.titular)).slice(0, 88)}
+                    {String(n.titular).length > 88 ? '…' : ''}
+                  </div>
+                </button>
+              );
+            })}
+
+            {ultimas.length === 0 && (
+              <div className="em" style={{ fontSize: 11.5, color: '#8E959C', padding: '12px 0' }}>cargando…</div>
+            )}
+          </aside>
+        </div>
+      </section>
+
+      <div id="resultados" style={{ marginTop: 8, scrollMarginTop: 20 }}>
         {etiqueta && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             <div className="ed" style={{ fontSize: 21, fontWeight: 600 }}>Leyes que afectan a: {etiqueta}</div>
@@ -169,10 +268,35 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
           </div>
         )}
         {!etiqueta && <div className="rot" style={{ marginBottom: 12 }}>Todas las leyes votadas</div>}
-        <Feed filtros={filtro ?? {}} onAbrir={onVotacion} />
+        <Feed filtros={filtro ?? {}} onAbrir={onVotacion} limpiarTitular={limpiarTitular} />
       </div>
 
-      <div style={{ marginTop: 34 }}>
+      {ausentes.length > 0 && (
+        <div className="tarjeta" style={{ padding: 16, marginTop: 28 }}>
+          <div className="ed" style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>
+            Diputado más ausente de cada partido
+          </div>
+          <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.5, marginBottom: 12 }}>
+            Número de votaciones sin voto emitido. Cargos institucionales acumulan ausencias por agenda; no implica dejadez por sí solo.
+          </div>
+          <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            {ausentes.slice(0, 12).map(l => (
+              <div key={l.partido} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ width: 3, height: 28, background: l.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {l.nombre_completo}
+                  </span>
+                  <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue }}>{l.partido_siglas}</span>
+                </span>
+                <span className="em" style={{ fontSize: 14, fontWeight: 600, flexShrink: 0 }}>{l.valor}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 28 }}>
         <GraficoBrecha />
       </div>
 

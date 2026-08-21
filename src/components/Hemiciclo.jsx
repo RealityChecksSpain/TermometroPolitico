@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
+import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
 const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
@@ -39,28 +40,67 @@ export default function Hemiciclo({
 }) {
   const [encimaLocal, setEncimaLocal] = useState(null);
   const encima = encimaExterno ?? encimaLocal;
-  const setEncima = v => { setEncimaLocal(v); onEncima?.(v); };
+  const setEncima = useCallback(v => { setEncimaLocal(v); onEncima?.(v); }, [onEncima]);
   const svgRef = useRef(null);
 
   const asientos = useMemo(() => calcularAsientos(diputados.length, filas), [diputados.length, filas]);
   const mapaVotos = useMemo(() => votos ? new Map(votos.map(v => [v.mandato_id, v.voto])) : null, [votos]);
 
+  // Radio visual ≈ 0.062; umbral amplio para que no haya que acertar el centro exacto.
   const r = 0.062;
+  const umbral = r * 2.8;
+
+  const resolver = useCallback((clientX, clientY) => {
+    const p = puntoSvg(svgRef.current, clientX, clientY);
+    if (!p) return null;
+    const idx = indiceMasCercano(asientos, p.x, p.y, umbral);
+    if (idx < 0) return null;
+    const d = diputados[idx];
+    if (!d) return null;
+    if (resaltado && !resaltado(d)) return null;
+    return d;
+  }, [asientos, diputados, umbral, resaltado]);
+
+  const onPointerMove = useCallback(e => {
+    const d = resolver(e.clientX, e.clientY);
+    setEncima(d ? d.mandato_id : null);
+  }, [resolver, setEncima]);
+
+  const onPointerLeave = useCallback(() => setEncima(null), [setEncima]);
+
+  const onPointerUp = useCallback(e => {
+    const d = resolver(e.clientX, e.clientY);
+    if (!d) return;
+    if (esTactil && encima !== d.mandato_id) {
+      setEncima(d.mandato_id);
+      return;
+    }
+    onSeleccionar?.(d);
+  }, [resolver, encima, setEncima, onSeleccionar]);
+
   const activo = encima !== null ? diputados.find(d => d.mandato_id === encima) : null;
   const votoActivo = activo && mapaVotos ? mapaVotos.get(activo.mandato_id) : null;
 
   return (
     <div style={{ position: 'relative' }}>
-      <svg ref={svgRef} viewBox="-2.64 -2.64 5.28 2.78"
-        style={{ width: '100%', display: 'block' }}
-        onMouseLeave={() => setEncima(null)}
-        role="img" aria-label={votos ? 'Resultado de la votación por escaño' : 'Composición del hemiciclo'}>
+      <svg ref={svgRef}
+        viewBox="-2.75 -2.82 5.5 3.05"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: '100%', height: 'auto', display: 'block', touchAction: 'manipulation', cursor: 'crosshair' }}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+        onPointerUp={onPointerUp}
+        role="img"
+        aria-label={votos ? 'Resultado de la votación por escaño' : 'Composición del hemiciclo'}>
         <defs>
           <filter id="brillo" x="-60%" y="-60%" width="220%" height="220%">
             <feGaussianBlur stdDeviation="0.05" result="b" />
             <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
+
+        {/* Zona invisible de captura: el hit-test lo hacemos nosotros con la matriz SVG */}
+        <rect x="-2.75" y="-2.82" width="5.5" height="3.05" fill="transparent" />
 
         {diputados.map((d, i) => {
           const a = asientos[i];
@@ -101,33 +141,6 @@ export default function Hemiciclo({
             r={r * escala} fill={color} opacity={op}
             stroke={sel ? '#FFFFFF' : 'none'} strokeWidth={sel ? r * 0.4 : 0} />;
         })}
-
-        <g>
-          {diputados.map((d, i) => {
-            const a = asientos[i];
-            if (!a) return null;
-            const visible = !resaltado || resaltado(d);
-            const voto = mapaVotos?.get(d.mandato_id);
-            return (
-              <circle
-                key={'hit-' + d.mandato_id}
-                cx={a.cx} cy={a.cy} r={r * 1.12}
-                fill="transparent" pointerEvents={visible ? 'all' : 'none'}
-                tabIndex={visible ? 0 : -1}
-                role="button"
-                aria-label={`${d.nombre_completo}, ${d.partido_siglas || d.grupo || ''}${voto ? `, ${ETIQUETA[voto]}` : ''}`}
-                onMouseEnter={() => !esTactil && setEncima(d.mandato_id)}
-                onFocus={() => setEncima(d.mandato_id)}
-                onClick={() => {
-                  if (esTactil && encima !== d.mandato_id) { setEncima(d.mandato_id); return; }
-                  onSeleccionar?.(d);
-                }}
-                style={{ cursor: 'pointer', outline: 'none' }}
-              />
-            );
-          })}
-        </g>
-
       </svg>
 
       <div style={{

@@ -26,11 +26,12 @@ function primeraFrase(t) {
   return f.length > 190 ? f.slice(0, 187) + '…' : f;
 }
 
-function Tarjeta({ n, onAbrir, destacada }) {
+function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
   const aprobada = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
   const total = n.total_si + n.total_no + n.total_abstencion || 1;
   const efectos = Array.isArray(n.efectos) ? n.efectos : [];
   const frase = primeraFrase(n.resumen);
+  const titular = limpiarTitular ? limpiarTitular(n.titular) : n.titular;
 
   return (
     <article onClick={() => onAbrir(n)} style={{
@@ -60,9 +61,9 @@ function Tarjeta({ n, onAbrir, destacada }) {
         fontSize: destacada ? 'clamp(21px, 3.1vw, 30px)' : 'clamp(16px, 2.1vw, 19px)',
         fontWeight: destacada ? 600 : 500, lineHeight: 1.22, letterSpacing: '-0.012em', margin: 0
       }}>
-        {String(n.titular).length > (destacada ? 190 : 130)
-          ? String(n.titular).slice(0, destacada ? 187 : 127) + '…'
-          : n.titular}
+        {String(titular).length > (destacada ? 190 : 130)
+          ? String(titular).slice(0, destacada ? 187 : 127) + '…'
+          : titular}
       </h3>
 
       {frase && (
@@ -101,7 +102,7 @@ function Tarjeta({ n, onAbrir, destacada }) {
   );
 }
 
-export default function Feed({ filtros, onAbrir, cabecera }) {
+export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [fin, setFin] = useState(false);
@@ -140,7 +141,7 @@ export default function Feed({ filtros, onAbrir, cabecera }) {
       {cabecera}
       <div style={{ display: 'grid', gap: 10 }}>
         {items.map((n, i) => (
-          <Tarjeta key={n.clave_norma} n={n} onAbrir={onAbrir} destacada={i === 0} />
+          <Tarjeta key={n.clave_norma} n={n} onAbrir={onAbrir} destacada={i === 0} limpiarTitular={limpiarTitular} />
         ))}
       </div>
 

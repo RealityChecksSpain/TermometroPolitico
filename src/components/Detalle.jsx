@@ -100,7 +100,10 @@ export function DetalleLey({ votacion, onVolver }) {
           <span>{votacion.fecha} · Sesión {votacion.sesion} · {votacion.titulo}</span>
         </div>
         <div className="ed" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>
-          {votacion.subtitulo || votacion.titulo}
+          {String(votacion.subtitulo || votacion.titulo || '')
+            .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
+            .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
+            .trim() || (votacion.subtitulo || votacion.titulo)}
         </div>
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Sello aprobada={aprobada} />
