@@ -20,35 +20,111 @@ function fechaCorta(f) {
   return `${d.getDate()} ${MESES[d.getMonth()]}${d.getFullYear() !== hoy.getFullYear() ? ' ' + d.getFullYear() : ''}`;
 }
 
-function primeraFrase(t) {
-  if (!t) return null;
-  const f = String(t).split(/(?<=\.)\s+/)[0];
-  return f.length > 190 ? f.slice(0, 187) + '…' : f;
+/** Una frase llana: prioriza campo corto de IA; si no, primera frase del resumen. */
+export function fraseCorta(n) {
+  const corta = n?.frase_corta || n?.en_una_frase || n?.titular_corto;
+  if (corta && String(corta).trim()) {
+    const t = String(corta).trim();
+    return t.length > 160 ? t.slice(0, 157) + '…' : t;
+  }
+  if (!n?.resumen) return null;
+  const f = String(n.resumen).split(/(?<=\.)\s+/)[0];
+  return f.length > 160 ? f.slice(0, 157) + '…' : f;
+}
+
+function MiniResultado({ si, no, abs, aprobada }) {
+  const t = si + no + abs || 1;
+  const R = 28;
+  const stroke = 7;
+  const c = 2 * Math.PI * R;
+  const segs = [
+    [(si / t) * c, C.si],
+    [(abs / t) * c, C.abs],
+    [(no / t) * c, C.no]
+  ];
+  let offset = 0;
+  return (
+    <div style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={R} fill="none" stroke="#E4E4DC" strokeWidth={stroke} />
+        {segs.map(([len, col], i) => {
+          if (len <= 0) return null;
+          const el = (
+            <circle key={i} cx="36" cy="36" r={R} fill="none" stroke={col} strokeWidth={stroke}
+              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset}
+              strokeLinecap="butt" transform="rotate(-90 36 36)" />
+          );
+          offset += len;
+          return el;
+        })}
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', pointerEvents: 'none'
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: aprobada ? C.si : C.no }}>
+          {aprobada ? 'SÍ' : 'NO'}
+        </span>
+        <span className="em" style={{ fontSize: 8, color: C.tenue }}>{Math.round((si / t) * 100)}%</span>
+      </div>
+    </div>
+  );
+}
+
+function BarrasVoto({ si, no, abs }) {
+  const t = si + no + abs || 1;
+  const filas = [
+    ['A favor', si, C.si],
+    ['En contra', no, C.no],
+    ['Abs.', abs, C.abs]
+  ];
+  return (
+    <div style={{ display: 'grid', gap: 4, minWidth: 0, flex: 1 }}>
+      {filas.map(([et, v, col]) => v > 0 && (
+        <div key={et} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="em" style={{ width: 58, fontSize: 9.5, color: C.tenue, flexShrink: 0 }}>{et}</span>
+          <div style={{ flex: 1, height: 8, background: '#EDEDE6', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              width: `${(v / t) * 100}%`, height: '100%', background: col, borderRadius: 2,
+              transition: 'width 400ms ease'
+            }} />
+          </div>
+          <span className="em" style={{ width: 28, fontSize: 10, color: C.media, textAlign: 'right' }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
   const aprobada = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-  const total = n.total_si + n.total_no + n.total_abstencion || 1;
+  const frase = fraseCorta(n);
+  const tituloLegal = limpiarTitular
+    ? limpiarTitular(n.titular || n.subtitulo || n.titulo)
+    : (n.titular || n.subtitulo || n.titulo);
   const efectos = Array.isArray(n.efectos) ? n.efectos : [];
-  const frase = primeraFrase(n.resumen);
-  const titular = limpiarTitular ? limpiarTitular(n.titular) : n.titular;
 
   return (
     <article onClick={() => onAbrir(n)} style={{
       background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3,
-      padding: destacada ? 'clamp(18px, 3vw, 26px)' : '16px 17px',
+      padding: destacada ? 'clamp(16px, 2.5vw, 22px)' : '14px 15px',
       cursor: 'pointer', transition: 'border-color 140ms ease, transform 140ms ease'
     }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = C.tinta; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = C.linea; }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 9 }}>
-        {n.materia_nombre && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        {n.materia_nombre ? (
           <span className="em" style={{
-            fontSize: 9.5, letterSpacing: '.07em', textTransform: 'uppercase', fontWeight: 500,
-            color: n.materia_color || C.media,
-            borderBottom: `2px solid ${n.materia_color || C.media}`, paddingBottom: 1
+            fontSize: destacada ? 12 : 11, letterSpacing: '.06em', textTransform: 'uppercase',
+            fontWeight: 700, color: '#fff', background: n.materia_color || C.media,
+            padding: '3px 9px', borderRadius: 2
           }}>{n.materia_nombre}</span>
+        ) : (
+          <span className="em" style={{
+            fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600,
+            color: C.media, border: `1px solid ${C.linea}`, padding: '3px 9px', borderRadius: 2
+          }}>Sin materia</span>
         )}
         <span className="em" style={{ fontSize: 10.5, color: C.tenue }}>{fechaCorta(n.fecha)}</span>
         <span className="em" style={{
@@ -58,46 +134,38 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
       </div>
 
       <h3 className="ed" style={{
-        fontSize: destacada ? 'clamp(21px, 3.1vw, 30px)' : 'clamp(16px, 2.1vw, 19px)',
-        fontWeight: destacada ? 600 : 500, lineHeight: 1.22, letterSpacing: '-0.012em', margin: 0
+        fontSize: destacada ? 'clamp(20px, 2.8vw, 28px)' : 'clamp(16px, 2vw, 19px)',
+        fontWeight: 600, lineHeight: 1.25, letterSpacing: '-0.015em', margin: 0, color: C.tinta
       }}>
-        {String(titular).length > (destacada ? 190 : 130)
-          ? String(titular).slice(0, destacada ? 187 : 127) + '…'
-          : titular}
+        {frase || (String(tituloLegal).length > 110 ? String(tituloLegal).slice(0, 107) + '…' : tituloLegal)}
       </h3>
 
       {frase && (
-        <p style={{
-          fontSize: destacada ? 15.5 : 14, color: C.media, lineHeight: 1.55, margin: '10px 0 0'
-        }}>{frase}</p>
+        <div className="em" style={{
+          fontSize: 11, color: C.tenue, lineHeight: 1.45, marginTop: 8
+        }} title={tituloLegal}>
+          {String(tituloLegal).length > 140 ? String(tituloLegal).slice(0, 137) + '…' : tituloLegal}
+        </div>
       )}
+
+      <div style={{
+        display: 'flex', gap: 14, alignItems: 'center', marginTop: 14,
+        padding: '10px 12px', background: C.papel, borderRadius: 3
+      }}>
+        <MiniResultado si={n.total_si} no={n.total_no} abs={n.total_abstencion} aprobada={aprobada} />
+        <BarrasVoto si={n.total_si} no={n.total_no} abs={n.total_abstencion} />
+      </div>
 
       {efectos.length > 0 && (
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 12 }}>
           {efectos.slice(0, destacada ? 4 : 3).map(e => (
             <span key={e.slug} className="em" style={{
               fontSize: 10, padding: '3px 8px', borderRadius: 20,
-              background: C.papel, color: C.media, border: `1px solid ${C.linea}`
+              background: C.superficie, color: C.media, border: `1px solid ${C.linea}`
             }}>{e.nombre}</span>
           ))}
-          {efectos.length > (destacada ? 4 : 3) && (
-            <span className="em" style={{ fontSize: 10, color: C.tenue, alignSelf: 'center' }}>
-              +{efectos.length - (destacada ? 4 : 3)}
-            </span>
-          )}
         </div>
       )}
-
-      <div style={{ display: 'flex', height: 4, borderRadius: 2, overflow: 'hidden', background: '#E4E4DC', marginTop: 14 }}>
-        {[[n.total_si, C.si], [n.total_abstencion, C.abs], [n.total_no, C.no]].map(([v, col], i) =>
-          v > 0 && <div key={i} style={{ width: `${(v / total) * 100}%`, background: col }} />)}
-      </div>
-      <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 6, display: 'flex', gap: 12 }}>
-        <span style={{ color: C.si }}>{n.total_si} a favor</span>
-        <span style={{ color: C.no }}>{n.total_no} en contra</span>
-        {n.total_abstencion > 0 && <span style={{ color: C.abs }}>{n.total_abstencion} abst.</span>}
-        {n.votaciones > 1 && <span style={{ marginLeft: 'auto' }}>{n.votaciones} votaciones</span>}
-      </div>
     </article>
   );
 }

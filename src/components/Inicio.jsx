@@ -3,6 +3,7 @@ import Feed from './Feed.jsx';
 import GraficoBrecha from './GraficoBrecha.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
 import { traerUltimas, traerLideres } from '../lib/cliente.js';
+import { fraseCorta } from './Feed.jsx';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -206,9 +207,12 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
                 display: 'block', width: '100%', textAlign: 'left', background: 'rgba(0,0,0,0.2)',
                 border: 'none', borderRadius: 2, cursor: 'pointer', padding: '12px 12px', marginBottom: 6
               }}>
-                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', marginBottom: 6, display: 'flex', gap: 8 }}>
+                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
                   {destacada.materia_nombre && (
-                    <span style={{ color: destacada.materia_color || '#C9CDD2' }}>{destacada.materia_nombre}</span>
+                    <span style={{
+                      background: destacada.materia_color || '#5A6067', color: '#fff',
+                      padding: '2px 7px', borderRadius: 2, fontWeight: 700, letterSpacing: '.04em'
+                    }}>{destacada.materia_nombre}</span>
                   )}
                   <span>{corta(destacada.fecha)}</span>
                   <span style={{
@@ -220,14 +224,21 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
                   </span>
                 </div>
                 <div className="ed" style={{ fontSize: 15, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3 }}>
-                  {String(limpiarTitular(destacada.titular)).slice(0, 110)}
-                  {String(destacada.titular).length > 110 ? '…' : ''}
+                  {(() => {
+                    const f = fraseCorta(destacada);
+                    const t = limpiarTitular(destacada.titular);
+                    const txt = f || t;
+                    return String(txt).slice(0, 110) + (String(txt).length > 110 ? '…' : '');
+                  })()}
                 </div>
               </button>
             )}
 
             {restoUltimas.map((n, i) => {
               const ok = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
+              const f = fraseCorta(n);
+              const t = limpiarTitular(n.titular);
+              const txt = f || t;
               return (
                 <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
                   display: 'block', width: '100%', textAlign: 'left', background: 'none',
@@ -236,7 +247,10 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
                 }}>
                   <div className="em" style={{ fontSize: 9.5, marginBottom: 3, display: 'flex', gap: 7, alignItems: 'center' }}>
                     {n.materia_nombre && (
-                      <span style={{ color: n.materia_color || '#A8AEB4' }}>{n.materia_nombre}</span>
+                      <span style={{
+                        color: '#fff', background: n.materia_color || '#5A6067',
+                        padding: '1px 6px', borderRadius: 2, fontWeight: 600
+                      }}>{n.materia_nombre}</span>
                     )}
                     <span style={{ color: '#7C8288' }}>{corta(n.fecha)}</span>
                     <span style={{ marginLeft: 'auto', color: ok ? '#5FBF92' : '#E08278', fontWeight: 600 }}>
@@ -244,8 +258,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
                     </span>
                   </div>
                   <div style={{ fontSize: 12.5, lineHeight: 1.35, color: '#DDE1E5' }}>
-                    {String(limpiarTitular(n.titular)).slice(0, 88)}
-                    {String(n.titular).length > 88 ? '…' : ''}
+                    {String(txt).slice(0, 88)}{String(txt).length > 88 ? '…' : ''}
                   </div>
                 </button>
               );

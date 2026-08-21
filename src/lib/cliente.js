@@ -42,7 +42,38 @@ export async function traerDiputados() {
     .select('*')
     .order('eje1', { ascending: true, nullsFirst: false });
   if (error) throw error;
-  return data ?? [];
+  const lista = data ?? [];
+
+  // mv_diputados a veces se queda sin foto_url tras un refresh fallido;
+  // las fotos viven en mandatos.
+  const sinFoto = lista.filter(d => !d.foto_url).map(d => d.mandato_id).filter(Boolean);
+  if (!sinFoto.length) return lista;
+
+  const fotos = [];
+  for (let i = 0; i < sinFoto.length; i += 200) {
+    const chunk = sinFoto.slice(i, i + 200);
+    const { data: filas } = await supabase
+      .from('mandatos')
+      .select('id, foto_url, cod_parlamentario, url_ficha, url_bienes')
+      .in('id', chunk);
+    if (filas?.length) fotos.push(...filas);
+  }
+  if (!fotos.length) return lista;
+
+  const mapa = new Map(fotos.map(f => [f.id, f]));
+  return lista.map(d => {
+    const m = mapa.get(d.mandato_id);
+    if (!m) return d;
+    return {
+      ...d,
+      foto_url: d.foto_url || m.foto_url || (m.cod_parlamentario
+        ? `https://www.congreso.es/docu/imgweb/diputados/${m.cod_parlamentario}_15.jpg`
+        : null),
+      cod_parlamentario: d.cod_parlamentario ?? m.cod_parlamentario,
+      url_ficha: d.url_ficha || m.url_ficha,
+      url_bienes: d.url_bienes || m.url_bienes
+    };
+  });
 }
 
 export async function traerVotaciones(limite = 200, filtros = {}) {
@@ -234,8 +265,15 @@ export async function traerPromesaVsVoto() {
 
 export async function traerUltimas(limite = 6) {
   const { data, error } = await supabase
-    .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no')
+    .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen, frase_corta')
     .order('fecha', { ascending: false }).limit(limite);
-  if (error) return [];
+  if (error) {
+    // frase_corta puede no existir aún en la vista
+    const { data: d2, error: e2 } = await supabase
+      .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen')
+      .order('fecha', { ascending: false }).limit(limite);
+    if (e2) return [];
+    return d2 ?? [];
+  }
   return data ?? [];
 }

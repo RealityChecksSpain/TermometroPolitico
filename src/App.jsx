@@ -65,6 +65,7 @@ color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,co
 .split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
 @media(min-width:960px){.split{grid-template-columns:minmax(340px,.95fr) minmax(340px,1.05fr);gap:22px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
+@media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(420px,1.35fr) minmax(260px,.72fr);gap:18px}}
 .portada{display:grid;grid-template-columns:1fr;gap:20px;padding-top:6px}
 @media(min-width:900px){.portada{grid-template-columns:1.35fr 1fr;gap:32px;align-items:start}}
 .heroCols{display:grid;grid-template-columns:1fr;gap:14px}
@@ -292,7 +293,7 @@ export default function App() {
           ))}
         </nav>
 
-        <div className={mostrarHemiciclo ? 'split' : 'cols'}>
+        <div className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}>
           {mostrarHemiciclo && (
             <div className="izq">
               <div className="hero">
@@ -449,7 +450,15 @@ export default function App() {
                     Ninguna votación con esos filtros.
                   </div>
                 )}
-                {votaciones.map((v, i) => (
+                {votaciones.map((v, i) => {
+                  const frase = (() => {
+                    if (v.frase_corta) return String(v.frase_corta);
+                    if (!v.resumen) return null;
+                    const f = String(v.resumen).split(/(?<=\.)\s+/)[0];
+                    return f.length > 140 ? f.slice(0, 137) + '…' : f;
+                  })();
+                  const legal = limpiarTitular(v.titular || v.subtitulo || v.titulo);
+                  return (
                   <button key={v.clave_norma ?? v.id} className="fila"
                     onClick={async () => {
                       const id = v.votacion_principal ?? v.id;
@@ -459,9 +468,13 @@ export default function App() {
                     display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '12px 13px',
                     background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
                   }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{limpiarTitular(v.titular || v.subtitulo || v.titulo)}</div>
-                    <div className="em" style={{ fontSize: 10, color: C.tenue, margin: '5px 0 7px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {v.materia_nombre && <span style={{ background: (v.materia_color || '#8E9299') + '22', color: v.materia_color || C.media, padding: '1px 6px', borderRadius: 2, fontWeight: 500 }}>{v.materia_nombre}</span>}
+                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {v.materia_nombre && (
+                        <span style={{
+                          background: v.materia_color || C.media, color: '#fff', padding: '2px 8px',
+                          borderRadius: 2, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 10
+                        }}>{v.materia_nombre}</span>
+                      )}
                       <span>{v.fecha}</span>
                       {v.votaciones > 1 && (
                         <span style={{ color: C.media }}>
@@ -469,7 +482,15 @@ export default function App() {
                         </span>
                       )}
                     </div>
-                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} />
+                    <div className="ed" style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+                      {frase || (String(legal).length > 110 ? String(legal).slice(0, 107) + '…' : legal)}
+                    </div>
+                    {frase && (
+                      <div className="em" style={{ fontSize: 10.5, color: C.tenue, marginTop: 5, lineHeight: 1.4 }}>
+                        {String(legal).length > 120 ? String(legal).slice(0, 117) + '…' : legal}
+                      </div>
+                    )}
+                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} alto={6} />
                     <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 5, display: 'flex', gap: 10 }}>
                       <span style={{ color: C.si }}>Sí {v.total_si}</span>
                       <span style={{ color: C.no }}>No {v.total_no}</span>
@@ -487,7 +508,8 @@ export default function App() {
                       )}
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -578,50 +600,53 @@ export default function App() {
                     onMouseEnter={() => setEncimaEscano(d.mandato_id)}
                     onMouseLeave={() => setEncimaEscano(null)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
-                      padding: '10px 13px', cursor: 'pointer',
+                      display: 'grid',
+                      gridTemplateColumns: 'auto minmax(0,1fr) auto',
+                      alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                      padding: '8px 10px', cursor: 'pointer',
                       background: encimaEscano === d.mandato_id ? '#F3F3EE' : 'transparent',
                       border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none',
                       boxShadow: encimaEscano === d.mandato_id ? `inset 3px 0 0 ${d.color || '#8E9299'}` : 'none'
                     }}>
                     {d.foto_url ? (
-                      <img src={d.foto_url} alt="" width={34} height={42} loading="lazy"
+                      <img src={d.foto_url} alt="" width={30} height={38} loading="lazy"
                         onError={e => { e.currentTarget.style.visibility = 'hidden'; }}
-                        style={{ width: 34, height: 42, objectFit: 'cover', borderRadius: 2,
+                        style={{ width: 30, height: 38, objectFit: 'cover', borderRadius: 2,
                           flexShrink: 0, borderLeft: `3px solid ${d.color || '#8E9299'}`, background: '#E4E4DC' }} />
                     ) : (
-                      <span style={{ width: 3, height: 34, background: d.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
+                      <span style={{ width: 3, height: 30, background: d.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
                     )}
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13 }}>{d.nombre_completo}</span>
-                      <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue }}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{
+                        display: 'block', fontSize: 12.5, whiteSpace: 'nowrap',
+                        overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>{d.nombre_completo}</span>
+                      <span className="em" style={{
+                        display: 'block', fontSize: 9.5, color: C.tenue, whiteSpace: 'nowrap',
+                        overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
                         {d.partido_siglas || d.grupo || '—'} · {d.circunscripcion ?? '—'}
-                        {d.cargo && <span style={{ color: C.media }}> · {d.cargo}</span>}
                       </span>
                     </span>
-                    <span style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 72 }}>
                       {(() => {
                         const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
                         const etiquetas = {
-                          nombre: ['min tribuna', d.minutos_tribuna],
-                          ausencias: ['ausencias', d.ausencias],
-                          disidencias: ['contra su partido', d.disidencias],
-                          tribuna: ['min tribuna', d.minutos_tribuna],
-                          intervenciones: ['intervenciones', d.intervenciones],
-                          abstenciones: ['abstenciones', d.abstenciones],
-                          telematicos: ['a distancia', d.telematicos],
-                          patrimonio: ['€ declarados', d.patrimonio_euros ?? d.bienes_total ?? '—'],
-                          donaciones: ['donaciones', d.donaciones],
-                          privadas: ['cargos privados', d.actividades_privadas]
+                          nombre: ['min', d.minutos_tribuna],
+                          ausencias: ['aus.', d.ausencias],
+                          disidencias: ['contra', d.disidencias],
+                          tribuna: ['min', d.minutos_tribuna],
+                          intervenciones: ['int.', d.intervenciones],
+                          abstenciones: ['abs.', d.abstenciones],
+                          telematicos: ['tel.', d.telematicos],
+                          patrimonio: ['€', d.patrimonio_euros ?? d.bienes_total ?? '—'],
+                          donaciones: ['don.', d.donaciones],
+                          privadas: ['priv.', d.actividades_privadas]
                         };
                         const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
                         return (<>
-                          <span className="ed" style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{val ?? 0}</span>
-                          <span style={{ display: 'block', fontSize: 9, color: C.tenue }}>
-                            {et}
-                            {(cfg[0] === 'ausencias' || cfg[0] === 'abstenciones' || cfg[0] === 'disidencias' || cfg[0] === 'telematicos') &&
-                              ` de ${Number(d.votos_emitidos) + Number(d.ausencias ?? 0)}`}
-                          </span>
+                          <span className="ed" style={{ display: 'block', fontSize: 14, fontWeight: 600, lineHeight: 1.1 }}>{val ?? 0}</span>
+                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue }}>{et}</span>
                         </>);
                       })()}
                     </span>

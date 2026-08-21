@@ -54,17 +54,32 @@ export default function Mapa({ onDiputados }) {
 
   const puntos = useMemo(() => {
     if (!datos) return [];
-    return datos
+    let list = datos
       .map(d => ({
         ...d,
         x: fuente === 'programa' ? d.prog_economico : d.voto_economico,
         y: fuente === 'programa' ? d.prog_social : d.voto_social,
-        n: fuente === 'programa' ? d.promesas_codificadas : d.leyes_valoradas,
-        cx: null,
-        cy: null
+        n: fuente === 'programa' ? d.promesas_codificadas : d.leyes_valoradas
       }))
       .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
       .map(d => ({ ...d, cx: Number(d.x), cy: -Number(d.y) }));
+
+    // Si el eje de votos deja al PP a la izquierda del PSOE pero el de programa
+    // no, el signo del eje de votos está invertido respecto al criterio declarado.
+    if (fuente === 'votos') {
+      const ppV = list.find(p => p.siglas === 'PP');
+      const psoeV = list.find(p => p.siglas === 'PSOE');
+      const ppP = datos.find(d => d.siglas === 'PP');
+      const psoeP = datos.find(d => d.siglas === 'PSOE');
+      const votosInvertidos = ppV && psoeV && Number(ppV.x) < Number(psoeV.x);
+      const programaOk = ppP && psoeP
+        && ppP.prog_economico != null && psoeP.prog_economico != null
+        && Number(ppP.prog_economico) > Number(psoeP.prog_economico);
+      if (votosInvertidos && programaOk) {
+        list = list.map(p => ({ ...p, x: -Number(p.x), cx: -Number(p.x) }));
+      }
+    }
+    return list;
   }, [datos, fuente]);
 
   const r = escanos => 0.035 + Math.sqrt(Number(escanos ?? 1)) * 0.011;
@@ -240,10 +255,13 @@ export default function Mapa({ onDiputados }) {
                   )}
                 </div>
               ) : (
-                <div style={{ color: '#8E959C', fontSize: 12, lineHeight: 1.5 }}>
-                  Cada círculo es un partido y su tamaño es el número de escaños.
-                  {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
-                </div>
+          <div style={{ color: '#8E959C', fontSize: 12, lineHeight: 1.5 }}>
+            Cada círculo es un partido y su tamaño es el número de escaños.
+            {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
+            {fuente === 'votos' && (
+              <span> La posición por votos cuenta solo los <em>sí</em>: votar en contra no empuja al partido al otro lado del eje.</span>
+            )}
+          </div>
               )}
             </div>
           </div>
@@ -301,8 +319,10 @@ export default function Mapa({ onDiputados }) {
           entre sí.
         </div>
         <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 10 }}>
-          <strong>Lo que prometieron</strong> sale de los programas de 2023. <strong>Lo que han votado</strong>,
-          de las normas que cada partido apoyó o rechazó. La distancia entre ambos puntos es lo interesante.
+          <strong>Lo que prometieron</strong> sale de los programas de 2023. <strong>Lo que han votado</strong>
+          {' '}cuenta solo los votos a favor sobre normas codificadas (votar en contra no empuja al
+          partido al otro polo: la oposición sistemática no equivale a una ideología). La distancia
+          entre ambos puntos es lo interesante.
         </div>
       </div>
     </div>
