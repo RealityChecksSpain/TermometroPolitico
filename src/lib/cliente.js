@@ -101,17 +101,14 @@ export async function traerDiputados() {
       const b = bm.get(d.mandato_id);
       if (!b) return d;
       const inm = contarInmuebles(b.inmuebles_detalle, b.inmuebles_urbanos, b.inmuebles_rusticos);
-      const casas = Math.max(
-        b.n_inmuebles ?? 0,
-        inm.n_inmuebles ?? 0,
+      // Preferir recuento del detalle; NUNCA Math.max con n_inmuebles viejo (inflaba a 36, etc.)
+      const desdeFilas =
         (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
           ? (Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0))
-          : 0
-      ) || (b.n_inmuebles ?? inm.n_inmuebles ?? (
-        (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
-          ? (Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0))
-          : null
-      ));
+          : null;
+      const casas =
+        inm.fuente === 'detalle' ? inm.n_inmuebles
+          : (inm.n_inmuebles ?? b.n_inmuebles ?? desdeFilas);
 
       // Saneo en cliente por si el backfill aún no corrió (evita mostrar 187 M)
       const dep = sanearImporte(b.depositos);
@@ -138,8 +135,9 @@ export async function traerDiputados() {
         ...d,
         patrimonio_euros: d.patrimonio_euros ?? patrimonio,
         bienes_total: d.bienes_total ?? patrimonio,
-        n_inmuebles: d.n_inmuebles ?? casas,
-        n_casas: d.n_casas ?? casas,
+        // casas ya viene del detalle (no usar d.n_inmuebles viejo de la MV)
+        n_inmuebles: casas ?? d.n_inmuebles,
+        n_casas: casas ?? d.n_casas,
         n_viviendas: inm.n_viviendas,
         n_coches: b.n_coches ?? veh.n_coches,
         n_motos: b.n_motos ?? veh.n_motos,

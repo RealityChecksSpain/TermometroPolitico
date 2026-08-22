@@ -137,9 +137,10 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
       (pat != null && h.patrimonio_euros == null) ||
       (pat != null && h.patrimonio_euros != null && Math.abs(pat - Number(h.patrimonio_euros)) > 0.02);
 
+    // Corregir también a la baja (antes solo subía → se quedaban 36 eternos)
     const cambioInm =
       inm.n_inmuebles != null &&
-      (h.n_inmuebles == null || inm.n_inmuebles > Number(h.n_inmuebles));
+      (h.n_inmuebles == null || Number(h.n_inmuebles) !== Number(inm.n_inmuebles));
 
     if (!cambioEuro && !cambioInm) continue;
 

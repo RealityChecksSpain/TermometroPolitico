@@ -80,14 +80,13 @@ RENTAS PERCIBIDAS POR EL PARLAMENTARIO
 - irpf_pagado: recuadro "CANTIDAD PAGADA POR IRPF".
 
 BIENES PATRIMONIALES (urbanos + rústicos + inmuebles de sociedad si aparecen)
-- NO cuentes solo filas. Suma las CANTIDADES escritas en cada celda:
-  "2 VIVIENDAS" = 2, "13 FINCAS RUSTICAS" = 13, "4 FINCAS URBANAS" = 4,
-  "PLAZA DE GARAJE" sin número = 1, "VIVIENDA" + "VIVIENDA" en la misma fila = 2.
-- inmuebles_urbanos: total de unidades urbanas (viviendas, casas, plazas, locales, naves…).
-- inmuebles_rusticos: total de unidades rústicas (fincas rústicas, terrenos…).
-- Incluye también los inmuebles listados como propiedad de una sociedad.
-- inmuebles_detalle: UNA entrada por grupo, con la cantidad al inicio, separadas por "; ".
-  Ej: "2 VIVIENDAS Madrid 2011 25%; 13 FINCAS RUSTICAS León 2021 25%"
+- Suma UNIDADES, no solo filas:
+  "2 TRASTEROS" = 2; "PLAZA DE GARAJE" = 1;
+  "Vivienda, plaza de garaje y Trastero" = 3 (vivienda+garaje+trastero).
+- inmuebles_urbanos / inmuebles_rusticos: totales de unidades (incluidas las de sociedad).
+- inmuebles_detalle: UNA entrada por fila del PDF, separadas por "; ", cantidad al inicio.
+  Ej: "1 LOCAL A Coruña 2020; 1 PISO A Coruña 2020; 2 TRASTEROS Madrid 2000; 1 VIVIENDA 1 GARAJE 1 TRASTERO Santiago 2003; 1 OFICINA 25% sociedad"
+  NO repitas palabras ni inventes. NO uses m² ni % como cantidad.
 
 DEPÓSITOS
 - depositos: el "SALDO de todos los depósitos" (máx. 2 decimales). Cifras > 5 millones son
