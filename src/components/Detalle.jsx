@@ -1,5 +1,8 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { traerVotacionesDeNorma, traerRelacionadas } from '../lib/cliente.js';
+import HistorialNorma from './HistorialNorma.jsx';
+import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
+import { implicacionDe } from '../lib/implicaciones.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -83,6 +86,31 @@ function Bloque({ titulo, children, aviso }) {
 export function DetalleLey({ votacion, onVolver }) {
   const aprobada = votacion.resultado === 'aprobada';
   const enlaces = String(votacion.enlaces_bocg ?? '').split(/[\s·]+/).filter(u => u.startsWith('http')).slice(0, 3);
+  const frase = fraseCortaDeNorma(votacion, 72);
+  const [seccion, setSeccion] = useState('afecta');
+  const refAfecta = useRef(null);
+  const refResumen = useRef(null);
+  const refHistorial = useRef(null);
+  const refFuentes = useRef(null);
+  const refs = { afecta: refAfecta, resumen: refResumen, historial: refHistorial, fuentes: refFuentes };
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(entries => {
+      const visible = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible?.target?.dataset?.sec) setSeccion(visible.target.dataset.sec);
+    }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.2, 0.5, 0.8] });
+    Object.values(refs).forEach(r => r.current && obs.observe(r.current));
+    return () => obs.disconnect();
+  }, [votacion.id]);
+
+  const pasos = [
+    ['afecta', 'A quién afecta'],
+    ['resumen', 'Qué dice'],
+    ['historial', 'Historial'],
+    ['fuentes', 'Fuentes']
+  ];
 
   return (
     <div className="e">
@@ -90,16 +118,41 @@ export function DetalleLey({ votacion, onVolver }) {
         background: 'none', border: 'none', cursor: 'pointer', color: C.media, fontSize: 12, padding: '0 0 12px'
       }}>← Volver a la lista</button>
 
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 5, background: 'rgba(239,239,233,.92)',
+        backdropFilter: 'blur(8px)', padding: '8px 0 10px', marginBottom: 4
+      }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {pasos.map(([id, et]) => (
+            <button key={id} onClick={() => refs[id].current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="em" style={{
+                fontSize: 10.5, padding: '5px 9px', borderRadius: 2, cursor: 'pointer',
+                border: `1px solid ${seccion === id ? C.tinta : C.linea}`,
+                background: seccion === id ? C.tinta : 'transparent',
+                color: seccion === id ? '#EFEFE9' : C.media, fontWeight: seccion === id ? 600 : 400
+              }}>{et}</button>
+          ))}
+        </div>
+      </div>
+
       <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 16 }}>
         <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {votacion.materia_nombre && (
-            <span style={{ background: (votacion.materia_color || '#8E9299') + '22', color: votacion.materia_color || C.media, padding: '2px 7px', borderRadius: 2, fontWeight: 500 }}>
+            <span style={{
+              background: votacion.materia_color || C.media, color: '#fff',
+              padding: '3px 9px', borderRadius: 2, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase'
+            }}>
               {votacion.materia_nombre}
             </span>
           )}
-          <span>{votacion.fecha} · Sesión {votacion.sesion} · {votacion.titulo}</span>
+          <span>{votacion.fecha} · Sesión {votacion.sesion}</span>
         </div>
-        <div className="ed" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.3 }}>
+        {frase && (
+          <div className="ed" style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.25, marginBottom: 8 }}>
+            {frase}
+          </div>
+        )}
+        <div className="em" style={{ fontSize: 11.5, color: C.media, lineHeight: 1.4 }}>
           {String(votacion.subtitulo || votacion.titulo || '')
             .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
             .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
@@ -109,125 +162,176 @@ export function DetalleLey({ votacion, onVolver }) {
           <Sello aprobada={aprobada} />
           {votacion.votaciones_norma > 1 && (
             <span className="em" style={{ fontSize: 11, color: C.media }}>
-              Esta norma se votó {votacion.votaciones_norma} veces (enmiendas incluidas).
-              Aquí se muestra la votación principal.
+              {votacion.votaciones_norma} votaciones (enmiendas incluidas)
             </span>
           )}
         </div>
       </div>
 
-      {Array.isArray(votacion.efectos) && votacion.efectos.length > 0 && (
-        <Bloque titulo="Si esto te afecta">
-          {votacion.efectos.map(e => (
-            <div key={e.slug} style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: `1px solid ${C.linea}` }}>
-              <span style={{
-                flexShrink: 0, width: 7, height: 7, borderRadius: 7, marginTop: 6,
-                background: votacion.materia_color || C.tinta
-              }} />
-              <div>
-                <div className="ed" style={{ fontSize: 14, fontWeight: 600 }}>{e.nombre}</div>
-                <div style={{ fontSize: 13.5, color: C.tinta, lineHeight: 1.5, marginTop: 3 }}>{e.efecto}</div>
-              </div>
+      <div ref={refs.afecta} data-sec="afecta" style={{ scrollMarginTop: 52 }}>
+        {Array.isArray(votacion.efectos) && votacion.efectos.length > 0 ? (
+          <Bloque titulo="Si esto te afecta">
+            {votacion.efectos.map(e => {
+              const tip = implicacionDe(e.slug);
+              return (
+                <div key={e.slug} style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: `1px solid ${C.linea}` }}>
+                  <span style={{
+                    flexShrink: 0, width: 7, height: 7, borderRadius: 7, marginTop: 6,
+                    background: votacion.materia_color || C.tinta
+                  }} />
+                  <div>
+                    <div className="ed" style={{ fontSize: 14, fontWeight: 600 }}>{e.nombre}</div>
+                    <div style={{ fontSize: 13.5, color: C.tinta, lineHeight: 1.5, marginTop: 3 }}>{e.efecto}</div>
+                    {tip && (
+                      <div style={{
+                        marginTop: 8, padding: '8px 10px', background: '#F7F7F2', borderRadius: 2,
+                        fontSize: 12, color: C.media, lineHeight: 1.5
+                      }}>
+                        <strong style={{ color: C.tinta }}>Qué mirar:</strong> {tip.hacer}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 10, lineHeight: 1.5 }}>
+              Colectivos identificados sobre una lista cerrada. El efecto describe lo que cambia, no si es bueno o malo.
             </div>
-          ))}
-          <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 10, lineHeight: 1.5 }}>
-            Colectivos identificados automáticamente sobre una lista cerrada. El efecto describe
-            lo que cambia, no si es bueno o malo.
-          </div>
-        </Bloque>
-      )}
+          </Bloque>
+        ) : (
+          <Bloque titulo="Si esto te afecta">
+            <div style={{ fontSize: 13, color: C.media, lineHeight: 1.5 }}>
+              Esta norma no tiene colectivos etiquetados todavía. Usa el buscador del inicio con tu situación
+              para ver leyes que sí te marcan.
+            </div>
+          </Bloque>
+        )}
+      </div>
 
-      {votacion.resumen && (
-        <Bloque titulo="Qué dice esta norma">
-          <div style={{ fontSize: 14.5, lineHeight: 1.6 }}>
-            {String(votacion.resumen).split(/(?<=\.)\s+/).slice(0, 2).join(' ')}
-          </div>
-          {(String(votacion.resumen).split(/(?<=\.)\s+/).length > 2 ||
-            (Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0)) && (
-            <details style={{ marginTop: 12 }}>
-              <summary className="em" style={{ fontSize: 11.5, color: C.media, cursor: 'pointer' }}>
-                Leer el detalle completo
-              </summary>
-              <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 10, color: C.media }}>
-                {String(votacion.resumen).split(/(?<=\.)\s+/).slice(2).join(' ')}
-              </div>
-              {Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0 && (
-                <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, lineHeight: 1.55, color: C.media }}>
-                  {votacion.puntos_clave.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
-                </ul>
-              )}
-            </details>
-          )}
-          <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 12, lineHeight: 1.5 }}>
-            {votacion.resumen_basado_en === 'texto_bocg'
-              ? 'Resumen sintetizado automáticamente del texto oficial publicado en el BOCG.'
-              : 'Resumen sintetizado automáticamente a partir del título oficial.'}
-            {' '}No sustituye al texto legal.
-          </div>
-        </Bloque>
-      )}
+      <div ref={refs.resumen} data-sec="resumen" style={{ scrollMarginTop: 52 }}>
+        {votacion.resumen && (
+          <Bloque titulo="Qué dice esta norma">
+            <div style={{ fontSize: 14.5, lineHeight: 1.6 }}>
+              {String(votacion.resumen).split(/(?<=\.)\s+/).slice(0, 2).join(' ')}
+            </div>
+            {(String(votacion.resumen).split(/(?<=\.)\s+/).length > 2 ||
+              (Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0)) && (
+              <details style={{ marginTop: 12 }}>
+                <summary className="em" style={{ fontSize: 11.5, color: C.media, cursor: 'pointer' }}>
+                  Leer el detalle completo
+                </summary>
+                <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 10, color: C.media }}>
+                  {String(votacion.resumen).split(/(?<=\.)\s+/).slice(2).join(' ')}
+                </div>
+                {Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0 && (
+                  <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, lineHeight: 1.55, color: C.media }}>
+                    {votacion.puntos_clave.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
+                  </ul>
+                )}
+              </details>
+            )}
+            <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 12, lineHeight: 1.5 }}>
+              {votacion.resumen_basado_en === 'texto_bocg'
+                ? 'Resumen del texto oficial del BOCG.'
+                : 'Resumen a partir del título oficial.'}
+              {' '}No sustituye al texto legal.
+            </div>
+          </Bloque>
+        )}
+      </div>
 
-      {(votacion.expediente || enlaces.length > 0) && (
-        <Bloque titulo="Acceder a la norma">
-          {votacion.expediente && (
-            <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 6 }}>
-              Expediente {votacion.expediente}
-              {votacion.similitud_enlace && ` · coincidencia ${Math.round(votacion.similitud_enlace * 100)}%`}
-            </div>
-          )}
-          {votacion.autor_texto && (
-            <div style={{ fontSize: 12.5, marginBottom: 4 }}>
-              <span style={{ color: C.tenue }}>Presentada por </span>{votacion.autor_texto}
-            </div>
-          )}
-          {votacion.situacion && (
-            <div style={{ fontSize: 12.5, marginBottom: 10 }}>
-              <span style={{ color: C.tenue }}>Situación: </span>{votacion.situacion}
-            </div>
-          )}
-          {enlaces.length > 0 && (
-            <a href={enlaces[0]} target="_blank" rel="noreferrer" style={{
-              display: 'inline-block', marginTop: 4, padding: '9px 14px', fontSize: 12.5, fontWeight: 600,
-              background: C.tinta, color: '#EFEFE9', borderRadius: 2, textDecoration: 'none'
-            }}>Leer el texto oficial en el BOCG →</a>
-          )}
-          {enlaces.slice(1).map((u, i) => (
-            <a key={u} href={u} target="_blank" rel="noreferrer" className="em"
-              style={{ fontSize: 11, color: C.media, display: 'block', marginTop: 7 }}>
-              Publicación posterior en el BOCG ({i + 2}) →
+      <div ref={refs.historial} data-sec="historial" style={{ scrollMarginTop: 52 }}>
+        <HistorialNormaLazy votacion={votacion} />
+      </div>
+
+      <div ref={refs.fuentes} data-sec="fuentes" style={{ scrollMarginTop: 52 }}>
+        {(votacion.expediente || enlaces.length > 0) && (
+          <Bloque titulo="Acceder a la norma">
+            {votacion.expediente && (
+              <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 6 }}>
+                Expediente {votacion.expediente}
+                {votacion.similitud_enlace && ` · coincidencia ${Math.round(votacion.similitud_enlace * 100)}%`}
+              </div>
+            )}
+            {votacion.autor_texto && (
+              <div style={{ fontSize: 12.5, marginBottom: 4 }}>
+                <span style={{ color: C.tenue }}>Presentada por </span>{votacion.autor_texto}
+              </div>
+            )}
+            {votacion.situacion && (
+              <div style={{ fontSize: 12.5, marginBottom: 10 }}>
+                <span style={{ color: C.tenue }}>Situación: </span>{votacion.situacion}
+              </div>
+            )}
+            {enlaces.length > 0 && (
+              <a href={enlaces[0]} target="_blank" rel="noreferrer" style={{
+                display: 'inline-block', marginTop: 4, padding: '9px 14px', fontSize: 12.5, fontWeight: 600,
+                background: C.tinta, color: '#EFEFE9', borderRadius: 2, textDecoration: 'none'
+              }}>Leer el texto oficial en el BOCG →</a>
+            )}
+            {enlaces.slice(1).map((u, i) => (
+              <a key={u} href={u} target="_blank" rel="noreferrer" className="em"
+                style={{ fontSize: 11, color: C.media, display: 'block', marginTop: 7 }}>
+                Publicación posterior en el BOCG ({i + 2}) →
+              </a>
+            ))}
+            <a href={votacion.fuente_url} target="_blank" rel="noreferrer" className="em"
+              style={{ fontSize: 11, color: C.media, display: 'block', marginTop: 12 }}>
+              Acta oficial de la votación →
             </a>
-          ))}
-          <a href={votacion.fuente_url} target="_blank" rel="noreferrer" className="em"
-            style={{ fontSize: 11, color: C.media, display: 'block', marginTop: 12 }}>
-            Acta oficial de la votación →
-          </a>
-        </Bloque>
-      )}
+          </Bloque>
+        )}
 
-      {!votacion.resumen && (
-        <Bloque titulo="Sin resumen disponible" aviso>
-          <div style={{ fontSize: 12.5, color: '#6B5518', lineHeight: 1.55 }}>
-            Esta votación es una proposición no de ley, moción o interpelación. El Congreso no
-            publica su texto en el portal de datos abiertos, así que solo disponemos del título
-            oficial y del acta de la votación.
-          </div>
-          <a href={votacion.fuente_url} target="_blank" rel="noreferrer" className="em"
-            style={{ fontSize: 11, color: '#6B5518', display: 'block', marginTop: 10 }}>
-            Acta oficial de la votación →
-          </a>
-        </Bloque>
-      )}
+        {!votacion.resumen && (
+          <Bloque titulo="Sin resumen disponible" aviso>
+            <div style={{ fontSize: 12.5, color: '#6B5518', lineHeight: 1.55 }}>
+              Esta votación es una proposición no de ley, moción o interpelación. El Congreso no
+              publica su texto en el portal de datos abiertos, así que solo disponemos del título
+              oficial y del acta de la votación.
+            </div>
+            <a href={votacion.fuente_url} target="_blank" rel="noreferrer" className="em"
+              style={{ fontSize: 11, color: '#6B5518', display: 'block', marginTop: 10 }}>
+              Acta oficial de la votación →
+            </a>
+          </Bloque>
+        )}
+      </div>
     </div>
   );
 }
 
+function HistorialNormaLazy({ votacion }) {
+  const [enmiendas, setEnmiendas] = useState(null);
+  useEffect(() => {
+    setEnmiendas(null);
+    if (votacion.clave_norma && votacion.votaciones_norma > 1) {
+      traerVotacionesDeNorma(votacion.clave_norma).then(setEnmiendas).catch(() => setEnmiendas([]));
+    } else {
+      setEnmiendas([]);
+    }
+  }, [votacion.clave_norma, votacion.votaciones_norma]);
+
+  if (enmiendas === null) {
+    return <div className="em" style={{ padding: 14, color: C.tenue, fontSize: 11 }}>Cargando historial…</div>;
+  }
+  if (enmiendas.length <= 1) {
+    return (
+      <Bloque titulo="Historial de esta norma">
+        <div style={{ fontSize: 13, color: C.media, lineHeight: 1.5 }}>
+          Solo hay una votación registrada para esta norma. No hay enmiendas enlazadas en los datos abiertos.
+        </div>
+      </Bloque>
+    );
+  }
+  return <HistorialNorma enmiendas={enmiendas} />;
+}
+
 export default function Detalle({ votacion, diputados, votos, onDiputado, onNorma }) {
   const [enmiendas, setEnmiendas] = useState(null);
-  const [verEnmiendas, setVerEnmiendas] = useState(false);
   const [relacionadas, setRelacionadas] = useState([]);
 
   useEffect(() => {
-    setEnmiendas(null); setVerEnmiendas(false); setRelacionadas([]);
+    setEnmiendas(null); setRelacionadas([]);
     if (votacion.clave_norma && votacion.votaciones_norma > 1) {
       traerVotacionesDeNorma(votacion.clave_norma).then(setEnmiendas).catch(() => setEnmiendas([]));
     }
@@ -312,45 +416,7 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
             );
           })()}
 
-      {enmiendas && enmiendas.length > 1 && (
-        <Bloque titulo={`Historial de esta norma · ${enmiendas.length} votaciones`}>
-          <button onClick={() => setVerEnmiendas(!verEnmiendas)} className="em" style={{
-            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-            color: C.media, fontSize: 11.5, marginBottom: verEnmiendas ? 10 : 0
-          }}>
-            {verEnmiendas ? 'ocultar el desglose' : 'ver todas las votaciones y enmiendas'}
-          </button>
-
-          {verEnmiendas && enmiendas.map(e => (
-            <div key={e.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0',
-              borderTop: `1px solid ${C.linea}`,
-              opacity: e.es_tramite ? 0.72 : 1
-            }}>
-              <span className="em" style={{ fontSize: 10, color: C.tenue, width: 74, flexShrink: 0 }}>{e.fecha}</span>
-              <span style={{ flex: 1, fontSize: 12, minWidth: 0 }}>
-                {e.titulo}
-                {e.es_tramite && <span className="em" style={{ fontSize: 9.5, color: C.tenue }}> · trámite</span>}
-              </span>
-              <span className="em" style={{ fontSize: 10.5, color: C.tenue, flexShrink: 0 }}>
-                {e.total_si}–{e.total_no}
-              </span>
-              <span className="em" style={{
-                fontSize: 10.5, width: 62, textAlign: 'right', flexShrink: 0, fontWeight: 500,
-                color: e.resultado === 'aprobada' ? C.si : C.no
-              }}>{e.resultado}</span>
-            </div>
-          ))}
-
-          {!verEnmiendas && (
-            <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.5, marginTop: 8 }}>
-              Esta norma pasó por {enmiendas.length} votaciones, de las cuales{' '}
-              {enmiendas.filter(e => e.es_tramite).length} fueron enmiendas o trámites.
-              Lo que ves arriba es la votación principal.
-            </div>
-          )}
-        </Bloque>
-      )}
+      {enmiendas && enmiendas.length > 1 && <HistorialNorma enmiendas={enmiendas} />}
 
       {relacionadas.length > 0 && (
         <Bloque titulo="Otras normas aprobadas sobre lo mismo">

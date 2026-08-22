@@ -7,6 +7,8 @@ import Metodologia from './components/Metodologia.jsx';
 import Descargas from './components/Descargas.jsx';
 import Partidos from './components/Partidos.jsx';
 import Inicio from './components/Inicio.jsx';
+import AvatarPartido from './components/AvatarPartido.jsx';
+import { fraseCortaDeNorma } from './lib/fraseCorta.js';
 import {
   faltaConfig, problemasConfig, traerDiputados, traerVotaciones, traerVotos,
   traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
@@ -44,12 +46,16 @@ border-top:2px solid transparent}
 border-top:none;border-bottom:2px solid transparent;margin-bottom:-2px}}
 .navb[data-on="1"]{color:${C.tinta};font-weight:600;border-top-color:${C.tinta}}
 @media(min-width:900px){.navb[data-on="1"]{border-top-color:transparent;border-bottom-color:${C.tinta}}}
+.tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;
+box-shadow:0 1px 0 rgba(20,22,26,0.03)}
+.fila{transition:background 140ms ease, transform 140ms ease}
 .fila:hover{background:#F3F3EE}
-.chip{padding:4px 9px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
+.chip{padding:5px 11px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
 display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:transparent;
-color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,color 120ms ease}
-.chip:hover{border-color:${C.tinta}}
+color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,color 140ms ease,border-color 140ms ease,transform 140ms ease}
+.chip:hover{border-color:${C.tinta};transform:translateY(-1px)}
 .chip[data-on="1"]{background:${C.tinta};color:${C.papel};border-color:${C.tinta}}
+.navb{transition:color 140ms ease,border-color 140ms ease}
 .hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
 .hero .chip:hover{color:#FFFFFF;border-color:#8E959C}
 .hero .chip[data-on="1"]{background:#F2F3F0;color:#14161A;border-color:#F2F3F0}
@@ -63,12 +69,13 @@ color:${C.media};border:1px solid ${C.linea};transition:background 120ms ease,co
 .ejesGuia{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:820px){.ejesGuia{grid-template-columns:1fr 1fr}}
 .split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
-@media(min-width:960px){.split{grid-template-columns:minmax(340px,.95fr) minmax(340px,1.05fr);gap:22px;align-items:start}
+@media(min-width:960px){.split{grid-template-columns:minmax(380px,1.15fr) minmax(300px,.9fr);gap:18px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
+@media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(420px,1.35fr) minmax(260px,.72fr);gap:18px}}
 .portada{display:grid;grid-template-columns:1fr;gap:20px;padding-top:6px}
 @media(min-width:900px){.portada{grid-template-columns:1.35fr 1fr;gap:32px;align-items:start}}
 .heroCols{display:grid;grid-template-columns:1fr;gap:14px}
-@media(min-width:760px){.heroCols.conPanel{grid-template-columns:148px 1fr;gap:16px;align-items:start}}
+@media(min-width:760px){.heroCols.conPanel{grid-template-columns:128px 1fr;gap:12px;align-items:start}}
 .panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
 .panelGrupos::-webkit-scrollbar{width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
@@ -101,7 +108,18 @@ const ORDENES = [
   ['intervenciones', 'Más intervenciones', d => Number(d.intervenciones ?? 0), true],
   ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
   ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true],
-  ['patrimonio', 'Mayor patrimonio declarado', d => Number(d.patrimonio_euros ?? d.bienes_total ?? -1), true],
+  ['patrimonio', 'Mayor patrimonio (€)', d => {
+    if (d.bienes_outlier) return -1; // no liderar el ranking con cifras anómalas
+    return Number(d.patrimonio_euros ?? d.bienes_total ?? -1);
+  }, true],
+  ['inmuebles', 'Más inmuebles', d => {
+    const n = d.n_casas ?? d.n_inmuebles;
+    return n == null ? -1 : Number(n);
+  }, true],
+  ['vehiculos', 'Más vehículos', d => {
+    const n = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
+    return (d.vehiculos_detalle || n > 0) ? Number(n) : -1;
+  }, true],
   ['donaciones', 'Más donaciones recibidas', d => Number(d.donaciones ?? 0), true],
   ['privadas', 'Más cargos en el sector privado', d => Number(d.actividades_privadas ?? 0), true]
 ];
@@ -292,7 +310,7 @@ export default function App() {
           ))}
         </nav>
 
-        <div className={mostrarHemiciclo ? 'split' : 'cols'}>
+        <div className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}>
           {mostrarHemiciclo && (
             <div className="izq">
               <div className="hero">
@@ -315,11 +333,12 @@ export default function App() {
                 <button
                   onClick={() => setFPartido(null)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                    padding: '6px 7px', background: !fPartido ? '#2B3037' : 'transparent',
+                    display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 6,
+                    width: '100%', textAlign: 'left', padding: '5px 4px',
+                    background: !fPartido ? '#2B3037' : 'transparent',
                     border: 'none', borderRadius: 2, cursor: 'pointer', marginBottom: 2
                   }}>
-                  <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5' }}>Todos</span>
+                  <span style={{ fontSize: 11.5, color: '#DDE1E5' }}>Todos</span>
                   <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{enHemiciclo.length}</span>
                 </button>
                 {(votacionSel && votos ? posicionPartidos : partidos.map(([siglas, { n, color }]) => ({
@@ -328,19 +347,20 @@ export default function App() {
                   <button key={g.siglas}
                     onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                      padding: '6px 7px', background: fPartido === g.siglas ? '#2B3037' : 'transparent',
+                      display: 'grid', gridTemplateColumns: '3px 1fr auto', alignItems: 'center', gap: 6,
+                      width: '100%', textAlign: 'left', padding: '5px 4px',
+                      background: fPartido === g.siglas ? '#2B3037' : 'transparent',
                       border: 'none', borderRadius: 2, cursor: 'pointer', transition: 'background 140ms ease'
                     }}>
-                    <span style={{ width: 3, height: 20, background: g.color, borderRadius: 3, flexShrink: 0 }} />
-                    <span style={{ flex: 1, fontSize: 11.5, color: '#DDE1E5', minWidth: 0 }}>{g.siglas}</span>
+                    <span style={{ width: 3, height: 16, background: g.color, borderRadius: 3 }} />
+                    <span style={{ fontSize: 11.5, color: '#DDE1E5', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.siglas}</span>
                     {g.voto ? (
-                      <span className="em" style={{ fontSize: 11, fontWeight: 500, flexShrink: 0,
+                      <span className="em" style={{ fontSize: 11, fontWeight: 500,
                         color: g.voto === 'si' ? '#5FBF92' : g.voto === 'no' ? '#E08278' : '#E0BB6A' }}>
-                        {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'} {g.n}
+                        {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'}{g.n}
                       </span>
                     ) : (
-                      <span className="em" style={{ fontSize: 11, color: '#8E959C', flexShrink: 0 }}>{g.n}</span>
+                      <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{g.n}</span>
                     )}
                   </button>
                 ))}
@@ -349,17 +369,19 @@ export default function App() {
                     <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
                       letterSpacing: '.07em', marginBottom: 7 }}>Autonomía</div>
                     <button onClick={() => setFCcaa(null)} style={{
-                      display: 'block', width: '100%', textAlign: 'left', padding: '4px 7px',
+                      display: 'grid', gridTemplateColumns: '1fr auto', width: '100%', textAlign: 'left', padding: '4px 4px',
                       background: !fCcaa ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
-                      cursor: 'pointer', fontSize: 11, color: '#DDE1E5', marginBottom: 2
-                    }}>Toda España</button>
+                      cursor: 'pointer', fontSize: 11, color: '#DDE1E5', marginBottom: 2, gap: 6
+                    }}>
+                      <span>Toda España</span>
+                    </button>
                     {ccaa.map(c => (
                       <button key={c.slug} onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)} style={{
-                        display: 'flex', width: '100%', textAlign: 'left', padding: '4px 7px',
+                        display: 'grid', gridTemplateColumns: '1fr auto', width: '100%', textAlign: 'left', padding: '4px 4px',
                         background: fCcaa === c.slug ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
                         cursor: 'pointer', fontSize: 11, color: '#DDE1E5', gap: 6
                       }}>
-                        <span style={{ flex: 1, minWidth: 0 }}>{c.nombre}</span>
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nombre}</span>
                         <span className="em" style={{ color: '#8E959C' }}>{c.diputados}</span>
                       </button>
                     ))}
@@ -449,28 +471,43 @@ export default function App() {
                     Ninguna votación con esos filtros.
                   </div>
                 )}
-                {votaciones.map((v, i) => (
+                {votaciones.map((v, i) => {
+                  const frase = fraseCortaDeNorma(v, 52);
+                  const legal = limpiarTitular(v.titular || v.subtitulo || v.titulo);
+                  return (
                   <button key={v.clave_norma ?? v.id} className="fila"
                     onClick={async () => {
                       const id = v.votacion_principal ?? v.id;
                       const completa = (await traerVotaciones(1, { id }))[0];
                       if (completa) setVotacionSel({ ...completa, clave_norma: v.clave_norma, votaciones_norma: v.votaciones });
                     }} style={{
-                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '12px 13px',
+                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '11px 12px',
                     background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
                   }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.4 }}>{limpiarTitular(v.titular || v.subtitulo || v.titulo)}</div>
-                    <div className="em" style={{ fontSize: 10, color: C.tenue, margin: '5px 0 7px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {v.materia_nombre && <span style={{ background: (v.materia_color || '#8E9299') + '22', color: v.materia_color || C.media, padding: '1px 6px', borderRadius: 2, fontWeight: 500 }}>{v.materia_nombre}</span>}
+                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 5, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {v.materia_nombre && (
+                        <span style={{
+                          background: v.materia_color || C.media, color: '#fff', padding: '2px 8px',
+                          borderRadius: 2, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 10
+                        }}>{v.materia_nombre}</span>
+                      )}
                       <span>{v.fecha}</span>
                       {v.votaciones > 1 && (
                         <span style={{ color: C.media }}>
-                          {v.votaciones} votaciones{v.tramites > 0 ? ` · ${v.tramites} enmiendas` : ''}
+                          {v.votaciones} vot.{v.tramites > 0 ? ` · ${v.tramites} enm.` : ''}
                         </span>
                       )}
                     </div>
-                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} />
-                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 5, display: 'flex', gap: 10 }}>
+                    <div className="ed" style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3 }}>
+                      {frase || (String(legal).length > 70 ? String(legal).slice(0, 67) + '…' : legal)}
+                    </div>
+                    {frase && (
+                      <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, lineHeight: 1.35 }}>
+                        {String(legal).length > 90 ? String(legal).slice(0, 87) + '…' : legal}
+                      </div>
+                    )}
+                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} alto={5} />
+                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, display: 'flex', gap: 10 }}>
                       <span style={{ color: C.si }}>Sí {v.total_si}</span>
                       <span style={{ color: C.no }}>No {v.total_no}</span>
                       {v.resultado_fiable === false && v.votaciones > 1 ? (
@@ -487,7 +524,8 @@ export default function App() {
                       )}
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -507,8 +545,11 @@ export default function App() {
             <div className="solo1">
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Nombre o circunscripción"
-                style={{ width: '100%', padding: '10px 12px', fontSize: 14, marginBottom: 10,
-                  border: `1px solid ${C.linea}`, borderRadius: 2, background: C.superficie }} />
+                style={{
+                  width: '100%', padding: '12px 14px', fontSize: 14.5, marginBottom: 12,
+                  border: `1px solid ${C.linea}`, borderRadius: 3, background: C.superficie,
+                  boxShadow: 'inset 0 1px 0 rgba(20,22,26,0.02)', outline: 'none'
+                }} />
 
               <div className="rot">Ordenar por</div>
               <div className="chips" style={{ marginBottom: 12 }}>
@@ -529,8 +570,32 @@ export default function App() {
               {orden === 'patrimonio' && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Patrimonio declarado en la declaración de bienes del Congreso. Solo aparece si ya se
-                  ha cargado el PDF (npm run bienes). Si ves ceros, faltan declaraciones digitalizadas.
+                  Dinero declarado aproximado: depósitos + valores + planes − deuda.
+                  No incluye el valor de inmuebles (el PDF no lo trae).
+                  Cifras &gt;10 M o depósitos &gt;5 M se marcan para revisión (errores de coma/punto).
+                  Digitaliza con <code>npm run bienes:auto</code>
+                  {' '}· ahora: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con cifra
+                  {diputados.filter(d => d.bienes_outlier).length
+                    ? ` · ${diputados.filter(d => d.bienes_outlier).length} en revisión`
+                    : ''}.
+                </div>
+              )}
+
+              {orden === 'inmuebles' && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Unidades del PDF (no solo filas): «2 VIVIENDAS» = 2, «13 FINCAS» = 13,
+                  plazas, locales y naves incluidas. Si el detalle está vacío, se usan las filas.
+                  {' '}Ahora: {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con dato.
+                </div>
+              )}
+
+              {orden === 'vehiculos' && (
+                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
+                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                  Coches, motos, embarcaciones y aeronaves del PDF. Abre la ficha para ver el detalle
+                  (p. ej. «Jeep Commander», «BMW R80RT»).
+                  {' '}Ahora: {diputados.filter(d => (d.n_vehiculos ?? 0) > 0 || d.vehiculos_detalle).length} con vehículos.
                 </div>
               )}
 
@@ -578,49 +643,76 @@ export default function App() {
                     onMouseEnter={() => setEncimaEscano(d.mandato_id)}
                     onMouseLeave={() => setEncimaEscano(null)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
-                      padding: '10px 13px', cursor: 'pointer',
+                      display: 'grid',
+                      gridTemplateColumns: 'auto minmax(0,1fr) auto',
+                      alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                      padding: '8px 10px', cursor: 'pointer',
                       background: encimaEscano === d.mandato_id ? '#F3F3EE' : 'transparent',
                       border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none',
                       boxShadow: encimaEscano === d.mandato_id ? `inset 3px 0 0 ${d.color || '#8E9299'}` : 'none'
                     }}>
-                    {d.foto_url ? (
-                      <img src={d.foto_url} alt="" width={34} height={42} loading="lazy"
-                        onError={e => { e.currentTarget.style.visibility = 'hidden'; }}
-                        style={{ width: 34, height: 42, objectFit: 'cover', borderRadius: 2,
-                          flexShrink: 0, borderLeft: `3px solid ${d.color || '#8E9299'}`, background: '#E4E4DC' }} />
-                    ) : (
-                      <span style={{ width: 3, height: 34, background: d.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
-                    )}
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13 }}>{d.nombre_completo}</span>
-                      <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue }}>
+                    <AvatarPartido
+                      foto={d.foto_url}
+                      color={d.color}
+                      siglas={d.partido_siglas || d.grupo}
+                      nombre={d.nombre_completo}
+                      w={30}
+                      h={38}
+                    />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{
+                        display: 'block', fontSize: 12.5, whiteSpace: 'nowrap',
+                        overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>{d.nombre_completo}</span>
+                      <span className="em" style={{
+                        display: 'block', fontSize: 9.5, color: C.tenue, whiteSpace: 'nowrap',
+                        overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
                         {d.partido_siglas || d.grupo || '—'} · {d.circunscripcion ?? '—'}
-                        {d.cargo && <span style={{ color: C.media }}> · {d.cargo}</span>}
                       </span>
                     </span>
-                    <span style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 88 }}>
                       {(() => {
                         const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
+                        const fmtEuro = v => {
+                          if (v == null || v === '—' || Number.isNaN(Number(v))) return '—';
+                          const n = Number(v);
+                          if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' M';
+                          if (Math.abs(n) >= 1000) return Math.round(n / 1000) + ' mil';
+                          return String(Math.round(n));
+                        };
+                        const casas = d.n_casas ?? d.n_inmuebles;
+                        const nVeh = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
                         const etiquetas = {
-                          nombre: ['min tribuna', d.minutos_tribuna],
-                          ausencias: ['ausencias', d.ausencias],
-                          disidencias: ['contra su partido', d.disidencias],
-                          tribuna: ['min tribuna', d.minutos_tribuna],
-                          intervenciones: ['intervenciones', d.intervenciones],
-                          abstenciones: ['abstenciones', d.abstenciones],
-                          telematicos: ['a distancia', d.telematicos],
-                          patrimonio: ['€ declarados', d.patrimonio_euros ?? d.bienes_total ?? '—'],
-                          donaciones: ['donaciones', d.donaciones],
-                          privadas: ['cargos privados', d.actividades_privadas]
+                          nombre: ['min', d.minutos_tribuna],
+                          ausencias: ['aus.', d.ausencias],
+                          disidencias: ['contra', d.disidencias],
+                          tribuna: ['min', d.minutos_tribuna],
+                          intervenciones: ['int.', d.intervenciones],
+                          abstenciones: ['abs.', d.abstenciones],
+                          telematicos: ['tel.', d.telematicos],
+                          patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
+                          inmuebles: ['inm.', casas ?? '—'],
+                          vehiculos: ['veh.', nVeh || '—'],
+                          donaciones: ['don.', d.donaciones],
+                          privadas: ['priv.', d.actividades_privadas]
                         };
                         const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
+                        let sub = et;
+                        if (cfg[0] === 'inmuebles' && casas != null) sub = 'inmuebles';
+                        if (cfg[0] === 'vehiculos') {
+                          const partes = [];
+                          if (d.n_coches) partes.push(`${d.n_coches} coche${d.n_coches === 1 ? '' : 's'}`);
+                          if (d.n_motos) partes.push(`${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}`);
+                          if (d.n_embarcaciones) partes.push(`${d.n_embarcaciones} emb.`);
+                          if (d.n_aeronaves) partes.push(`${d.n_aeronaves} aer.`);
+                          sub = partes.length ? partes.join(' · ') : 'vehículos';
+                        }
+                        if (cfg[0] === 'patrimonio' && casas != null) sub = `${casas} inm.`;
                         return (<>
-                          <span className="ed" style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{val ?? 0}</span>
-                          <span style={{ display: 'block', fontSize: 9, color: C.tenue }}>
-                            {et}
-                            {(cfg[0] === 'ausencias' || cfg[0] === 'abstenciones' || cfg[0] === 'disidencias' || cfg[0] === 'telematicos') &&
-                              ` de ${Number(d.votos_emitidos) + Number(d.ausencias ?? 0)}`}
+                          <span className="ed" style={{ display: 'block', fontSize: 14, fontWeight: 600, lineHeight: 1.1 }}>{val ?? 0}</span>
+                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {sub}
                           </span>
                         </>);
                       })()}

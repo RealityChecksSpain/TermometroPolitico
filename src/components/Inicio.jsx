@@ -1,8 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { DestelloSuave, EntradaSuave } from './Destello.jsx';
 import Feed from './Feed.jsx';
 import GraficoBrecha from './GraficoBrecha.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
+import { implicacionDe } from '../lib/implicaciones.js';
+import {
+  cargarPerfilGuardado, guardarPerfil, borrarPerfilGuardado,
+  marcarVistoAhora, ultimaVista, filtrarNovedades
+} from '../lib/alertas.js';
 import { traerUltimas, traerLideres } from '../lib/cliente.js';
+import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -54,16 +61,49 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   const [etiqueta, setEtiqueta] = useState(null);
   const [ultimas, setUltimas] = useState([]);
   const [ausentes, setAusentes] = useState([]);
+  const [guardado, setGuardado] = useState(() => cargarPerfilGuardado());
+  const [novedades, setNovedades] = useState([]);
 
   useEffect(() => {
-    traerUltimas(7).then(setUltimas).catch(() => setUltimas([]));
+    traerUltimas(12).then(rows => {
+      setUltimas(rows);
+      const g = cargarPerfilGuardado();
+      if (g) {
+        const desde = ultimaVista();
+        setNovedades(filtrarNovedades(rows, g, desde));
+      }
+      marcarVistoAhora();
+    }).catch(() => setUltimas([]));
     traerLideres('ausencias').then(setAusentes).catch(() => setAusentes([]));
+
+    const g = cargarPerfilGuardado();
+    if (g?.texto) {
+      setPerfil(g.texto);
+      const d = { colectivos: g.colectivos ?? [], materias: g.materias ?? [] };
+      setDeteccion(d);
+      if (d.colectivos[0] || d.materias[0]) {
+        const col = d.colectivos[0] ?? null;
+        const mat = !col ? (d.materias[0] ?? null) : null;
+        setFiltro({ colectivo: col, materia: mat });
+        setEtiqueta(col
+          ? ((colectivos ?? []).find(c => c.slug === col)?.nombre ?? col)
+          : ((facetas?.materias ?? []).find(m => m.slug === mat)?.nombre ?? mat));
+      }
+    }
   }, []);
 
-  const nombreColectivo = s => (colectivos ?? []).find(c => c.slug === s)?.nombre ?? s;
+  const nombreColectivo = s => {
+    const tip = implicacionDe(s);
+    return tip?.etiqueta ?? (colectivos ?? []).find(c => c.slug === s)?.nombre ?? s;
+  };
 
-  function aplicar(d) {
-    const col = d.colectivos[0] ?? null;
+  const tips = useMemo(
+    () => (deteccion.colectivos ?? []).map(s => ({ slug: s, ...implicacionDe(s) })).filter(t => t.implica),
+    [deteccion]
+  );
+
+  function aplicar(d, slugForzado) {
+    const col = slugForzado ?? d.colectivos[0] ?? null;
     const mat = !col ? (d.materias[0] ?? null) : null;
     if (!col && !mat) return;
     setFiltro({ colectivo: col, materia: mat });
@@ -72,11 +112,14 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   }
 
   async function buscar() {
-    if (deteccion.colectivos.length) { aplicar(deteccion); return; }
+    if (deteccion.colectivos.length || deteccion.materias.length) { aplicar(deteccion); return; }
     if (perfil.trim().length < 3) return;
     setPensando(true);
-    try { const d = await detectarPerfilAmpliado(perfil); setDeteccion(d); aplicar(d); }
-    finally { setPensando(false); }
+    try {
+      const d = await detectarPerfilAmpliado(perfil);
+      setDeteccion(d);
+      aplicar(d);
+    } finally { setPensando(false); }
   }
 
   function limpiar() {
@@ -84,8 +127,24 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
     setFiltro(null); setEtiqueta(null);
   }
 
-  const destacada = ultimas[0];
-  const restoUltimas = ultimas.slice(1);
+  function guardarAlerta() {
+    if (!deteccion.colectivos.length && !deteccion.materias.length) return;
+    const p = {
+      texto: perfil,
+      colectivos: deteccion.colectivos,
+      materias: deteccion.materias
+    };
+    guardarPerfil(p);
+    setGuardado(p);
+    marcarVistoAhora();
+    setNovedades([]);
+  }
+
+  function olvidarAlerta() {
+    borrarPerfilGuardado();
+    setGuardado(null);
+    setNovedades([]);
+  }
 
   return (
     <div>
@@ -101,7 +160,9 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
           position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.35,
           background: 'radial-gradient(ellipse at 85% 20%, rgba(94,191,146,0.35), transparent 45%), radial-gradient(ellipse at 10% 90%, rgba(176,140,60,0.2), transparent 40%)'
         }} />
+        <DestelloSuave color="rgba(242,243,240,0.45)" n={10} />
 
+        <EntradaSuave>
         <div style={{
           position: 'relative',
           display: 'grid',
@@ -159,7 +220,43 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
               }}>{pensando ? 'pensando…' : 'Ver mis leyes'}</button>
             </div>
 
-            {!etiqueta && (
+            {(deteccion.colectivos.length > 0 || deteccion.materias.length > 0) && (
+              <div style={{ marginTop: 12 }}>
+                <div className="em" style={{ fontSize: 10, color: '#9AA0A6', marginBottom: 6, letterSpacing: '.04em' }}>
+                  Detectado en tu texto · elige uno para filtrar
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {deteccion.colectivos.map(s => {
+                    const activo = filtro?.colectivo === s;
+                    return (
+                      <button key={s} onClick={() => aplicar(deteccion, s)} style={{
+                        padding: '6px 12px', fontSize: 12, cursor: 'pointer', borderRadius: 2,
+                        border: `1px solid ${activo ? '#F2F3F0' : 'rgba(255,255,255,0.22)'}`,
+                        background: activo ? '#F2F3F0' : 'transparent',
+                        color: activo ? C.tinta : '#DDE1E5', fontWeight: activo ? 600 : 400
+                      }}>{nombreColectivo(s)}</button>
+                    );
+                  })}
+                  {deteccion.materias.map(s => {
+                    const activo = filtro?.materia === s;
+                    const nom = (facetas?.materias ?? []).find(m => m.slug === s)?.nombre ?? s;
+                    return (
+                      <button key={`m-${s}`} onClick={() => {
+                        setFiltro({ colectivo: null, materia: s });
+                        setEtiqueta(nom);
+                      }} style={{
+                        padding: '6px 12px', fontSize: 12, cursor: 'pointer', borderRadius: 2,
+                        border: `1px solid ${activo ? '#F2F3F0' : 'rgba(255,255,255,0.22)'}`,
+                        background: activo ? '#F2F3F0' : 'transparent',
+                        color: activo ? C.tinta : '#C9CDD2'
+                      }}>{nom}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!etiqueta && deteccion.colectivos.length === 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
                 {EJEMPLOS.slice(0, 4).map(e => (
                   <button key={e} onClick={() => { setPerfil(e); const d = detectarPerfil(e); setDeteccion(d); aplicar(d); }}
@@ -173,12 +270,23 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             )}
 
             {etiqueta && (
-              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ color: '#F2F3F0', fontSize: 14 }}>Filtro: <strong>{etiqueta}</strong></span>
                 <button onClick={limpiar} style={{
                   background: 'none', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 20,
                   color: '#C9CDD2', fontSize: 12, padding: '4px 10px', cursor: 'pointer'
                 }}>× quitar</button>
+                <button onClick={guardarAlerta} style={{
+                  background: 'rgba(95,191,146,0.18)', border: '1px solid rgba(95,191,146,0.45)',
+                  borderRadius: 20, color: '#A8E0C4', fontSize: 12, padding: '4px 12px', cursor: 'pointer'
+                }}>
+                  {guardado ? 'Actualizar alerta' : 'Guardar para avisarme'}
+                </button>
+                {guardado && (
+                  <button onClick={olvidarAlerta} className="em" style={{
+                    background: 'none', border: 'none', color: '#8E959C', fontSize: 11, cursor: 'pointer', padding: 0
+                  }}>olvidar perfil</button>
+                )}
               </div>
             )}
           </div>
@@ -187,7 +295,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             background: 'rgba(255,255,255,0.07)',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 3,
-            padding: '14px 14px 8px',
+            padding: '14px 14px 10px',
             backdropFilter: 'blur(8px)'
           }}>
             <div style={{
@@ -201,52 +309,56 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
               }}>Ver todas →</button>
             </div>
 
-            {destacada && (
-              <button onClick={() => onVotacion(destacada)} style={{
-                display: 'block', width: '100%', textAlign: 'left', background: 'rgba(0,0,0,0.2)',
-                border: 'none', borderRadius: 2, cursor: 'pointer', padding: '12px 12px', marginBottom: 6
-              }}>
-                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', marginBottom: 6, display: 'flex', gap: 8 }}>
-                  {destacada.materia_nombre && (
-                    <span style={{ color: destacada.materia_color || '#C9CDD2' }}>{destacada.materia_nombre}</span>
-                  )}
-                  <span>{corta(destacada.fecha)}</span>
-                  <span style={{
-                    marginLeft: 'auto',
-                    color: (destacada.resultado_final ?? destacada.resultado_ultima) === 'aprobada' ? '#5FBF92' : '#E08278',
-                    fontWeight: 600
-                  }}>
-                    {(destacada.resultado_final ?? destacada.resultado_ultima) === 'aprobada' ? '✓' : '✕'}
-                  </span>
-                </div>
-                <div className="ed" style={{ fontSize: 15, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3 }}>
-                  {String(limpiarTitular(destacada.titular)).slice(0, 110)}
-                  {String(destacada.titular).length > 110 ? '…' : ''}
-                </div>
-              </button>
-            )}
-
-            {restoUltimas.map((n, i) => {
+            {ultimas.slice(0, 5).map((n, i) => {
               const ok = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
+              const frase = fraseCortaDeNorma(n, 42) || String(nombreOficialNorma(n)).slice(0, 42);
+              const oficial = nombreOficialNorma(n);
+              const efectos = Array.isArray(n.efectos) ? n.efectos
+                : (Array.isArray(n.colectivos) ? n.colectivos.map(s => ({ slug: s, nombre: s })) : []);
               return (
                 <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
-                  display: 'block', width: '100%', textAlign: 'left', background: 'none',
-                  border: 'none', borderTop: i || destacada ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                  cursor: 'pointer', padding: '10px 4px'
+                  display: 'block', width: '100%', textAlign: 'left',
+                  background: i === 0 ? 'rgba(0,0,0,0.22)' : 'transparent',
+                  border: 'none',
+                  borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  borderRadius: i === 0 ? 2 : 0,
+                  cursor: 'pointer',
+                  padding: i === 0 ? '12px' : '11px 4px'
                 }}>
-                  <div className="em" style={{ fontSize: 9.5, marginBottom: 3, display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div className="em" style={{
+                    fontSize: 9.5, marginBottom: 5, display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap'
+                  }}>
                     {n.materia_nombre && (
-                      <span style={{ color: n.materia_color || '#A8AEB4' }}>{n.materia_nombre}</span>
+                      <span style={{
+                        color: '#fff', background: n.materia_color || '#5A6067',
+                        padding: '2px 7px', borderRadius: 2, fontWeight: 700, letterSpacing: '.04em',
+                        textTransform: 'uppercase'
+                      }}>{n.materia_nombre}</span>
                     )}
-                    <span style={{ color: '#7C8288' }}>{corta(n.fecha)}</span>
-                    <span style={{ marginLeft: 'auto', color: ok ? '#5FBF92' : '#E08278', fontWeight: 600 }}>
-                      {ok ? '✓' : '✕'}
-                    </span>
+                    <span style={{ color: '#8E959C' }}>{corta(n.fecha)}</span>
+                    <span style={{
+                      marginLeft: 'auto', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
+                      color: ok ? '#5FBF92' : '#E08278'
+                    }}>{ok ? 'Aprobada' : 'Rechazada'}</span>
                   </div>
-                  <div style={{ fontSize: 12.5, lineHeight: 1.35, color: '#DDE1E5' }}>
-                    {String(limpiarTitular(n.titular)).slice(0, 88)}
-                    {String(n.titular).length > 88 ? '…' : ''}
+                  <div className="ed" style={{
+                    fontSize: i === 0 ? 15 : 13.5, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3
+                  }}>{frase}</div>
+                  <div className="em" style={{
+                    fontSize: 10, color: '#8E959C', lineHeight: 1.4, marginTop: 5
+                  }} title={oficial}>
+                    {oficial.length > 110 ? oficial.slice(0, 107) + '…' : oficial}
                   </div>
+                  {efectos.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+                      {efectos.slice(0, 3).map(e => (
+                        <span key={e.slug || e.nombre} className="em" style={{
+                          fontSize: 9.5, padding: '2px 7px', borderRadius: 2,
+                          border: '1px solid rgba(255,255,255,0.18)', color: '#C9CDD2'
+                        }}>{e.nombre || e.slug}</span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -256,7 +368,53 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             )}
           </aside>
         </div>
+        </EntradaSuave>
       </section>
+
+      {novedades.length > 0 && (
+        <div style={{
+          marginBottom: 18, padding: 14, borderRadius: 3,
+          background: '#E8F4EE', border: '1px solid #B7D9C6'
+        }}>
+          <div className="ed" style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+            {novedades.length} norma{novedades.length === 1 ? '' : 's'} nueva{novedades.length === 1 ? '' : 's'} para tu perfil
+          </div>
+          <div style={{ fontSize: 12.5, color: C.media, marginBottom: 10, lineHeight: 1.45 }}>
+            Desde tu última visita, con los colectivos que guardaste.
+          </div>
+          {novedades.slice(0, 4).map(n => (
+            <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
+              display: 'block', width: '100%', textAlign: 'left', background: 'none',
+              border: 'none', borderTop: `1px solid #C5DFD0`, cursor: 'pointer', padding: '8px 0'
+            }}>
+              <span style={{ fontSize: 13, color: C.tinta }}>{fraseCortaDeNorma(n, 60) || limpiarTitular(n.titular)}</span>
+              <span className="em" style={{ fontSize: 10, color: C.tenue, marginLeft: 8 }}>{corta(n.fecha)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tips.length > 0 && (
+        <div style={{
+          marginBottom: 20, display: 'grid', gap: 10,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))'
+        }}>
+          {tips.slice(0, 3).map(t => (
+            <div key={t.slug} style={{
+              background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 14
+            }}>
+              <div className="em" style={{
+                fontSize: 10, color: C.tenue, letterSpacing: '.05em', textTransform: 'uppercase',
+                fontWeight: 600, marginBottom: 6
+              }}>Qué te implica · {t.etiqueta}</div>
+              <div style={{ fontSize: 13.5, color: C.tinta, lineHeight: 1.45, marginBottom: 8 }}>{t.implica}</div>
+              <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.45 }}>
+                <strong style={{ color: C.tinta }}>Qué hacer:</strong> {t.hacer}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div id="resultados" style={{ marginTop: 8, scrollMarginTop: 20 }}>
         {etiqueta && (

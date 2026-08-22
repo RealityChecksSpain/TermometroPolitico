@@ -1,8 +1,17 @@
 node_modules
 dist
 .env
-.env.local
+.env.*
+!.env.example
 .vercel
 *.log
 programas/
 cargos.txt
+
+# Scripts temporales de inspección (nunca deben llevar claves)
+scripts/_inspect*
+scripts/_*.mjs
+scripts/_*.ts
+**/*secret*
+**/*credentials*
+!.cursor/rules/secretos.mdc

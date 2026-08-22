@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
+import AvatarPartido from './AvatarPartido.jsx';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -60,16 +61,14 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
         <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.linea}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12, minWidth: 0 }}>
-              {d.foto_url ? (
-                <img src={d.foto_url} alt="" width={58} height={74} loading="lazy"
-                  onError={e => { e.currentTarget.style.display = 'none'; }}
-                  style={{
-                    width: 58, height: 74, objectFit: 'cover', borderRadius: 2, flexShrink: 0,
-                    borderLeft: `4px solid ${d.color || '#8E9299'}`, background: '#E4E4DC'
-                  }} />
-              ) : (
-                <span style={{ width: 4, background: d.color || '#8E9299', borderRadius: 4, flexShrink: 0 }} />
-              )}
+              <AvatarPartido
+                foto={d.foto_url}
+                color={d.color}
+                siglas={d.partido_siglas || d.grupo}
+                nombre={d.nombre_completo}
+                w={58}
+                h={74}
+              />
               <div>
                 <div className="ed" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{d.nombre_completo}</div>
                 <div className="em" style={{ fontSize: 11, color: C.tenue, marginTop: 3 }}>
@@ -195,9 +194,63 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           })}
           <div className="em" style={{ fontSize: 10, color: C.tenue, lineHeight: 1.5, marginTop: 10 }}>
             Declaración de intereses económicos presentada por el propio diputado y publicada por el
-            Congreso. No incluye patrimonio: el Congreso solo publica los bienes en PDF individuales.
+            Congreso.
           </div>
         </div>
+
+        {(d.patrimonio_euros != null || d.n_casas != null || d.n_inmuebles != null || d.vehiculos_detalle || (d.n_vehiculos ?? 0) > 0) && (
+          <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.linea}`, background: '#F7F7F2' }}>
+            <div className="em" style={{
+              fontSize: 10, color: C.tenue, letterSpacing: '.05em', textTransform: 'uppercase',
+              fontWeight: 600, marginBottom: 8
+            }}>Declaración de bienes</div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+              {d.patrimonio_euros != null && (
+                <div>
+                  <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>
+                    {Number(d.patrimonio_euros).toLocaleString('es-ES', { maximumFractionDigits: 0 })} €
+                  </div>
+                  <div style={{ fontSize: 10, color: C.tenue }}>patrimonio líquido est.</div>
+                </div>
+              )}
+              {(d.n_casas ?? d.n_inmuebles) != null && (
+                <div>
+                  <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>{d.n_casas ?? d.n_inmuebles}</div>
+                  <div style={{ fontSize: 10, color: C.tenue }}>inmuebles</div>
+                </div>
+              )}
+              <div>
+                <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>
+                  {(d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0) || d.n_vehiculos || 0}
+                </div>
+                <div style={{ fontSize: 10, color: C.tenue }}>
+                  {[
+                    d.n_coches ? `${d.n_coches} coche${d.n_coches === 1 ? '' : 's'}` : null,
+                    d.n_motos ? `${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}` : null,
+                    d.n_embarcaciones ? `${d.n_embarcaciones} emb.` : null,
+                    d.n_aeronaves ? `${d.n_aeronaves} aer.` : null
+                  ].filter(Boolean).join(' · ') || 'vehículos'}
+                </div>
+              </div>
+            </div>
+            {Array.isArray(d.vehiculos_lista) && d.vehiculos_lista.length > 0 && (
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: C.media, lineHeight: 1.5 }}>
+                {d.vehiculos_lista.map((v, i) => (
+                  <li key={i}><span className="em" style={{ fontSize: 10, color: C.tenue }}>{v.tipo}</span> · {v.texto}</li>
+                ))}
+              </ul>
+            )}
+            {!d.vehiculos_lista?.length && d.vehiculos_detalle && (
+              <div style={{ fontSize: 12, color: C.media, lineHeight: 1.45 }}>{d.vehiculos_detalle}</div>
+            )}
+            <div className="em" style={{ fontSize: 9.5, color: C.tenue, marginTop: 8 }}>
+              Del PDF oficial. El patrimonio no valora inmuebles. Abre la declaración para comprobar.
+              {d.url_bienes && (
+                <>{' '}<a href={d.url_bienes} target="_blank" rel="noreferrer" style={{ color: C.media }}>PDF →</a></>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ overflowY: 'auto', flex: 1, padding: '0 18px 18px', display: pestana === 'votos' ? 'block' : 'none' }}>
           {votos === null && !fallo && <div style={{ padding: 30, textAlign: 'center', color: C.tenue, fontSize: 12 }}>Cargando su historial de votos…</div>}

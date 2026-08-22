@@ -39,7 +39,9 @@
     "sondear:patrimonio": "node --import tsx scripts/sondear-patrimonio.ts",
     "actividades": "node --env-file=.env --import tsx scripts/cargar-actividades.ts",
     "sondear:bienes": "node --import tsx scripts/sondear-bienes.ts",
-    "bienes": "node --env-file=.env --import tsx scripts/servidor-bienes.ts",
+    "bienes": "node --env-file=.env --import tsx scripts/cargar-bienes.ts",
+    "bienes:auto": "node --env-file=.env --import tsx scripts/cargar-bienes.ts",
+    "bienes:manual": "node --env-file=.env --import tsx scripts/servidor-bienes.ts",
     "probar:perfil": "node --import tsx scripts/probar-perfil.ts",
     "busquedas": "node --env-file=.env --import tsx scripts/revisar-busquedas.ts",
     "sondear:fotos": "node --import tsx scripts/sondear-fotos.ts",
@@ -50,6 +52,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "framer-motion": "^13.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "unpdf": "^1.8.1"

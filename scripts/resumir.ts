@@ -3,12 +3,13 @@ import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
-const VERSION = process.env.VERSION_PROMPT ?? 'v2-texto-2026-08';
+const VERSION = process.env.VERSION_PROMPT ?? 'v3-frase-corta-2026-08';
 const SOLO_CON_TEXTO = process.env.SOLO_CON_TEXTO !== 'false';
 
 const ESQUEMA = {
   type: 'object',
   properties: {
+    frase_corta: { type: 'string' },
     resumen: { type: 'string' },
     puntos_clave: { type: 'array', items: { type: 'string' } },
     que_cambia: { type: 'array', items: { type: 'string' } },
@@ -16,7 +17,7 @@ const ESQUEMA = {
     entrada_en_vigor: { type: 'string' },
     suficiente_informacion: { type: 'boolean' }
   },
-  required: ['resumen', 'puntos_clave', 'que_cambia', 'a_quien_afecta', 'entrada_en_vigor', 'suficiente_informacion']
+  required: ['frase_corta', 'resumen', 'puntos_clave', 'que_cambia', 'a_quien_afecta', 'entrada_en_vigor', 'suficiente_informacion']
 };
 
 function promptConTexto(i: any): string {
@@ -40,6 +41,7 @@ REGLAS ESTRICTAS:
 - No repitas el título. Quien lee ya lo ha visto. Explica el CONTENIDO.
 
 CAMPOS:
+- frase_corta: UNA sola frase, máximo 50 caracteres (~8-10 palabras). Empieza directo por el contenido: "Cribado neonatal cada dos años", "Plan de respuesta a Oriente Medio". PROHIBIDO empezar por "La norma", "regula", "establece", "aprueba", "modifica". Sin jerga. Sin partido autor. Sin adjetivos valorativos.
 - resumen: 3 a 5 frases. Qué establece la norma en la práctica. Concreto, no genérico.
 - puntos_clave: 3 a 5 medidas concretas que introduce, cada una en una frase. Con cifras, plazos o artículos si el texto los da.
 - que_cambia: 2 a 4 elementos con el formato "Antes X. Ahora Y." solo cuando el texto lo permita deducir. Lista vacía si no.
@@ -105,6 +107,7 @@ const progreso = await procesarLote(
       modelo: modeloActivo(),
       version_prompt: VERSION,
       resumen: r.datos.resumen,
+      frase_corta: String(r.datos.frase_corta ?? '').slice(0, 180) || null,
       puntos_clave: puntos,
       a_quien_afecta: [r.datos.a_quien_afecta, r.datos.entrada_en_vigor && r.datos.entrada_en_vigor !== 'No consta en el texto'
         ? `Entrada en vigor: ${r.datos.entrada_en_vigor}` : null].filter(Boolean).join(' · '),
