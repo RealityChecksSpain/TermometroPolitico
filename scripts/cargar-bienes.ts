@@ -1,12 +1,3 @@
-/**
- * Batch: lee PDFs de declaración de bienes (Gemini) y guarda en bienes_declarados.
- * Seguro interrumpir y reanudar. Corrige outliers de escala (€) y subconteo de inmuebles.
- *
- *   npm run bienes:auto
- *   npm run bienes:auto -- --limite=20
- *   npm run bienes:auto -- --solo-outliers
- *   npm run bienes:auto -- --reescribir-altos
- */
 import { db, exigirEnv } from '../src/lib/supabase';
 import { leerDeclaracion, revalidarCifrasAnomalas } from '../src/lib/leer-declaracion';
 import { clasificarVehiculos } from '../src/lib/vehiculos.js';
@@ -34,7 +25,13 @@ const SOLO_OUTLIERS = args['solo-outliers'] === 'true';
 const REESCRIBIR_ALTOS = args['reescribir-altos'] === 'true';
 
 function casasDe(d: Record<string, any>) {
-  return contarInmuebles(d.inmuebles_detalle, d.inmuebles_urbanos, d.inmuebles_rusticos).n_inmuebles;
+  return contarInmuebles(
+    d.inmuebles_detalle,
+    d.inmuebles_urbanos,
+    d.inmuebles_rusticos,
+    d.inmuebles_detalle_propios,
+    d.inmuebles_detalle_sociedad
+  ).n_inmuebles;
 }
 
 function esAbsurdo(d: Record<string, any>) {
@@ -78,7 +75,7 @@ async function pendientes() {
 
   const { data: hechos } = await db()
     .from('bienes_declarados')
-    .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, confianza, verificado, depositos, valores, introducido_por');
+    .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, confianza, verificado, depositos, valores, introducido_por');
 
   const mapa = new Map((hechos ?? []).map(h => [h.mandato_id, h]));
   const conPat = (hechos ?? []).filter(h => h.patrimonio_euros != null).length;
@@ -94,6 +91,7 @@ async function pendientes() {
     if (h.patrimonio_euros != null) return true;
     if (h.depositos != null || h.valores != null) return true;
     if (h.inmuebles_urbanos != null || h.inmuebles_rusticos != null || h.n_inmuebles != null) return true;
+    if (h.inmuebles_detalle_propios != null || h.inmuebles_detalle_sociedad != null) return true;
     return false;
   };
 
@@ -106,6 +104,7 @@ async function pendientes() {
     }
     if (!tieneDato(h)) return true;
     if (esAltoSospechoso(h)) return true;
+    if (h.n_inmuebles != null && h.n_inmuebles_propios == null) return true;
     if (h.verificado && h.patrimonio_euros != null) return false;
     if (h.confianza === 'alta' && h.patrimonio_euros != null) return false;
     if (h.patrimonio_euros == null && (h.depositos != null || h.valores != null)) return false;
@@ -115,11 +114,10 @@ async function pendientes() {
 
 console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
 
-// Backfill: sanear € e inmuebles ya guardados (arregla 187 M sin re-leer PDF)
 {
   const { data: filas } = await db()
     .from('bienes_declarados')
-    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, patrimonio_euros, inmuebles_detalle, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles');
+    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, patrimonio_euros, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad');
 
   let filled = 0;
   for (const h of filas ?? []) {
@@ -129,7 +127,13 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
     const deu = sanearImporte(h.deuda_pendiente);
     const saneado = { depositos: dep, valores: val, planes_pensiones: plan, deuda_pendiente: deu };
     const pat = patrimonioLiquido(saneado);
-    const inm = contarInmuebles(h.inmuebles_detalle, h.inmuebles_urbanos, h.inmuebles_rusticos);
+    const inm = contarInmuebles(
+      h.inmuebles_detalle,
+      h.inmuebles_urbanos,
+      h.inmuebles_rusticos,
+      h.inmuebles_detalle_propios,
+      h.inmuebles_detalle_sociedad
+    );
 
     const cambioEuro =
       (h.depositos != null && dep !== null && dep !== Number(h.depositos)) ||
@@ -139,7 +143,9 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
 
     const cambioInm =
       inm.n_inmuebles != null &&
-      (h.n_inmuebles == null || inm.n_inmuebles > Number(h.n_inmuebles));
+      (h.n_inmuebles == null ||
+        inm.n_inmuebles !== Number(h.n_inmuebles) ||
+        (inm.n_inmuebles_propios != null && h.n_inmuebles_propios == null));
 
     if (!cambioEuro && !cambioInm) continue;
 
@@ -151,7 +157,11 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
       if (deu != null) patch.deuda_pendiente = deu;
       if (pat != null) patch.patrimonio_euros = pat;
     }
-    if (cambioInm) patch.n_inmuebles = inm.n_inmuebles;
+    if (cambioInm) {
+      patch.n_inmuebles = inm.n_inmuebles;
+      patch.n_inmuebles_propios = inm.n_inmuebles_propios;
+      patch.n_inmuebles_sociedad = inm.n_inmuebles_sociedad;
+    }
 
     if (pat != null && (pat > UMBRAL.patrimonioAlto || pat < UMBRAL.patrimonioBajo)) {
       patch.introducido_por = 'gemini_outlier';
@@ -173,7 +183,6 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
   if (filled) console.log(`Backfill saneo € / inmuebles: ${filled} filas\n`);
 }
 
-// Backfill vehículos
 {
   const { data: conDetalle } = await db()
     .from('bienes_declarados')
@@ -252,7 +261,13 @@ for (let i = 0; i < cola.length; i++) {
 
   const d = lectura.datos!;
   const veh = clasificarVehiculos(d.vehiculos_detalle, d.vehiculos);
-  const inm = contarInmuebles(d.inmuebles_detalle, d.inmuebles_urbanos, d.inmuebles_rusticos);
+  const inm = contarInmuebles(
+    d.inmuebles_detalle,
+    d.inmuebles_urbanos,
+    d.inmuebles_rusticos,
+    d.inmuebles_detalle_propios,
+    d.inmuebles_detalle_sociedad
+  );
   const pat = patrimonioLiquido(d);
 
   const fila = {
@@ -267,6 +282,8 @@ for (let i = 0; i < cola.length; i++) {
     inmuebles_urbanos: d.inmuebles_urbanos,
     inmuebles_rusticos: d.inmuebles_rusticos,
     inmuebles_detalle: d.inmuebles_detalle,
+    inmuebles_detalle_propios: d.inmuebles_detalle_propios,
+    inmuebles_detalle_sociedad: d.inmuebles_detalle_sociedad,
     depositos: d.depositos,
     valores: d.valores,
     planes_pensiones: d.planes_pensiones,
@@ -277,6 +294,8 @@ for (let i = 0; i < cola.length; i++) {
     observaciones: d.observaciones,
     patrimonio_euros: pat,
     n_inmuebles: inm.n_inmuebles,
+    n_inmuebles_propios: inm.n_inmuebles_propios,
+    n_inmuebles_sociedad: inm.n_inmuebles_sociedad,
     n_coches: veh.n_coches,
     n_motos: veh.n_motos,
     n_embarcaciones: veh.n_embarcaciones,
@@ -290,9 +309,11 @@ for (let i = 0; i < cola.length; i++) {
 
   const { error } = await db().from('bienes_declarados').upsert(fila, { onConflict: 'mandato_id' });
   if (error) {
-    if (/patrimonio_euros|n_inmuebles|n_coches|confianza|dudas/i.test(error.message)) {
+    if (/patrimonio_euros|n_inmuebles|n_coches|confianza|dudas|inmuebles_detalle_/i.test(error.message)) {
       const {
-        patrimonio_euros, n_inmuebles, n_coches, n_motos, n_embarcaciones, n_aeronaves,
+        patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad,
+        inmuebles_detalle_propios, inmuebles_detalle_sociedad,
+        n_coches, n_motos, n_embarcaciones, n_aeronaves,
         confianza, dudas, ...basico
       } = fila;
       const r2 = await db().from('bienes_declarados').upsert({
@@ -314,7 +335,8 @@ for (let i = 0; i < cola.length; i++) {
     }
   } else {
     console.log(
-      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${fila.n_inmuebles ?? '—'} · ` +
+      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${fila.n_inmuebles ?? '—'}` +
+      `${inm.n_inmuebles_propios != null ? ` (${inm.n_inmuebles_propios} propios + ${inm.n_inmuebles_sociedad} soc.)` : ''} · ` +
       `coches ${veh.n_coches} motos ${veh.n_motos} · ${d.confianza}` +
       `${corregido ? ' · corregido' : ''}${motivo ? ' · revisar' : ''}`
     );
@@ -324,3 +346,4 @@ for (let i = 0; i < cola.length; i++) {
 
 console.log(`\nListo: ${ok} guardados, ${fallos} fallos, ${revisita} revalidaciones, ${corregidos} corregidos.\n`);
 console.log('Para rehacer los >10 M: npm run bienes:auto -- --reescribir-altos\n');
+console.log('Antes de la primera pasada con desglose: sql/2026-08-inmuebles-desglose.sql\n');
