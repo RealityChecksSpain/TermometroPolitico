@@ -216,7 +216,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
               {(d.n_casas ?? d.n_inmuebles) != null && (
                 <div>
                   <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>{d.n_casas ?? d.n_inmuebles}</div>
-                  <div style={{ fontSize: 10, color: C.tenue }}>inmuebles</div>
+                  <div style={{ fontSize: 10, color: C.tenue }}>inmuebles vinculados</div>
                 </div>
               )}
               <div>
@@ -233,6 +233,56 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                 </div>
               </div>
             </div>
+            {(d.n_inmuebles_propios != null || d.n_inmuebles_sociedad != null) && (
+              <div style={{
+                border: `1px solid ${C.linea}`, borderRadius: 3, background: '#FFFFFF',
+                padding: '9px 11px', marginBottom: 9
+              }}>
+                <div style={{ display: 'flex', gap: 9, alignItems: 'baseline', marginBottom: 5 }}>
+                  <span className="ed" style={{ fontSize: 13, fontWeight: 600 }}>{d.n_inmuebles_propios ?? 0}</span>
+                  <span style={{ fontSize: 11.5, color: C.media }}>en pleno dominio o comunidad de bienes</span>
+                </div>
+                <div style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
+                  <span className="ed" style={{ fontSize: 13, fontWeight: 600 }}>{d.n_inmuebles_sociedad ?? 0}</span>
+                  <span style={{ fontSize: 11.5, color: C.media }}>
+                    a nombre de una sociedad no cotizada{' '}
+                    <span
+                      title="El inmueble figura a nombre de una empresa de la que el diputado tiene acciones o participaciones. El porcentaje declarado aparece en cada línea del detalle."
+                      style={{
+                        display: 'inline-block', width: 13, height: 13, lineHeight: '13px',
+                        textAlign: 'center', borderRadius: 13, border: `1px solid ${C.linea}`,
+                        fontSize: 9, color: C.tenue, cursor: 'help', verticalAlign: 'middle'
+                      }}>i</span>
+                  </span>
+                </div>
+
+                {Array.isArray(d.inmuebles_items) && d.inmuebles_items.length > 0 && (
+                  <ul style={{ margin: '9px 0 0', paddingLeft: 15, fontSize: 11.5, color: C.media, lineHeight: 1.55 }}>
+                    {d.inmuebles_items.map((it, i) => (
+                      <li key={i}>
+                        {it.qty > 1 ? `${it.qty} × ` : ''}{it.texto}
+                        <span className="em" style={{
+                          marginLeft: 6, fontSize: 9.5, padding: '1px 5px', borderRadius: 2,
+                          background: it.sociedad ? '#F3EEE2' : '#E7EEF8',
+                          color: it.sociedad ? '#6B5518' : '#083A79'
+                        }}>
+                          {it.sociedad
+                            ? `vía sociedad${it.porcentaje != null ? ` · ${it.porcentaje}%` : ''}`
+                            : 'propio'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="em" style={{ fontSize: 9.5, color: C.tenue, marginTop: 8, lineHeight: 1.5 }}>
+                  Un pacto sucesorio es una herencia en vida, habitual en Galicia, País Vasco y
+                  Navarra. Un inmueble declarado así o a través de una sociedad sí está vinculado al
+                  diputado; lo que cambia es la forma jurídica de la titularidad y la cuota.
+                </div>
+              </div>
+            )}
+
             {Array.isArray(d.vehiculos_lista) && d.vehiculos_lista.length > 0 && (
               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: C.media, lineHeight: 1.5 }}>
                 {d.vehiculos_lista.map((v, i) => (
