@@ -14,6 +14,8 @@ export interface DeclaracionLeida {
   inmuebles_urbanos: number | null;
   inmuebles_rusticos: number | null;
   inmuebles_detalle: string | null;
+  inmuebles_detalle_propios: string | null;
+  inmuebles_detalle_sociedad: string | null;
   depositos: number | null;
   valores: number | null;
   planes_pensiones: number | null;
@@ -42,6 +44,8 @@ const ESQUEMA = {
     inmuebles_urbanos: INT,
     inmuebles_rusticos: INT,
     inmuebles_detalle: TXT,
+    inmuebles_detalle_propios: TXT,
+    inmuebles_detalle_sociedad: TXT,
     depositos: NUM,
     valores: NUM,
     planes_pensiones: NUM,
@@ -79,14 +83,38 @@ RENTAS PERCIBIDAS POR EL PARLAMENTARIO
 - rentas_detalle: los conceptos escritos, literales, separados por punto y coma.
 - irpf_pagado: recuadro "CANTIDAD PAGADA POR IRPF".
 
-BIENES PATRIMONIALES (urbanos + rústicos + inmuebles de sociedad si aparecen)
-- Suma UNIDADES, no solo filas:
-  "2 TRASTEROS" = 2; "PLAZA DE GARAJE" = 1;
-  "Vivienda, plaza de garaje y Trastero" = 3 (vivienda+garaje+trastero).
-- inmuebles_urbanos / inmuebles_rusticos: totales de unidades (incluidas las de sociedad).
-- inmuebles_detalle: UNA entrada por fila del PDF, separadas por "; ", cantidad al inicio.
-  Ej: "1 LOCAL A Coruña 2020; 1 PISO A Coruña 2020; 2 TRASTEROS Madrid 2000; 1 VIVIENDA 1 GARAJE 1 TRASTERO Santiago 2003; 1 OFICINA 25% sociedad"
-  NO repitas palabras ni inventes. NO uses m² ni % como cantidad.
+BIENES PATRIMONIALES — DOS LISTAS SEPARADAS, NO LAS MEZCLES
+
+El formulario tiene tres bloques de inmuebles. Los dos primeros son del propio
+declarante. El tercero es de una sociedad. Van a campos distintos.
+
+A) inmuebles_detalle_propios — bloques "Bienes Inmuebles de naturaleza urbana"
+   y "Bienes Inmuebles de naturaleza rústica". Titularidad directa: pleno
+   dominio, nuda propiedad, usufructo, gananciales, comunidad de bienes.
+   Termina cada entrada con el título de adquisición literal del PDF.
+
+B) inmuebles_detalle_sociedad — bloque "Bienes inmuebles propiedad de una
+   sociedad, comunidad o entidad que no cotiza en Bolsa y de la que el
+   declarante tiene acciones o participaciones".
+   IMPORTANTE: este bloque CASI SIEMPRE SIGUE EN EL RECUADRO "OBSERVACIONES"
+   de las últimas páginas, encabezado por "CONTINUACION" o "CONTINUACIÓN".
+   Esa continuación es parte de esta lista y suele tener más entradas que la
+   tabla. Si no la incluyes, el recuento sale mal. Termina cada entrada con el
+   porcentaje declarado (ej. "25%").
+
+REGLA DE RECUENTO, igual en las dos listas:
+- NO cuentes filas. Cuenta UNIDADES escritas en la celda:
+  "2 VIVIENDAS" = 2, "13 FINCAS RUSTICAS" = 13, "4 plazas de garaje" = 4,
+  "PLAZA DE GARAJE" sin número = 1,
+  "Vivienda, plaza de garaje y trastero" en una sola celda = 3.
+- Formato de ambos campos: UNA entrada por grupo, con la cantidad al inicio,
+  separadas por "; ".
+  Propios: "1 LOCAL COMERCIAL 323 m2 A Coruña 2020 Comunidad de Bienes; 2 TRASTEROS Madrid 2000 Pleno Dominio"
+  Sociedad: "2 OFICINAS 64 m2 A Coruña 2020 25%; 8 FINCAS RUSTICAS Laracha 2020 25%"
+
+- inmuebles_urbanos: unidades urbanas SOLO del bloque A.
+- inmuebles_rusticos: unidades rústicas SOLO del bloque A.
+- inmuebles_detalle: deja este campo a null. Existe solo por compatibilidad.
 
 DEPÓSITOS
 - depositos: el "SALDO de todos los depósitos" (máx. 2 decimales). Cifras > 5 millones son
@@ -110,6 +138,9 @@ DEUDAS Y OBLIGACIONES
 
 OBSERVACIONES
 - observaciones: el texto del recuadro, o null si está vacío.
+- Si el recuadro continúa la lista de inmuebles de sociedad, transcríbelo aquí
+  igualmente Y ADEMÁS inclúyelo en inmuebles_detalle_sociedad. No lo omitas de
+  ninguno de los dos.
 
 CABECERA
 - fecha_declaracion: la fecha de la declaración en formato AAAA-MM-DD.
@@ -119,7 +150,6 @@ Y ADEMÁS:
   "media" si alguna casilla es dudosa. "baja" si el documento está torcido, borroso o cortado.
 - dudas: lista de campos concretos que no has podido leer con seguridad. Sé específico.`;
 
-/** Gemma y similares no aceptan PDF inline → 400. Solo Gemini para multimodal. */
 function modelosParaPdf(): string[] {
   const desdeEnv = (process.env.MODELO_BIENES ?? '')
     .split(',')
@@ -179,7 +209,6 @@ async function llamarModelo(
 
   if (!res.ok) {
     const cuerpo = (await res.text()).slice(0, 280).replace(/\s+/g, ' ');
-    // Si el esquema no gusta al modelo, reintentar sin él
     if (conEsquema && res.status === 400 && /response_schema|responseSchema|Proto field/i.test(cuerpo)) {
       return llamarModelo(modelo, clave, parts, false);
     }
@@ -210,16 +239,14 @@ const ESQUEMA_CORRECCION = {
     deuda_pendiente: NUM,
     inmuebles_urbanos: INT,
     inmuebles_rusticos: INT,
-    inmuebles_detalle: TXT,
+    inmuebles_detalle_propios: TXT,
+    inmuebles_detalle_sociedad: TXT,
     explicacion: TXT,
     cifras_confirmadas: { type: 'BOOLEAN', nullable: true }
   },
   required: ['explicacion']
 };
 
-/**
- * Segunda pasada cuando depósitos/patrimonio salen anómalos (p. ej. 187 M por mala lectura ES).
- */
 export async function revalidarCifrasAnomalas(
   url: string,
   sospecha: DeclaracionLeida,
@@ -244,9 +271,13 @@ export async function revalidarCifrasAnomalas(
     `Valores extraídos antes (pueden estar MAL por puntos/comas o 3 decimales):\n${resumen}\n\n` +
     `REGLAS: formato español 187.425,53 = 187425.53 euros (NO 187 millones). ` +
     `Máximo 2 decimales. Si hay ,535 trunca a ,53.\n` +
-    `Inmuebles: suma cantidades ("13 FINCAS" = 13), no solo filas.\n` +
+    `Inmuebles: suma cantidades ("13 FINCAS" = 13, "4 plazas" = 4), no filas.\n` +
+    `Separa inmuebles propios del declarante de los que estan a nombre de una ` +
+    `sociedad no cotizada. El recuadro OBSERVACIONES suele continuar la lista de ` +
+    `sociedad: inclúyelo.\n` +
     `Devuelve JSON con depositos, valores, planes_pensiones, deuda_pendiente, ` +
-    `inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, explicacion, cifras_confirmadas.\n` +
+    `inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle_propios, ` +
+    `inmuebles_detalle_sociedad, explicacion, cifras_confirmadas.\n` +
     (texto.length >= 400
       ? `\n--- TEXTO PDF ---\n${texto.slice(0, 50_000)}`
       : '\n(El PDF va adjunto; léelo con cuidado en depósitos e inmuebles.)');
@@ -293,7 +324,8 @@ export async function revalidarCifrasAnomalas(
         deuda_pendiente: corr.deuda_pendiente ?? sospecha.deuda_pendiente,
         inmuebles_urbanos: corr.inmuebles_urbanos ?? sospecha.inmuebles_urbanos,
         inmuebles_rusticos: corr.inmuebles_rusticos ?? sospecha.inmuebles_rusticos,
-        inmuebles_detalle: corr.inmuebles_detalle ?? sospecha.inmuebles_detalle,
+        inmuebles_detalle_propios: corr.inmuebles_detalle_propios ?? sospecha.inmuebles_detalle_propios,
+        inmuebles_detalle_sociedad: corr.inmuebles_detalle_sociedad ?? sospecha.inmuebles_detalle_sociedad,
         confianza: corr.cifras_confirmadas === false ? 'baja' : 'media',
         dudas: [
           ...(sospecha.dudas ?? []),
@@ -302,7 +334,7 @@ export async function revalidarCifrasAnomalas(
       };
       return { ok: true, datos };
     } catch {
-      /* siguiente modelo */
+      continue;
     }
   }
   return { ok: false, error: 'revalidación fallida' };
@@ -322,7 +354,6 @@ export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos
   const tieneTexto = texto.length >= 400;
   let ultimoError = '';
 
-  // 1) Si hay capa de texto, cualquier modelo de la cadena vale (más barato / Gemma OK).
   if (tieneTexto) {
     const cadencia = new Cadencia(modelosParaTexto()[0]);
     const promptTexto = `${PROMPT}\n\n--- TEXTO EXTRAIDO DEL PDF (${paginas} paginas) ---\n${texto.slice(0, 60_000)}`;
@@ -335,7 +366,6 @@ export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos
     }
   }
 
-  // 2) PDF escaneado → multimodal solo con Gemini (no Gemma).
   const base64 = buf.toString('base64');
   const modelosPdf = modelosParaPdf();
   const cadenciaPdf = new Cadencia(modelosPdf[0] ?? 'gemini-2.0-flash');
@@ -347,7 +377,6 @@ export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos
     ]);
     if (r2.ok) return { ok: true, datos: r2.datos, modelo: `${modelo}+pdf` };
     ultimoError = r2.error;
-    // Si el modelo no soporta PDF, prueba el siguiente
     if (/HTTP 400|HTTP 404|not supported|INVALID_ARGUMENT/i.test(r2.error)) continue;
   }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { DestelloSuave } from './Destello.jsx';
-import { traerMapaPartidos, traerSesgo } from '../lib/cliente.js';
+import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos } from '../lib/cliente.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
 const esTactil = typeof window !== 'undefined' &&
@@ -11,19 +11,7 @@ const C = {
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3'
 };
 
-/** Estira un eje al intervalo ~[-0.95, 0.95] si el rango real está amontonado en el centro. */
-function estirarEje(lista, campo) {
-  const vals = lista.map(p => Number(p[campo])).filter(v => Number.isFinite(v));
-  if (vals.length < 2) return lista;
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
-  const span = max - min;
-  const absMax = Math.max(Math.abs(min), Math.abs(max), 1e-9);
-  if (absMax >= 0.35 && span >= 0.5) return lista;
-  if (span < 1e-9) return lista;
-  const factor = 0.95 / Math.max(absMax, span / 2);
-  return lista.map(p => ({ ...p, [campo]: Number(p[campo]) * factor }));
-}
+const ESCALA_VOTOS = 1.7;
 
 function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
   return (
@@ -66,11 +54,13 @@ export default function Mapa({ onDiputados }) {
   const [fuente, setFuente] = useState('programa');
   const [encima, setEncima] = useState(null);
   const [sesgo, setSesgo] = useState(null);
+  const [auditoria, setAuditoria] = useState(null);
   const svgRef = useRef(null);
 
   useEffect(() => {
     traerMapaPartidos().then(setDatos).catch(() => setDatos([]));
     traerSesgo().then(setSesgo).catch(() => setSesgo(null));
+    traerAuditoriaEjeVotos().then(setAuditoria).catch(() => setAuditoria(null));
   }, []);
 
   const puntos = useMemo(() => {
@@ -80,41 +70,22 @@ export default function Mapa({ onDiputados }) {
         ...d,
         x: fuente === 'programa' ? d.prog_economico : d.voto_economico,
         y: fuente === 'programa' ? d.prog_social : d.voto_social,
-        n: fuente === 'programa' ? d.promesas_codificadas : d.leyes_valoradas
+        n: fuente === 'programa' ? d.promesas_codificadas : d.voto_n_economico,
+        ex: fuente === 'programa' ? null : d.voto_err_economico,
+        ey: fuente === 'programa' ? null : d.voto_err_social,
+        nulo: fuente === 'programa' ? false : Boolean(d.voto_eco_nulo && d.voto_soc_nulo)
       }))
       .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
       .map(d => ({ ...d, x: Number(d.x), y: Number(d.y) }));
 
-    // Si el eje de votos deja al PP a la izquierda del PSOE pero el de programa
-    // no, el signo del eje de votos está invertido respecto al criterio declarado.
     if (fuente === 'votos') {
-      const ppV = list.find(p => p.siglas === 'PP');
-      const psoeV = list.find(p => p.siglas === 'PSOE');
-      const ppP = datos.find(d => d.siglas === 'PP');
-      const psoeP = datos.find(d => d.siglas === 'PSOE');
-      const votosEcoInvertidos = ppV && psoeV && Number(ppV.x) < Number(psoeV.x);
-      const programaEcoOk = ppP && psoeP
-        && ppP.prog_economico != null && psoeP.prog_economico != null
-        && Number(ppP.prog_economico) > Number(psoeP.prog_economico);
-      if (votosEcoInvertidos && programaEcoOk) {
-        list = list.map(p => ({ ...p, x: -Number(p.x) }));
-      }
-
-      const ppVs = list.find(p => p.siglas === 'PP');
-      const psoeVs = list.find(p => p.siglas === 'PSOE');
-      const votosSocInvertidos = ppVs && psoeVs && Number(ppVs.y) < Number(psoeVs.y);
-      const programaSocOk = ppP && psoeP
-        && ppP.prog_social != null && psoeP.prog_social != null
-        && Number(ppP.prog_social) > Number(psoeP.prog_social);
-      if (votosSocInvertidos && programaSocOk) {
-        list = list.map(p => ({ ...p, y: -Number(p.y) }));
-      }
-
-      // Los ejes por votos salen muy comprimidos (todos cerca de 0) porque casi
-      // todos apoyan las mismas normas. Estiramos el rango para que se lea el mapa
-      // sin inventar el orden relativo.
-      list = estirarEje(list, 'x');
-      list = estirarEje(list, 'y');
+      list = list.map(p => ({
+        ...p,
+        x: Number(p.x) * ESCALA_VOTOS,
+        y: Number(p.y) * ESCALA_VOTOS,
+        ex: Number(p.ex ?? 0) * 1.96 * ESCALA_VOTOS,
+        ey: Number(p.ey ?? 0) * 1.96 * ESCALA_VOTOS
+      }));
     }
 
     return list.map(d => ({ ...d, cx: d.x, cy: -d.y }));
@@ -236,16 +207,14 @@ export default function Mapa({ onDiputados }) {
               role="img"
               aria-label="Mapa de partidos en dos ejes">
               <rect x="-1.45" y="-1.5" width="2.9" height="3.05" fill="transparent" />
-              {/* Tintes suaves por cuadrante para leer los ejes */}
-              <rect x="-1.24" y="-1.24" width="1.24" height="1.24" fill="#F2A7A018" />
+                            <rect x="-1.24" y="-1.24" width="1.24" height="1.24" fill="#F2A7A018" />
               <rect x="0" y="-1.24" width="1.24" height="1.24" fill="#8EB8F018" />
               <rect x="-1.24" y="0" width="1.24" height="1.24" fill="#6ECFBC14" />
               <rect x="0" y="0" width="1.24" height="1.24" fill="#E8C56A14" />
               <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
               <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
-              {/* Ejes resaltados: color + peso para leer el mapa de un vistazo */}
-              <text x="-1.32" y="-1.28" fill="#F2A7A0" fontSize="0.092" fontWeight="700"
+                            <text x="-1.32" y="-1.28" fill="#F2A7A0" fontSize="0.092" fontWeight="700"
                 fontFamily="DM Mono, monospace" letterSpacing="0.02">IZQUIERDA</text>
               <text x="1.32" y="-1.28" fill="#8EB8F0" fontSize="0.092" fontWeight="700"
                 textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">DERECHA</text>
@@ -266,9 +235,20 @@ export default function Mapa({ onDiputados }) {
                       <line x1={p.cx} y1={p.cy + p.radio} x2={p.cx} y2={p.labelY - 0.045}
                         stroke="#5A6067" strokeWidth="0.005" />
                     )}
+                    {fuente === 'votos' && (p.ex > 0 || p.ey > 0) && (
+                      <>
+                        <line x1={p.cx - p.ex} y1={p.cy} x2={p.cx + p.ex} y2={p.cy}
+                          stroke={p.color || '#8E9299'} strokeWidth="0.009" opacity="0.42" />
+                        <line x1={p.cx} y1={p.cy - p.ey} x2={p.cx} y2={p.cy + p.ey}
+                          stroke={p.color || '#8E9299'} strokeWidth="0.009" opacity="0.42" />
+                      </>
+                    )}
                     <circle cx={p.cx} cy={p.cy}
                       r={encima === p.partido ? p.radio * 1.22 : p.radio}
-                      fill={p.color || '#8E9299'} stroke={C.pizarra} strokeWidth="0.014"
+                      fill={p.nulo ? 'none' : (p.color || '#8E9299')}
+                      stroke={p.nulo ? (p.color || '#8E9299') : C.pizarra}
+                      strokeWidth={p.nulo ? 0.018 : 0.014}
+                      strokeDasharray={p.nulo ? '0.035 0.028' : undefined}
                       style={{ transition: 'r 200ms cubic-bezier(.34,1.56,.64,1)' }} />
                     <text x={p.cx} y={p.labelY}
                       fill={encima === p.partido ? '#FFFFFF' : '#C9CDD2'}
@@ -280,6 +260,20 @@ export default function Mapa({ onDiputados }) {
                 );
               })}
             </svg>
+
+            {fuente === 'votos' && auditoria && auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
+              <div style={{
+                marginTop: 10, padding: 11, background: '#3A3226', border: '1px solid #6B5518',
+                borderRadius: 3, fontSize: 12, color: '#E8C56A', lineHeight: 1.55
+              }}>
+                Auditoría automática: este eje todavía no se puede presentar como izquierda-derecha.
+                {auditoria.contaminacion_economica != null && (
+                  <> Su correlación con el apoyo al Gobierno es {Number(auditoria.contaminacion_economica).toFixed(2)},
+                    así que lo que separa a los partidos sigue siendo el bloque parlamentario.</>
+                )}
+                {' '}Se muestra como dato en bruto, no como posición ideológica.
+              </div>
+            )}
 
             {faltan > 0 && (
               <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
@@ -296,9 +290,18 @@ export default function Mapa({ onDiputados }) {
                     <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.escanos} escaños</span>
                   </div>
                   <div className="em" style={{ color: '#A8AEB4', fontSize: 11.5, marginTop: 6, lineHeight: 1.6 }}>
-                    económico {Number(activo.x).toFixed(2)} · social {Number(activo.y).toFixed(2)}
-                    {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'leyes'}
+                    económico {Number(activo.x / (fuente === 'votos' ? ESCALA_VOTOS : 1)).toFixed(2)}
+                    {fuente === 'votos' && activo.ex > 0 && ` ±${(activo.ex / ESCALA_VOTOS).toFixed(2)}`}
+                    {' · '}social {Number(activo.y / (fuente === 'votos' ? ESCALA_VOTOS : 1)).toFixed(2)}
+                    {fuente === 'votos' && activo.ey > 0 && ` ±${(activo.ey / ESCALA_VOTOS).toFixed(2)}`}
+                    {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'votos codificados'}
                   </div>
+                  {fuente === 'votos' && activo.voto_apoyo_gobierno != null && (
+                    <div className="em" style={{ color: '#7C8288', fontSize: 10.5, marginTop: 3 }}>
+                      apoya el {Math.round(Number(activo.voto_apoyo_gobierno) * 100)} % de las normas del Gobierno
+                      {activo.nulo && ' · su posición no se distingue de cero'}
+                    </div>
+                  )}
                   {fuente === 'programa' && activo.prog_bruto_economico != null && (
                     <div className="em" style={{ color: '#7C8288', fontSize: 10.5, marginTop: 3 }}>
                       valor absoluto sin comparar: {Number(activo.prog_bruto_economico).toFixed(2)}
@@ -315,9 +318,11 @@ export default function Mapa({ onDiputados }) {
             Cada círculo es un partido y su tamaño es el número de escaños.
             {esTactil ? ' Toca uno' : ' Pasa por encima de uno'} para ver su posición exacta.
             {fuente === 'votos' && (
-              <span> La posición por votos cuenta solo los <em>sí</em> a normas ya codificadas
-                y se reescala para leerse (en bruto casi todos quedan cerca del centro).
-                El mapa de <em>programa</em> es la referencia más estable.</span>
+              <span> La posición por votos no mide cuánto apoya un partido, sino cuánto más
+                apoya lo que <em>baja</em> gasto, impuestos o regulación que lo que los sube.
+                El centro exacto significa que vota igual en ambos casos. Las cruces son el
+                margen de error; un círculo hueco es un partido cuya posición no se distingue
+                del centro.</span>
             )}
           </div>
               )}
@@ -379,10 +384,24 @@ export default function Mapa({ onDiputados }) {
           entre sí.
         </div>
         <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 10 }}>
-          <strong>Lo que prometieron</strong> sale de los programas de 2023. <strong>Lo que han votado</strong>
-          {' '}cuenta solo los votos a favor sobre normas codificadas (votar en contra no empuja al
-          partido al otro polo: la oposición sistemática no equivale a una ideología). La distancia
-          entre ambos puntos es lo interesante.
+          <strong>Lo que prometieron</strong> sale de los programas de 2023 y es una posición
+          <em> relativa</em> al resto de partidos españoles. <strong>Lo que han votado</strong> se
+          calcula distinto y tiene cero absoluto: para cada partido se compara qué porcentaje de las
+          normas que <em>reducen</em> gasto, impuestos o regulación apoyó, frente al porcentaje de
+          las que los <em>aumentan</em>. La diferencia entre esos dos porcentajes es su posición.
+        </div>
+        <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 10 }}>
+          Esa resta existe por un motivo concreto: en un parlamento con disciplina de voto, la
+          oposición vota que no a casi todo y el Gobierno que sí a casi todo, independientemente del
+          contenido. Contar votos a favor mide bloque parlamentario, no ideología. Al restar, esa
+          propensión se cancela y queda solo la sensibilidad al contenido. La comparación se hace
+          además por separado dentro de las normas del Gobierno y dentro de las del resto, para que
+          quién propone la norma no contamine el resultado.
+        </div>
+        <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 10 }}>
+          Un partido que vota igual suba o baje el gasto sale en el centro, no en un extremo. Los
+          partidos con pocos votos codificados se acercan al centro automáticamente en lugar de
+          dispararse a los bordes. Ningún eje se invierte ni se reescala a mano.
         </div>
       </div>
     </div>

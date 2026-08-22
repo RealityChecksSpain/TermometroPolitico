@@ -47,8 +47,6 @@ export async function traerDiputados() {
   if (error) throw error;
   let lista = data ?? [];
 
-  // mv_diputados a veces se queda sin foto_url tras un refresh fallido;
-  // las fotos viven en mandatos.
   const sinFoto = lista.filter(d => !d.foto_url).map(d => d.mandato_id).filter(Boolean);
   if (sinFoto.length) {
     const fotos = [];
@@ -78,14 +76,13 @@ export async function traerDiputados() {
     }
   }
 
-  // Patrimonio / inmuebles / vehículos desde bienes_declarados
   const ids = lista.map(d => d.mandato_id).filter(Boolean);
   const bienes = [];
   for (let i = 0; i < ids.length; i += 200) {
     const chunk = ids.slice(i, i + 200);
     const { data: filas, error } = await supabase
       .from('bienes_declarados')
-      .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
+      .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
       .in('mandato_id', chunk);
     if (error) {
       const { data: filas2 } = await supabase
@@ -100,17 +97,25 @@ export async function traerDiputados() {
     lista = lista.map(d => {
       const b = bm.get(d.mandato_id);
       if (!b) return d;
-      const inm = contarInmuebles(b.inmuebles_detalle, b.inmuebles_urbanos, b.inmuebles_rusticos);
-      // Preferir recuento del detalle; NUNCA Math.max con n_inmuebles viejo (inflaba a 36, etc.)
-      const desdeFilas =
-        (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
-          ? (Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0))
-          : null;
-      const casas =
-        inm.fuente === 'detalle' ? inm.n_inmuebles
-          : (inm.n_inmuebles ?? b.n_inmuebles ?? desdeFilas);
+      const inm = contarInmuebles(
+        b.inmuebles_detalle,
+        b.inmuebles_urbanos,
+        b.inmuebles_rusticos,
+        b.inmuebles_detalle_propios,
+        b.inmuebles_detalle_sociedad
+      );
 
-      // Saneo en cliente por si el backfill aún no corrió (evita mostrar 187 M)
+      const propios = inm.n_inmuebles_propios ?? (b.n_inmuebles_propios != null ? Number(b.n_inmuebles_propios) : null);
+      const sociedad = inm.n_inmuebles_sociedad ?? (b.n_inmuebles_sociedad != null ? Number(b.n_inmuebles_sociedad) : null);
+
+      const casas =
+        inm.n_inmuebles != null ? inm.n_inmuebles
+        : (propios != null || sociedad != null) ? Number(propios ?? 0) + Number(sociedad ?? 0)
+        : b.n_inmuebles != null ? Number(b.n_inmuebles)
+        : (b.inmuebles_urbanos != null || b.inmuebles_rusticos != null)
+          ? Number(b.inmuebles_urbanos ?? 0) + Number(b.inmuebles_rusticos ?? 0)
+          : null;
+
       const dep = sanearImporte(b.depositos);
       const val = sanearImporte(b.valores);
       const plan = sanearImporte(b.planes_pensiones);
@@ -135,10 +140,12 @@ export async function traerDiputados() {
         ...d,
         patrimonio_euros: d.patrimonio_euros ?? patrimonio,
         bienes_total: d.bienes_total ?? patrimonio,
-        // casas ya viene del detalle (no usar d.n_inmuebles viejo de la MV)
-        n_inmuebles: casas ?? d.n_inmuebles,
-        n_casas: casas ?? d.n_casas,
+        n_inmuebles: casas,
+        n_casas: casas,
+        n_inmuebles_propios: propios,
+        n_inmuebles_sociedad: sociedad,
         n_viviendas: inm.n_viviendas,
+        inmuebles_items: inm.items,
         n_coches: b.n_coches ?? veh.n_coches,
         n_motos: b.n_motos ?? veh.n_motos,
         n_embarcaciones: b.n_embarcaciones ?? veh.n_embarcaciones,
@@ -147,6 +154,8 @@ export async function traerDiputados() {
         vehiculos_detalle: b.vehiculos_detalle ?? null,
         vehiculos_lista: veh.vehiculos_lista,
         inmuebles_detalle: b.inmuebles_detalle ?? null,
+        inmuebles_detalle_propios: b.inmuebles_detalle_propios ?? null,
+        inmuebles_detalle_sociedad: b.inmuebles_detalle_sociedad ?? null,
         bienes_outlier: outlier,
         bienes_confianza: b.confianza ?? null
       };
@@ -297,10 +306,9 @@ export async function traerMapaPartidos() {
   const { data, error } = await supabase.from('v_mapa_partidos').select('*');
   if (!error && data?.length) return data.map(normalizarFilaMapa);
 
-  // Fallback: la vista puede no existir (PGRST205) aunque mv_eje_* sí tengan datos.
   const [{ data: prog }, { data: votos }, { data: dips }] = await Promise.all([
     supabase.from('mv_eje_programa').select('*'),
-    supabase.from('mv_eje_votos').select('*'),
+    supabase.from('mv_eje_votos_base').select('*'),
     supabase.from('mv_diputados').select('partido_siglas, partido, activo')
   ]);
 
@@ -355,8 +363,15 @@ function normalizarFilaMapa(d) {
     ...d,
     prog_economico: d.prog_economico ?? d.eje_economico ?? null,
     prog_social: d.prog_social ?? d.eje_social ?? null,
-    voto_economico: d.voto_economico ?? null,
-    voto_social: d.voto_social ?? null,
+    voto_economico: d.voto_economico ?? d.eje_economico ?? null,
+    voto_social: d.voto_social ?? d.eje_social ?? null,
+    voto_err_economico: d.voto_err_economico ?? d.err_economico ?? null,
+    voto_err_social: d.voto_err_social ?? d.err_social ?? null,
+    voto_n_economico: d.voto_n_economico ?? d.n_economico ?? null,
+    voto_n_social: d.voto_n_social ?? d.n_social ?? null,
+    voto_apoyo_gobierno: d.voto_apoyo_gobierno ?? d.apoyo_gobierno ?? null,
+    voto_eco_nulo: d.voto_eco_nulo ?? d.economico_indistinguible_de_cero ?? null,
+    voto_soc_nulo: d.voto_soc_nulo ?? d.social_indistinguible_de_cero ?? null,
     promesas_codificadas: d.promesas_codificadas ?? d.promesas ?? null,
     leyes_valoradas: d.leyes_valoradas ?? d.leyes_apoyadas ?? null,
     escanos: d.escanos ?? d.diputados ?? 1,
@@ -382,6 +397,12 @@ export async function traerActividades(mandatoId) {
   const { data, error } = await supabase.rpc('actividades_de_diputado', { p_mandato_id: mandatoId });
   if (error) return [];
   return data ?? [];
+}
+
+export async function traerAuditoriaEjeVotos() {
+  const { data, error } = await supabase.from('v_auditoria_eje_votos').select('*').limit(1);
+  if (error) return null;
+  return data?.[0] ?? null;
 }
 
 export async function traerSesgo() {
@@ -414,7 +435,6 @@ export async function traerUltimas(limite = 6) {
     .from('mv_normas').select(campos)
     .order('fecha', { ascending: false }).limit(limite);
   if (error) {
-    // columnas opcionales pueden faltar en la vista
     const { data: d2, error: e2 } = await supabase
       .from('mv_normas').select('clave_norma, votacion_principal, titular, fecha, materia_nombre, materia_color, resultado_final, resultado_ultima, total_si, total_no, resumen, colectivos')
       .order('fecha', { ascending: false }).limit(limite);

@@ -99,7 +99,6 @@ function Icono({ d }) {
   </svg>;
 }
 
-
 const ORDENES = [
   ['nombre', 'Nombre', d => d.nombre_completo, false],
   ['ausencias', 'Más ausencias', d => Number(d.ausencias ?? 0), true],
@@ -109,10 +108,14 @@ const ORDENES = [
   ['abstenciones', 'Más abstenciones', d => Number(d.abstenciones ?? 0), true],
   ['telematicos', 'Más votos a distancia', d => Number(d.telematicos ?? 0), true],
   ['patrimonio', 'Mayor patrimonio (€)', d => {
-    if (d.bienes_outlier) return -1; // no liderar el ranking con cifras anómalas
+    if (d.bienes_outlier) return -1;
     return Number(d.patrimonio_euros ?? d.bienes_total ?? -1);
   }, true],
-  ['inmuebles', 'Más inmuebles', d => {
+  ['inmuebles', 'Más inmuebles propios', d => {
+    const n = d.n_inmuebles_propios ?? d.n_casas ?? d.n_inmuebles;
+    return n == null ? -1 : Number(n);
+  }, true],
+  ['inmuebles_todos', 'Más inmuebles vinculados', d => {
     const n = d.n_casas ?? d.n_inmuebles;
     return n == null ? -1 : Number(n);
   }, true],
@@ -133,7 +136,6 @@ function Chip({ on, onClick, color, children, titulo }) {
   );
 }
 
-/** Evita titulares que flagean al autor (p. ej. «Presentada por el Grupo Parlamentario de…»). */
 function limpiarTitular(t) {
   if (!t) return t;
   return String(t)
@@ -581,12 +583,16 @@ export default function App() {
                 </div>
               )}
 
-              {orden === 'inmuebles' && (
+              {(orden === 'inmuebles' || orden === 'inmuebles_todos') && (
                 <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
                   borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Unidades del PDF (no solo filas): «2 VIVIENDAS» = 2, «13 FINCAS» = 13,
-                  plazas, locales y naves incluidas. Si el detalle está vacío, se usan las filas.
-                  {' '}Ahora: {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con dato.
+                  Unidades del PDF, no filas: «2 VIVIENDAS» = 2, «13 FINCAS RÚSTICAS» = 13,
+                  «vivienda, plaza de garaje y trastero» = 3. Plazas, locales, naves y trasteros incluidos.
+                  {orden === 'inmuebles'
+                    ? ' Este orden cuenta solo los inmuebles en pleno dominio, nuda propiedad, usufructo, gananciales o comunidad de bienes.'
+                    : ' Este orden suma los propios y los que figuran a nombre de una sociedad no cotizada del diputado, que se declaran por unidades aunque la cuota sea parcial. Abre la ficha para ver el desglose y el porcentaje.'}
+                  {' '}Ahora: {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con dato,
+                  {' '}{diputados.filter(d => d.n_inmuebles_propios != null).length} con desglose.
                 </div>
               )}
 
@@ -692,7 +698,8 @@ export default function App() {
                           abstenciones: ['abs.', d.abstenciones],
                           telematicos: ['tel.', d.telematicos],
                           patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
-                          inmuebles: ['inm.', casas ?? '—'],
+                          inmuebles: ['propios', d.n_inmuebles_propios ?? casas ?? '—'],
+                          inmuebles_todos: ['inm.', casas ?? '—'],
                           vehiculos: ['veh.', nVeh || '—'],
                           donaciones: ['don.', d.donaciones],
                           privadas: ['priv.', d.actividades_privadas]
