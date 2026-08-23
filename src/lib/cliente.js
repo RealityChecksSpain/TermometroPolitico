@@ -82,7 +82,7 @@ export async function traerDiputados() {
     const chunk = ids.slice(i, i + 200);
     const { data: filas, error } = await supabase
       .from('bienes_declarados')
-      .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
+      .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
       .in('mandato_id', chunk);
     if (error) {
       const { data: filas2 } = await supabase
@@ -144,7 +144,12 @@ export async function traerDiputados() {
         n_casas: casas,
         n_inmuebles_propios: propios,
         n_inmuebles_sociedad: sociedad,
-        n_viviendas: inm.n_viviendas,
+        n_inmuebles_equivalentes: inm.n_inmuebles_equivalentes ?? (b.n_inmuebles_equivalentes != null ? Number(b.n_inmuebles_equivalentes) : null),
+        n_viviendas: inm.n_viviendas ?? b.n_viviendas ?? null,
+        n_suelo: inm.n_suelo ?? b.n_suelo ?? null,
+        n_anejos: inm.n_anejos ?? b.n_anejos ?? null,
+        n_productivos: inm.n_productivos ?? b.n_productivos ?? null,
+        n_otros_bienes: inm.n_otros_bienes ?? b.n_otros_bienes ?? null,
         inmuebles_items: inm.items,
         n_coches: b.n_coches ?? veh.n_coches,
         n_motos: b.n_motos ?? veh.n_motos,
@@ -274,11 +279,15 @@ export async function traerProgramas() {
 }
 
 export async function traerPromesas(partido, soloVerificables = false, limite = 200) {
-  let q = supabase.from('v_promesas').select('*').eq('partido', partido);
+  let q = supabase.from('v_promesa_estado').select('*').eq('partido', partido);
   if (soloVerificables) q = q.eq('verificable', true);
   const { data, error } = await q.order('orden').limit(limite);
-  if (error) throw error;
-  return data ?? [];
+  if (!error) return data ?? [];
+  let q2 = supabase.from('v_promesas').select('*').eq('partido', partido);
+  if (soloVerificables) q2 = q2.eq('verificable', true);
+  const { data: d2, error: e2 } = await q2.order('orden').limit(limite);
+  if (e2) throw e2;
+  return d2 ?? [];
 }
 
 export async function traerCoherencia() {
@@ -403,6 +412,12 @@ export async function traerAuditoriaEjeVotos() {
   const { data, error } = await supabase.from('v_auditoria_eje_votos').select('*').limit(1);
   if (error) return null;
   return data?.[0] ?? null;
+}
+
+export async function traerHallazgos() {
+  const { data, error } = await supabase.from('v_hallazgos_todos').select('*').order('orden');
+  if (error) return [];
+  return (data ?? []).filter(h => h.titular);
 }
 
 export async function traerSesgo() {

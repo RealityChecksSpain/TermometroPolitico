@@ -1,7 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { traerProgramas, traerPromesas } from '../lib/cliente.js';
 
-const C = { superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3' };
+const ESTADO = {
+  cumplida: { icono: '✓', color: '#2E7D5B', fondo: '#E6F2EB', texto: 'cumplida' },
+  apoyada_sin_aprobar: { icono: '◐', color: '#8A6D1F', fondo: '#F6EFDC', texto: 'la apoyó, no salió' },
+  contradicha: { icono: '✕', color: '#9E1B32', fondo: '#FBE9EC', texto: 'votó lo contrario' },
+  pendiente: { icono: '○', color: '#8E9299', fondo: '#F1F1EC', texto: 'sin votación aún' }
+};
+
+function Estado({ pr }) {
+  const e = ESTADO[pr.estado] ?? ESTADO.pendiente;
+  const titulo = pr.norma_titular
+    ? `${e.texto} · ${pr.norma_titular}${pr.norma_justificacion ? ` · ${pr.norma_justificacion}` : ''}`
+    : e.texto;
+  return (
+    <span title={titulo} className="em" style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+      fontSize: 10, padding: '2px 6px', borderRadius: 2,
+      background: e.fondo, color: e.color, fontWeight: 600, cursor: 'help'
+    }}>
+      <span style={{ fontSize: 11, lineHeight: 1 }}>{e.icono}</span>{e.texto}
+    </span>
+  );
+}
+
+const C = { superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1' };
 
 const OFICIALES = {
   psoe: 'https://www.psoe.es', pp: 'https://www.pp.es', vox: 'https://www.voxespana.es',
@@ -92,7 +115,7 @@ export default function Partidos({ onDiputados }) {
                 <button onClick={() => setSoloVerificables(!soloVerificables)} className="em" style={{
                   padding: '4px 9px', fontSize: 10.5, cursor: 'pointer', borderRadius: 2, marginBottom: 10,
                   background: soloVerificables ? C.tinta : 'transparent',
-                  color: soloVerificables ? '#EFEFE9' : C.media,
+                  color: soloVerificables ? '#F3F1E8' : C.media,
                   border: `1px solid ${soloVerificables ? C.tinta : C.linea}`
                 }}>
                   {soloVerificables ? 'solo verificables' : 'todos los compromisos'}
@@ -129,14 +152,21 @@ export default function Partidos({ onDiputados }) {
 
                 {lista.slice(0, 60).map(pr => (
                   <div key={pr.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.linea}` }}>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.5 }}>{pr.texto}</div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <div style={{ fontSize: 12.5, lineHeight: 1.5, flex: 1, minWidth: 0 }}>{pr.texto}</div>
+                      {pr.verificable && <Estado pr={pr} />}
+                    </div>
                     <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {pr.materia_nombre && (
                         <span style={{ background: (pr.materia_color || '#8E9299') + '22', color: pr.materia_color || C.media, padding: '1px 5px', borderRadius: 2 }}>
                           {pr.materia_nombre}
                         </span>
                       )}
-                      {pr.verificable && <span style={{ color: '#2E7D5B' }}>verificable</span>}
+                      {pr.norma_titular && (
+                        <span style={{ color: C.media }}>
+                          {pr.norma_titular.length > 64 ? pr.norma_titular.slice(0, 64) + '…' : pr.norma_titular}
+                        </span>
+                      )}
                       {pr.votaciones_relacionadas > 0 && (
                         <span>{pr.votaciones_relacionadas} votaciones relacionadas</span>
                       )}

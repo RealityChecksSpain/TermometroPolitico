@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { DestelloSuave, EntradaSuave } from './Destello.jsx';
 import Feed from './Feed.jsx';
 import GraficoBrecha from './GraficoBrecha.jsx';
+import Hallazgos from './Hallazgos.jsx';
+import Portada from './Portada.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
 import { implicacionDe } from '../lib/implicaciones.js';
 import {
@@ -12,8 +14,8 @@ import { traerUltimas, traerLideres } from '../lib/cliente.js';
 import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
 
 const C = {
-  papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
-  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3',
+  papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
+  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1',
   si: '#2E7D5B', no: '#B23A2E'
 };
 
@@ -148,6 +150,8 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
 
   return (
     <div>
+      <Portada onIr={onIr} escanos={cobertura?.escanos ?? 350} leyes={cobertura?.normas} />
+      <Hallazgos onIr={onIr} />
       <section style={{
         position: 'relative',
         borderRadius: 4,
@@ -211,7 +215,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
                 placeholder="Soy autónoma y vivo de alquiler…"
                 style={{
                   flex: '1 1 220px', padding: '13px 14px', fontSize: 15,
-                  border: 'none', borderRadius: 2, background: '#F7F7F2', color: C.tinta, outline: 'none'
+                  border: 'none', borderRadius: 2, background: '#F8F6EE', color: C.tinta, outline: 'none'
                 }} />
               <button onClick={buscar} disabled={pensando} style={{
                 padding: '13px 20px', fontSize: 14.5, fontWeight: 600, cursor: 'pointer',

@@ -7,9 +7,24 @@ const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
 
 const C = {
-  papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
-  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3'
+  papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
+  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1'
 };
+
+const NOMBRE_DIM = {
+  gasto: 'gasto público',
+  impuestos: 'impuestos',
+  regulacion: 'regulación empresarial',
+  derechos: 'derechos individuales',
+  migracion: 'reglas de migración'
+};
+
+function listarDims(dims) {
+  if (!dims) return null;
+  const partes = String(dims).split('+').map(d => NOMBRE_DIM[d] || d);
+  if (partes.length === 1) return partes[0];
+  return partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
+}
 
 const ESCALA_VOTOS = 1.7;
 
@@ -55,13 +70,43 @@ export default function Mapa({ onDiputados }) {
   const [encima, setEncima] = useState(null);
   const [sesgo, setSesgo] = useState(null);
   const [auditoria, setAuditoria] = useState(null);
+  const [vista, setVista] = useState({ z: 1, px: 0, py: 0 });
+  const arrastre = useRef(null);
   const svgRef = useRef(null);
+
+  const VB = { x: -1.45, y: -1.5, w: 2.9, h: 3.05 };
+  const viewBox = useMemo(() => {
+    const w = VB.w / vista.z;
+    const h = VB.h / vista.z;
+    const cx = VB.x + VB.w / 2 + vista.px;
+    const cy = VB.y + VB.h / 2 + vista.py;
+    return `${cx - w / 2} ${cy - h / 2} ${w} ${h}`;
+  }, [vista]);
+
+  const acercar = useCallback((factor, foco) => {
+    setVista(v => {
+      const z = Math.min(6, Math.max(1, v.z * factor));
+      if (z === v.z) return v;
+      if (!foco) return { z, px: v.px, py: v.py };
+      const k = 1 / v.z - 1 / z;
+      return {
+        z,
+        px: v.px + (foco.x - (VB.x + VB.w / 2 + v.px)) * k * v.z,
+        py: v.py + (foco.y - (VB.y + VB.h / 2 + v.py)) * k * v.z
+      };
+    });
+  }, []);
+
+  const reencuadrar = useCallback(() => setVista({ z: 1, px: 0, py: 0 }), []);
 
   useEffect(() => {
     traerMapaPartidos().then(setDatos).catch(() => setDatos([]));
     traerSesgo().then(setSesgo).catch(() => setSesgo(null));
     traerAuditoriaEjeVotos().then(setAuditoria).catch(() => setAuditoria(null));
   }, []);
+
+  const ejeEcoValido = !auditoria || auditoria.etiqueta_permitida === 'izquierda-derecha';
+  const sustituido = fuente === 'votos' && !ejeEcoValido;
 
   const puntos = useMemo(() => {
     if (!datos) return [];
@@ -75,6 +120,9 @@ export default function Mapa({ onDiputados }) {
         ey: fuente === 'programa' ? null : d.voto_err_social,
         nulo: fuente === 'programa' ? false : Boolean(d.voto_eco_nulo && d.voto_soc_nulo)
       }))
+      .map(d => (fuente === 'votos' && !ejeEcoValido)
+        ? { ...d, x: d.voto_alineamiento, ex: 0, n: d.voto_n_social }
+        : d)
       .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
       .map(d => ({ ...d, x: Number(d.x), y: Number(d.y) }));
 
@@ -89,7 +137,7 @@ export default function Mapa({ onDiputados }) {
     }
 
     return list.map(d => ({ ...d, cx: d.x, cy: -d.y }));
-  }, [datos, fuente]);
+  }, [datos, fuente, ejeEcoValido]);
 
   const r = escanos => 0.035 + Math.sqrt(Number(escanos ?? 1)) * 0.011;
 
@@ -121,17 +169,61 @@ export default function Mapa({ onDiputados }) {
   }, [conEtiqueta]);
 
   const onPointerMove = useCallback(e => {
+    const a = arrastre.current;
+    if (a) {
+      if (Math.abs(e.clientX - a.sx) > 3 || Math.abs(e.clientY - a.sy) > 3) a.movido = true;
+      if (!a.movido) return;
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect || !rect.width) return;
+      const unidadesPorPx = (VB.w / a.z) / rect.width;
+      setVista(v => ({
+        ...v,
+        px: a.px - (e.clientX - a.sx) * unidadesPorPx,
+        py: a.py - (e.clientY - a.sy) * unidadesPorPx
+      }));
+      return;
+    }
     const hit = resolver(e.clientX, e.clientY);
     setEncima(hit ? hit.partido : null);
   }, [resolver]);
 
-  const onPointerLeave = useCallback(() => setEncima(null), []);
+  const onPointerLeave = useCallback(() => {
+    arrastre.current = null;
+    setEncima(null);
+  }, []);
+
+  const onPointerDown = useCallback(e => {
+    if (e.button != null && e.button !== 0) return;
+    arrastre.current = {
+      sx: e.clientX, sy: e.clientY,
+      px: vista.px, py: vista.py, z: vista.z,
+      movido: false
+    };
+    try { svgRef.current?.setPointerCapture?.(e.pointerId); } catch { /* sin captura */ }
+  }, [resolver, vista]);
 
   const onPointerUp = useCallback(e => {
+    const a = arrastre.current;
+    arrastre.current = null;
+    try { svgRef.current?.releasePointerCapture?.(e.pointerId); } catch { /* sin captura */ }
+    if (a?.movido) return;
     const hit = resolver(e.clientX, e.clientY);
     if (!hit) return;
     setEncima(prev => (prev === hit.partido ? null : hit.partido));
   }, [resolver]);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const alRodar = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const p = puntoSvg(svg, e.clientX, e.clientY);
+      acercar(e.deltaY < 0 ? 1.18 : 1 / 1.18, p);
+    };
+    svg.addEventListener('wheel', alRodar, { passive: false });
+    return () => svg.removeEventListener('wheel', alRodar);
+  }, [acercar, datos, fuente]);
 
   if (datos === null) return <div style={{ padding: 40, textAlign: 'center', color: C.tenue, fontSize: 13 }}>Cargando…</div>;
 
@@ -176,19 +268,29 @@ export default function Mapa({ onDiputados }) {
 
           <div className="mapaLado">
             <GuiaEje
-              titulo="Eje económico"
-              intro="Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades."
+              titulo={sustituido ? 'Eje de bloque' : 'Eje económico'}
+              intro={sustituido
+                ? 'No hay suficientes normas económicas contestadas en ambos sentidos para situar a los partidos en izquierda-derecha por sus votos. Mientras tanto, este eje mide lo que sí se puede medir: cuánto apoya cada partido las normas que trae el Gobierno.'
+                : 'Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades.'}
               colorA="#C45C52"
               colorB="#3D7AB8"
-              a={{
+              a={sustituido ? {
+                titulo: 'Oposición',
+                texto: 'El partido vota en contra de la mayor parte de lo que el Gobierno lleva al pleno. No dice nada sobre su ideología: un partido puede oponerse desde la izquierda o desde la derecha.'
+              } : {
                 titulo: 'Izquierda económica',
                 texto: 'El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto público, impuestos progresivos y reglas que limiten el poder de las empresas. Es la línea que va de Marx a la socialdemocracia de posguerra.'
               }}
-              b={{
+              b={sustituido ? {
+                titulo: 'Gobierno',
+                texto: 'El partido apoya la mayor parte de lo que el Gobierno lleva al pleno. Tampoco dice nada sobre ideología: puede ser socio de investidura, puede negociar apoyos puntuales, o puede coincidir en el fondo.'
+              } : {
                 titulo: 'Derecha económica',
                 texto: 'El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación. Es el argumento de Hayek y Friedman.'
               }}
-              miramos={<>Gasto público, impuestos y regulación empresarial. Nada más.</>}
+              miramos={sustituido
+                ? <>Propensión de cada partido a votar que sí, sobre {auditoria?.n_economico ?? '—'} normas.</>
+                : <>Gasto público, impuestos y regulación empresarial, sobre normas que se votaron divididas. Nada más.</>}
             />
           </div>
 
@@ -197,12 +299,32 @@ export default function Mapa({ onDiputados }) {
             background: C.pizarra, borderRadius: 3, padding: 'clamp(14px, 2.5vw, 22px)', minWidth: 0
           }}>
             <DestelloSuave color="rgba(232,197,106,0.35)" n={6} />
+            <div style={{
+              position: 'absolute', right: 14, top: 14, zIndex: 2,
+              display: 'flex', flexDirection: 'column', gap: 4
+            }}>
+              {[['+', () => acercar(1.4, null)], ['−', () => acercar(1 / 1.4, null)]].map(([t, fn]) => (
+                <button key={t} onClick={fn} aria-label={t === '+' ? 'Acercar' : 'Alejar'} style={{
+                  width: 26, height: 26, borderRadius: 3, cursor: 'pointer', lineHeight: 1,
+                  background: 'rgba(255,255,255,0.09)', color: '#D8DCE0',
+                  border: '1px solid rgba(255,255,255,0.16)', fontSize: 15, fontWeight: 600
+                }}>{t}</button>
+              ))}
+              {vista.z > 1 && (
+                <button onClick={reencuadrar} aria-label="Reencuadrar" style={{
+                  width: 26, height: 26, borderRadius: 3, cursor: 'pointer', lineHeight: 1,
+                  background: 'rgba(255,255,255,0.09)', color: '#D8DCE0',
+                  border: '1px solid rgba(255,255,255,0.16)', fontSize: 11
+                }}>⤢</button>
+              )}
+            </div>
             <svg ref={svgRef}
-              viewBox="-1.45 -1.5 2.9 3.05"
+              viewBox={viewBox}
               preserveAspectRatio="xMidYMid meet"
-              style={{ width: '100%', height: 'auto', maxHeight: '58vh', display: 'block', margin: '0 auto', touchAction: 'manipulation', cursor: 'crosshair' }}
+              style={{ width: '100%', height: 'auto', maxHeight: '58vh', display: 'block', margin: '0 auto', touchAction: 'none', cursor: vista.z > 1 ? 'grab' : 'crosshair', userSelect: 'none' }}
               onPointerMove={onPointerMove}
               onPointerLeave={onPointerLeave}
+              onPointerDown={onPointerDown}
               onPointerUp={onPointerUp}
               role="img"
               aria-label="Mapa de partidos en dos ejes">
@@ -215,9 +337,9 @@ export default function Mapa({ onDiputados }) {
               <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
 
                             <text x="-1.32" y="-1.28" fill="#F2A7A0" fontSize="0.092" fontWeight="700"
-                fontFamily="DM Mono, monospace" letterSpacing="0.02">IZQUIERDA</text>
+                fontFamily="DM Mono, monospace" letterSpacing="0.02">{sustituido ? 'OPOSICIÓN' : 'IZQUIERDA'}</text>
               <text x="1.32" y="-1.28" fill="#8EB8F0" fontSize="0.092" fontWeight="700"
-                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">DERECHA</text>
+                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{sustituido ? 'GOBIERNO' : 'DERECHA'}</text>
               <text x="0" y="-1.40" fill="#E8C56A" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">CONSERVADOR</text>
               <text x="0" y="1.48" fill="#6ECFBC" fontSize="0.092" fontWeight="700"
@@ -235,13 +357,11 @@ export default function Mapa({ onDiputados }) {
                       <line x1={p.cx} y1={p.cy + p.radio} x2={p.cx} y2={p.labelY - 0.045}
                         stroke="#5A6067" strokeWidth="0.005" />
                     )}
-                    {fuente === 'votos' && (p.ex > 0 || p.ey > 0) && (
-                      <>
-                        <line x1={p.cx - p.ex} y1={p.cy} x2={p.cx + p.ex} y2={p.cy}
-                          stroke={p.color || '#8E9299'} strokeWidth="0.009" opacity="0.42" />
-                        <line x1={p.cx} y1={p.cy - p.ey} x2={p.cx} y2={p.cy + p.ey}
-                          stroke={p.color || '#8E9299'} strokeWidth="0.009" opacity="0.42" />
-                      </>
+                    {fuente === 'votos' && encima === p.partido && (p.ex > 0 || p.ey > 0) && (
+                      <ellipse cx={p.cx} cy={p.cy}
+                        rx={Math.max(p.ex, p.radio * 1.3)} ry={Math.max(p.ey, p.radio * 1.3)}
+                        fill={p.color || '#8E9299'} opacity="0.16"
+                        stroke={p.color || '#8E9299'} strokeOpacity="0.35" strokeWidth="0.006" />
                     )}
                     <circle cx={p.cx} cy={p.cy}
                       r={encima === p.partido ? p.radio * 1.22 : p.radio}
@@ -261,19 +381,35 @@ export default function Mapa({ onDiputados }) {
               })}
             </svg>
 
-            {fuente === 'votos' && auditoria && auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
+            {fuente === 'votos' && auditoria && (
+              (auditoria.etiqueta_permitida !== 'izquierda-derecha' ||
+               auditoria.etiqueta_permitida_social !== 'conservador-progresista') && (
               <div style={{
                 marginTop: 10, padding: 11, background: '#3A3226', border: '1px solid #6B5518',
                 borderRadius: 3, fontSize: 12, color: '#E8C56A', lineHeight: 1.55
               }}>
-                Auditoría automática: este eje todavía no se puede presentar como izquierda-derecha.
-                {auditoria.contaminacion_economica != null && (
-                  <> Su correlación con el apoyo al Gobierno es {Number(auditoria.contaminacion_economica).toFixed(2)},
-                    así que lo que separa a los partidos sigue siendo el bloque parlamentario.</>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Auditoría automática</div>
+                {auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
+                  <div>
+                    El eje horizontal no puede ser izquierda-derecha: {auditoria.etiqueta_permitida === 'datos insuficientes'
+                      ? `solo hay ${auditoria.n_economico ?? '—'} normas económicas votadas con división real, y hacen falta 8.`
+                      : auditoria.etiqueta_permitida === 'sin poder discriminante'
+                        ? `solo ${auditoria.economico_significativos ?? 0} partidos tienen posición distinguible del centro.`
+                        : `barajando al azar las etiquetas de las normas se obtiene un rango parecido (p = ${Number(auditoria.p_economico ?? 1).toFixed(3)}), así que el orden no viene del contenido.`}
+                    {' '}En su lugar se muestra el alineamiento con el Gobierno, que sí está medido.
+                  </div>
                 )}
-                {' '}Se muestra como dato en bruto, no como posición ideológica.
+                {auditoria.etiqueta_permitida_social !== 'conservador-progresista' && (
+                  <div style={{ marginTop: 4 }}>
+                    Eje vertical: {auditoria.etiqueta_permitida_social === 'datos insuficientes'
+                      ? `solo ${auditoria.n_social ?? '—'} normas con división real, hacen falta 8.`
+                      : auditoria.etiqueta_permitida_social === 'sin poder discriminante'
+                        ? `solo ${auditoria.social_significativos ?? 0} partidos tienen posición distinguible del centro.`
+                        : `el test de permutación no lo distingue del azar (p = ${Number(auditoria.p_social ?? 1).toFixed(3)}).`}
+                  </div>
+                )}
               </div>
-            )}
+            ))}
 
             {faltan > 0 && (
               <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
@@ -343,7 +479,9 @@ export default function Mapa({ onDiputados }) {
                 titulo: 'Progresista',
                 texto: 'Cada persona debe poder decidir sobre su vida mientras no dañe a otros, y las costumbres heredadas no bastan para justificar una restricción. Viene de Mill y del liberalismo de los derechos: ampliar la autonomía personal y quitar límites que no protegen a nadie.'
               }}
-              miramos={<>Derechos individuales y reglas de entrada/regularización de migrantes. Nada más.</>}
+              miramos={fuente === 'votos'
+                ? <>Derechos individuales y reglas de migración. El grupo más pequeño tiene {auditoria?.n_social ?? '—'} normas votadas con división real.</>
+                : <>Derechos individuales y reglas de entrada/regularización de migrantes. Nada más.</>}
             />
           </div>
         </div>
@@ -399,10 +537,26 @@ export default function Mapa({ onDiputados }) {
           quién propone la norma no contamine el resultado.
         </div>
         <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 10 }}>
-          Un partido que vota igual suba o baje el gasto sale en el centro, no en un extremo. Los
-          partidos con pocos votos codificados se acercan al centro automáticamente en lugar de
-          dispararse a los bordes. Ningún eje se invierte ni se reescala a mano.
+          Un partido que vota igual suba o baje el gasto sale en el centro exacto, sea cual sea su
+          tasa de votos a favor. Por eso la oposición sistemática no empuja a nadie hacia un extremo.
+          Ningún eje se invierte ni se reescala a mano.
         </div>
+        {fuente === 'votos' && auditoria?.p_economico != null && (
+          <div style={{
+            marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.linea}`,
+            fontSize: 13, color: C.media, lineHeight: 1.6
+          }}>
+            <strong>Cómo sabemos que esto no es solo gobierno contra oposición.</strong> Se barajan
+            al azar las etiquetas de las normas {auditoria.placebo_reps} veces y se recalcula el mapa.
+            Si los partidos votaran solo según su bloque, barajar no cambiaría nada. El eje económico
+            real separa a los partidos {Number(auditoria.rango_economico).toFixed(2)} puntos; barajando,
+            la media baja a {Number(auditoria.placebo_medio_economico).toFixed(2)} y el máximo de las
+            {' '}{auditoria.placebo_reps} tiradas fue {Number(auditoria.placebo_max_economico).toFixed(2)}.
+            {' '}El eje social real separa {Number(auditoria.rango_social).toFixed(2)} frente a un máximo
+            barajado de {Number(auditoria.placebo_max_social).toFixed(2)}.
+            {' '}Es la prueba de que lo que ordena a los partidos es el contenido de las leyes.
+          </div>
+        )}
       </div>
     </div>
   );

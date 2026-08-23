@@ -43,7 +43,13 @@ export default function Hemiciclo({
   const setEncima = useCallback(v => { setEncimaLocal(v); onEncima?.(v); }, [onEncima]);
   const svgRef = useRef(null);
 
-  const asientos = useMemo(() => calcularAsientos(diputados.length, filas), [diputados.length, filas]);
+  const filasReales = useMemo(() => {
+    const n = diputados.length;
+    if (!n) return 1;
+    return Math.max(1, Math.min(filas, Math.round(Math.sqrt(n / 2.4))));
+  }, [diputados.length, filas]);
+
+  const asientos = useMemo(() => calcularAsientos(diputados.length, filasReales), [diputados.length, filasReales]);
   const mapaVotos = useMemo(() => votos ? new Map(votos.map(v => [v.mandato_id, v.voto])) : null, [votos]);
 
   // Radio visual ≈ 0.062; umbral amplio para que no haya que acertar el centro exacto.

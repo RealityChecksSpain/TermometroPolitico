@@ -15,8 +15,8 @@ import {
 } from './lib/cliente.js';
 
 const C = {
-  papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
-  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3',
+  papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
+  tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1',
   si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
 };
 
@@ -49,7 +49,7 @@ border-top:none;border-bottom:2px solid transparent;margin-bottom:-2px}}
 .tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;
 box-shadow:0 1px 0 rgba(20,22,26,0.03)}
 .fila{transition:background 140ms ease, transform 140ms ease}
-.fila:hover{background:#F3F3EE}
+.fila:hover{background:#EDEBE0}
 .chip{padding:5px 11px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
 display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:transparent;
 color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,color 140ms ease,border-color 140ms ease,transform 140ms ease}
@@ -72,16 +72,117 @@ color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,co
 @media(min-width:960px){.split{grid-template-columns:minmax(380px,1.15fr) minmax(300px,.9fr);gap:18px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
 @media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(420px,1.35fr) minmax(260px,.72fr);gap:18px}}
-.portada{display:grid;grid-template-columns:1fr;gap:20px;padding-top:6px}
-@media(min-width:900px){.portada{grid-template-columns:1.35fr 1fr;gap:32px;align-items:start}}
+:root{
+--s1:4px;--s2:8px;--s3:12px;--s4:20px;--s5:32px;--s6:52px;
+--radio:3px;--radioG:5px;
+--sombra:0 1px 2px rgba(20,22,26,.04);
+--sombraAlta:0 2px 4px rgba(20,22,26,.06),0 8px 24px rgba(20,22,26,.05);
+}
+body{font-size:15px;line-height:1.55}
+h1,h2,h3{margin:0;font-family:'Newsreader',Georgia,serif;letter-spacing:-0.018em;line-height:1.15}
+.display{font-size:clamp(28px,4.6vw,44px);font-weight:600;letter-spacing:-0.028em;line-height:1.08}
+.t1{font-size:clamp(21px,2.6vw,27px);font-weight:600;line-height:1.2}
+.t2{font-size:clamp(17px,1.9vw,20px);font-weight:600;line-height:1.28}
+.cifra{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
+font-size:clamp(24px,3.4vw,34px);font-weight:500;letter-spacing:-0.02em;line-height:1}
+.pie{font-size:12px;line-height:1.5}
+.tarjetaAncla{background:#FFFFFF;border:1px solid #CFCFC4;border-radius:var(--radioG);
+box-shadow:var(--sombraAlta)}
+.sep{border:0;border-top:1px solid #E3DFD1;margin:var(--s4) 0}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #3D7AB8;outline-offset:2px;border-radius:2px}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+
+[data-seccion]{--acento:#1E4A3C;--acentoClaro:#2F7F63;--acentoTenue:#EAF0EC}
+[data-seccion="inicio"]{--acento:#1E4A3C;--acentoClaro:#2F7F63;--acentoTenue:#E9F0EC}
+[data-seccion="leyes"]{--acento:#7A5A12;--acentoClaro:#B58A22;--acentoTenue:#F4EFE0}
+[data-seccion="diputados"]{--acento:#243F6B;--acentoClaro:#3C63A0;--acentoTenue:#E8ECF4}
+[data-seccion="partidos"]{--acento:#6E2C3C;--acentoClaro:#A24A5F;--acentoTenue:#F4E9EC}
+[data-seccion="ejes"]{--acento:#14524F;--acentoClaro:#1F8480;--acentoTenue:#E6F0EF}
+
+.listaFilete{background:transparent;border:0;box-shadow:none}
+.listaFilete .fila{border-top:1px solid var(--acentoTenue,#E3DFD1)}
+.listaFilete .fila:first-child{border-top:2px solid var(--acento,#16181B)}
+.listaFilete .fila:last-child{border-bottom:2px solid var(--acento,#16181B)}
+.dato{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
+font-size:clamp(19px,2.1vw,26px);font-weight:500;letter-spacing:-0.03em;line-height:1;
+color:var(--acento,#16181B)}
+.datoUnidad{display:block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+color:#8E9299;margin-top:3px;font-weight:600}
+.puesto{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
+font-size:10.5px;color:#A9AEB2;width:22px;flex-shrink:0;text-align:right}
+.fila[data-top="1"] .dato{font-size:clamp(23px,2.6vw,32px)}
+.nota{background:var(--acentoTenue,#F5F3EA);border:0;border-left:2px solid var(--acentoClaro,#B58A22);
+border-radius:0 var(--radio) var(--radio) 0;padding:10px 13px;margin-bottom:var(--s3);
+font-size:11.5px;line-height:1.55;color:#4A4F55}
+
+.hallazgos{background:linear-gradient(135deg,#16211D 0%,#1E2A26 60%,#1A2F28 100%);
+border-radius:var(--radioG);padding:var(--s3) var(--s4) var(--s4);margin-bottom:var(--s4);position:relative}
+.hallazgosCab{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);
+padding-bottom:var(--s2);border-bottom:1px solid #333941;margin-bottom:var(--s3)}
+.hallazgos .rotulo{color:#E8C56A;letter-spacing:.12em}
+.hallazgosNav{display:flex;align-items:center;gap:var(--s2)}
+.hallazgosNav button{width:22px;height:22px;border-radius:2px;cursor:pointer;line-height:1;font-size:15px;
+background:transparent;color:#8E959C;border:1px solid #3A4048;padding:0}
+.hallazgosNav button:hover{color:#F2F3F0;border-color:#6C737B}
+.hallazgosNav .contador{font-size:10.5px;color:#6C737B;min-width:26px;text-align:center}
+.hallazgoCuerpo{display:block;width:100%;text-align:left;background:none;border:none;padding:0;
+cursor:pointer;color:inherit;min-height:88px}
+@media(min-width:900px){.hallazgoCuerpo{min-height:76px}}
+.hallazgoTitular{display:block;color:#F7F8F5;font-size:clamp(16px,2.1vw,22px);font-weight:600;
+line-height:1.28;letter-spacing:-0.016em;animation:entra 380ms cubic-bezier(.2,.7,.3,1)}
+.hallazgoCuerpo:hover .hallazgoTitular{color:#FFFFFF;text-decoration:underline;text-underline-offset:3px;
+text-decoration-thickness:1px;text-decoration-color:#6C737B}
+.hallazgoDetalle{display:block;color:#A8B4AE;font-size:12.5px;line-height:1.55;margin-top:var(--s2);
+max-width:78ch;overflow-wrap:anywhere}
+@keyframes entra{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.hallazgosPuntos{display:flex;gap:5px;margin-top:var(--s3)}
+.hallazgosPuntos button{width:16px;height:3px;border-radius:3px;border:none;padding:0;cursor:pointer;
+background:#3A4048;transition:background 220ms ease,width 220ms ease}
+.hallazgosPuntos button[data-on="1"]{background:#E8C56A;width:26px}
+
 .heroCols{display:grid;grid-template-columns:1fr;gap:14px}
 @media(min-width:760px){.heroCols.conPanel{grid-template-columns:128px 1fr;gap:12px;align-items:start}}
 .panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
 .panelGrupos::-webkit-scrollbar{width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
-.tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;overflow:hidden}
 .rot{font-size:10px;color:${C.tenue};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
+
+.chipsCcaa{margin-top:14px;padding-top:12px;border-top:1px solid #3A4048}
+.chipsCcaaTitulo{font-size:9.5px;color:#8E959C;text-transform:uppercase;letter-spacing:.07em;
+margin-bottom:8px}
+.chipsCcaaLista{display:flex;flex-wrap:wrap;gap:5px}
+.chipsCcaaLista button{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;
+border-radius:2px;border:1px solid #3A4048;background:transparent;color:#C7CDD2;
+font-family:'Archivo',system-ui,sans-serif;font-size:11px;cursor:pointer;
+transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
+.chipsCcaaLista button:hover{border-color:#6C737B;color:#F2F3F0}
+.chipsCcaaLista button span{font-family:'DM Mono',ui-monospace,monospace;font-size:10px;color:#8E959C}
+.chipsCcaaLista button[data-on="1"]{background:#E8C56A;border-color:#E8C56A;color:#15171A;font-weight:600}
+.chipsCcaaLista button[data-on="1"] span{color:#5C4A14}
+
+.portada{position:relative;width:100vw;margin-left:calc(50% - 50vw);margin-bottom:var(--s5);
+background:#EFE1C4;background-image:repeating-linear-gradient(22deg,#DFCCA2 0 1px,transparent 1px 16px);
+border-radius:0;overflow:hidden;border-bottom:3px solid #15171A}
+.portadaInterior{position:relative;max-width:1120px;margin:0 auto;
+aspect-ratio:1120/520;min-height:clamp(430px,58vh,520px)}
+.portadaLienzo{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+.portadaTitulo{position:absolute;left:3.6%;top:11%;z-index:2;max-width:min(52%,540px);
+pointer-events:none}
+.portadaTitulo .rotulo{color:#7A6132;margin:0 0 var(--s2)}
+.portadaTitular{font-size:clamp(26px,4vw,50px);font-weight:600;letter-spacing:-0.03em;
+line-height:1.02;color:#15171A;margin:0}
+.portadaBajada{margin:var(--s3) 0 0;font-size:clamp(12px,1.3vw,15px);line-height:1.55;
+color:#4A4130;max-width:38ch}
+@media(max-width:860px){
+.portadaInterior{aspect-ratio:auto;min-height:620px}
+.portadaTitulo{position:relative;left:0;top:0;max-width:100%;padding:var(--s4) var(--s3) 0}
+.portadaLienzo{position:relative;inset:auto;height:auto}
+}
+
+.masthead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
+flex-wrap:wrap;padding:var(--s4) 0 var(--s3)}
+
 `;
 
 const ICONOS = {
@@ -111,11 +212,11 @@ const ORDENES = [
     if (d.bienes_outlier) return -1;
     return Number(d.patrimonio_euros ?? d.bienes_total ?? -1);
   }, true],
-  ['inmuebles', 'Más inmuebles propios', d => {
+  ['inmuebles', 'Más bienes propios', d => {
     const n = d.n_inmuebles_propios ?? d.n_casas ?? d.n_inmuebles;
     return n == null ? -1 : Number(n);
   }, true],
-  ['inmuebles_todos', 'Más inmuebles vinculados', d => {
+  ['inmuebles_todos', 'Más bienes vinculados', d => {
     const n = d.n_casas ?? d.n_inmuebles;
     return n == null ? -1 : Number(n);
   }, true],
@@ -290,9 +391,8 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 14px', flexWrap: 'wrap' }}>
           <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
-            className="ed" style={{
-              fontSize: 27, fontWeight: 600, lineHeight: 1, background: 'none', border: 'none',
-              padding: 0, cursor: 'pointer', color: C.tinta, letterSpacing: '-0.02em'
+            className="ed display" style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.tinta
             }}>
             Escaño
           </button>
@@ -312,7 +412,7 @@ export default function App() {
           ))}
         </nav>
 
-        <div className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}>
+        <div data-seccion={seccion} className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}>
           {mostrarHemiciclo && (
             <div className="izq">
               <div className="hero">
@@ -366,29 +466,6 @@ export default function App() {
                     )}
                   </button>
                 ))}
-                {ccaa.length > 0 && (
-                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #3A4048' }}>
-                    <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
-                      letterSpacing: '.07em', marginBottom: 7 }}>Autonomía</div>
-                    <button onClick={() => setFCcaa(null)} style={{
-                      display: 'grid', gridTemplateColumns: '1fr auto', width: '100%', textAlign: 'left', padding: '4px 4px',
-                      background: !fCcaa ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
-                      cursor: 'pointer', fontSize: 11, color: '#DDE1E5', marginBottom: 2, gap: 6
-                    }}>
-                      <span>Toda España</span>
-                    </button>
-                    {ccaa.map(c => (
-                      <button key={c.slug} onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)} style={{
-                        display: 'grid', gridTemplateColumns: '1fr auto', width: '100%', textAlign: 'left', padding: '4px 4px',
-                        background: fCcaa === c.slug ? '#2B3037' : 'transparent', border: 'none', borderRadius: 2,
-                        cursor: 'pointer', fontSize: 11, color: '#DDE1E5', gap: 6
-                      }}>
-                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nombre}</span>
-                        <span className="em" style={{ color: '#8E959C' }}>{c.diputados}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div style={{ minWidth: 0 }}>
@@ -408,6 +485,23 @@ export default function App() {
                 )}
               </div>
             </div>
+            {ccaa.length > 0 && (
+              <div className="chipsCcaa">
+                <div className="em chipsCcaaTitulo">Filtrar por comunidad autónoma</div>
+                <div className="chipsCcaaLista">
+                  <button onClick={() => setFCcaa(null)} data-on={!fCcaa ? '1' : '0'}>
+                    Toda España <span>{activos.length}</span>
+                  </button>
+                  {ccaa.map(c => (
+                    <button key={c.slug} data-on={fCcaa === c.slug ? '1' : '0'}
+                      onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)}>
+                      {c.nombre} <span>{c.diputados}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
               </div>
             </div>
           )}
@@ -561,8 +655,7 @@ export default function App() {
               </div>
 
               {(orden === 'privadas' || orden === 'donaciones') && (
-                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
-                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                <div className="nota">
                   Esto <strong>no mide dinero ni patrimonio</strong>. Es el número de cargos o donaciones
                   que cada diputado declaró en su registro de intereses económicos. El Congreso no
                   publica los importes en formato reutilizable, así que aquí no hay ninguna cifra en euros.
@@ -570,8 +663,7 @@ export default function App() {
               )}
 
               {orden === 'patrimonio' && (
-                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
-                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                <div className="nota">
                   Dinero declarado aproximado: depósitos + valores + planes − deuda.
                   No incluye el valor de inmuebles (el PDF no lo trae).
                   Cifras &gt;10 M o depósitos &gt;5 M se marcan para revisión (errores de coma/punto).
@@ -584,10 +676,11 @@ export default function App() {
               )}
 
               {(orden === 'inmuebles' || orden === 'inmuebles_todos') && (
-                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
-                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
-                  Unidades del PDF, no filas: «2 VIVIENDAS» = 2, «13 FINCAS RÚSTICAS» = 13,
-                  «vivienda, plaza de garaje y trastero» = 3. Plazas, locales, naves y trasteros incluidos.
+                <div className="nota">
+                  Bienes inmuebles declarados, contados por unidades y no por filas: «2 VIVIENDAS» = 2,
+                  «13 FINCAS RÚSTICAS» = 13, «vivienda, plaza de garaje y trastero» = 3. Incluye viviendas,
+                  parcelas y fincas, locales y naves, garajes y trasteros. Cada diputado lleva debajo su
+                  desglose por tipo.
                   {orden === 'inmuebles'
                     ? ' Este orden cuenta solo los inmuebles en pleno dominio, nuda propiedad, usufructo, gananciales o comunidad de bienes.'
                     : ' Este orden suma los propios y los que figuran a nombre de una sociedad no cotizada del diputado, que se declaran por unidades aunque la cuota sea parcial. Abre la ficha para ver el desglose y el porcentaje.'}
@@ -597,8 +690,7 @@ export default function App() {
               )}
 
               {orden === 'vehiculos' && (
-                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
-                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                <div className="nota">
                   Coches, motos, embarcaciones y aeronaves del PDF. Abre la ficha para ver el detalle
                   (p. ej. «Jeep Commander», «BMW R80RT»).
                   {' '}Ahora: {diputados.filter(d => (d.n_vehiculos ?? 0) > 0 || d.vehiculos_detalle).length} con vehículos.
@@ -606,8 +698,7 @@ export default function App() {
               )}
 
               {orden === 'ausencias' && (
-                <div style={{ padding: 11, background: '#FFF8E6', border: '1px solid #E8D9A8',
-                  borderRadius: 3, marginBottom: 12, fontSize: 12, color: '#6B5518', lineHeight: 1.5 }}>
+                <div className="nota">
                   Ministros, presidencia del Gobierno y líderes de la oposición acumulan ausencias por
                   obligaciones institucionales. Una cifra alta no implica dejadez: es el número de
                   votaciones en las que esa persona no emitió voto.
@@ -643,32 +734,33 @@ export default function App() {
                   return d ? <span style={{ color: C.media }}> · {d.nombre_completo}</span> : null;
                 })()}
               </div>
-              <div className="tarjeta">
+              <div className="listaFilete">
                 {listaDip.slice(0, 200).map((d, i) => (
-                  <button key={d.mandato_id} className="fila" onClick={() => setSel(d)}
+                  <button key={d.mandato_id} className="fila" data-top={i < 3 ? '1' : '0'} onClick={() => setSel(d)}
                     onMouseEnter={() => setEncimaEscano(d.mandato_id)}
                     onMouseLeave={() => setEncimaEscano(null)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'auto minmax(0,1fr) auto',
-                      alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                      padding: '8px 10px', cursor: 'pointer',
-                      background: encimaEscano === d.mandato_id ? '#F3F3EE' : 'transparent',
-                      border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none',
+                      gridTemplateColumns: 'auto auto minmax(0,1fr) auto',
+                      alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                      padding: i < 3 ? '13px 10px' : '9px 10px', cursor: 'pointer',
+                      background: encimaEscano === d.mandato_id ? 'var(--acentoTenue)' : 'transparent',
+                      border: 'none',
                       boxShadow: encimaEscano === d.mandato_id ? `inset 3px 0 0 ${d.color || '#8E9299'}` : 'none'
                     }}>
+                    <span className="puesto">{i + 1}</span>
                     <AvatarPartido
                       foto={d.foto_url}
                       color={d.color}
                       siglas={d.partido_siglas || d.grupo}
                       nombre={d.nombre_completo}
-                      w={30}
-                      h={38}
+                      w={i < 3 ? 34 : 28}
+                      h={i < 3 ? 43 : 35}
                     />
                     <span style={{ minWidth: 0 }}>
                       <span style={{
-                        display: 'block', fontSize: 12.5, whiteSpace: 'nowrap',
-                        overflow: 'hidden', textOverflow: 'ellipsis'
+                        display: 'block', fontSize: i < 3 ? 14.5 : 12.5, fontWeight: i < 3 ? 600 : 400,
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                       }}>{d.nombre_completo}</span>
                       <span className="em" style={{
                         display: 'block', fontSize: 9.5, color: C.tenue, whiteSpace: 'nowrap',
@@ -676,8 +768,16 @@ export default function App() {
                       }}>
                         {d.partido_siglas || d.grupo || '—'} · {d.circunscripcion ?? '—'}
                       </span>
+                      {(orden === 'inmuebles' || orden === 'inmuebles_todos') && desgloseBienes(d).length > 0 && (
+                        <span className="em" style={{
+                          display: 'block', fontSize: 9.5, color: '#8E959C', marginTop: 2,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                        }}>
+                          {desgloseBienes(d).map(x => x.texto).join(' · ')}
+                        </span>
+                      )}
                     </span>
-                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 88 }}>
+                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 120 }}>
                       {(() => {
                         const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
                         const fmtEuro = v => {
@@ -698,8 +798,8 @@ export default function App() {
                           abstenciones: ['abs.', d.abstenciones],
                           telematicos: ['tel.', d.telematicos],
                           patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
-                          inmuebles: ['propios', d.n_inmuebles_propios ?? casas ?? '—'],
-                          inmuebles_todos: ['inm.', casas ?? '—'],
+                          inmuebles: ['bienes', d.n_inmuebles_propios ?? casas ?? '—'],
+                          inmuebles_todos: ['bienes', casas ?? '—'],
                           vehiculos: ['veh.', nVeh || '—'],
                           donaciones: ['don.', d.donaciones],
                           privadas: ['priv.', d.actividades_privadas]
@@ -717,8 +817,8 @@ export default function App() {
                         }
                         if (cfg[0] === 'patrimonio' && casas != null) sub = `${casas} inm.`;
                         return (<>
-                          <span className="ed" style={{ display: 'block', fontSize: 14, fontWeight: 600, lineHeight: 1.1 }}>{val ?? 0}</span>
-                          <span style={{ display: 'block', fontSize: 8.5, color: C.tenue, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span className="dato" style={{ display: 'block' }}>{val ?? 0}</span>
+                          <span className="datoUnidad" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {sub}
                           </span>
                         </>);

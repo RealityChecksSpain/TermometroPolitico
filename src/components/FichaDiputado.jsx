@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { desgloseBienes } from '../lib/inmuebles.js';
 import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
 import AvatarPartido from './AvatarPartido.jsx';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
-  linea: '#DCDCD3', si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
+  linea: '#E3DFD1', si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
 };
 
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abst.', no_vota: 'No votó' };
@@ -56,7 +57,8 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,22,26,0.55)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onCerrar}>
       <div className="e" onClick={e => e.stopPropagation()} style={{
         background: C.superficie, width: '100%', maxWidth: 620, borderRadius: '4px 4px 0 0',
-        maxHeight: '92vh', display: 'flex', flexDirection: 'column'
+        maxHeight: '92vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain'
       }}>
         <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.linea}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
@@ -139,7 +141,8 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 4, padding: '10px 18px 0', borderBottom: `1px solid ${C.linea}` }}>
+        <div style={{ display: 'flex', gap: 4, padding: '10px 18px 0', borderBottom: `1px solid ${C.linea}`,
+          position: 'sticky', top: 0, background: C.superficie, zIndex: 2 }}>
           {[['votos', `Votaciones${resumen ? ` (${resumen.total_votos})` : ''}`],
             ['intereses', `Intereses declarados${actividades.length ? ` (${actividades.length})` : ''}`]].map(([k, t]) => (
             <button key={k} onClick={() => setPestana(k)} style={{
@@ -150,7 +153,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           ))}
         </div>
 
-        <div style={{ overflowY: 'auto', flex: 1, padding: '12px 18px 18px', display: pestana === 'intereses' ? 'block' : 'none' }}>
+        <div style={{ padding: '12px 18px 18px', display: pestana === 'intereses' ? 'block' : 'none' }}>
           {actividades.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 12 }}>
               Sin declaraciones registradas.
@@ -199,7 +202,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
         </div>
 
         {(d.patrimonio_euros != null || d.n_casas != null || d.n_inmuebles != null || d.vehiculos_detalle || (d.n_vehiculos ?? 0) > 0) && (
-          <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.linea}`, background: '#F7F7F2' }}>
+          <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.linea}`, background: '#F8F6EE' }}>
             <div className="em" style={{
               fontSize: 10, color: C.tenue, letterSpacing: '.05em', textTransform: 'uppercase',
               fontWeight: 600, marginBottom: 8
@@ -216,7 +219,12 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
               {(d.n_casas ?? d.n_inmuebles) != null && (
                 <div>
                   <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>{d.n_casas ?? d.n_inmuebles}</div>
-                  <div style={{ fontSize: 10, color: C.tenue }}>inmuebles vinculados</div>
+                  <div style={{ fontSize: 10, color: C.tenue }}>
+                    {desgloseBienes(d).map(x => x.texto).join(' · ') || 'unidades declaradas'}
+                    {d.n_inmuebles_equivalentes != null && Number(d.n_inmuebles_equivalentes) < Number(d.n_casas ?? d.n_inmuebles) * 0.9 && (
+                      <> · equivalen a {Number(d.n_inmuebles_equivalentes).toLocaleString('es-ES', { maximumFractionDigits: 1 })} en propiedad plena</>
+                    )}
+                  </div>
                 </div>
               )}
               <div>
@@ -302,7 +310,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           </div>
         )}
 
-        <div style={{ overflowY: 'auto', flex: 1, padding: '0 18px 18px', display: pestana === 'votos' ? 'block' : 'none' }}>
+        <div style={{ padding: '0 18px 18px', display: pestana === 'votos' ? 'block' : 'none' }}>
           {votos === null && !fallo && <div style={{ padding: 30, textAlign: 'center', color: C.tenue, fontSize: 12 }}>Cargando su historial de votos…</div>}
 
           {fallo && (

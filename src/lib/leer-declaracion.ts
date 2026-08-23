@@ -150,27 +150,32 @@ Y ADEMÁS:
   "media" si alguna casilla es dudosa. "baja" si el documento está torcido, borroso o cortado.
 - dudas: lista de campos concretos que no has podido leer con seguridad. Sé específico.`;
 
+const retirados = new Set<string>();
+
+function vivos(lista: string[]): string[] {
+  return lista.filter(m => !retirados.has(m));
+}
+
 function modelosParaPdf(): string[] {
   const desdeEnv = (process.env.MODELO_BIENES ?? '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
-  if (desdeEnv.length) return desdeEnv;
+  if (desdeEnv.length) return vivos(desdeEnv);
 
   const deLista = modelosDisponibles().filter(m => /^gemini/i.test(m) && !/gemma/i.test(m));
   const fallback = [
-    'gemini-2.0-flash',
     'gemini-flash-latest',
-    'gemini-1.5-flash',
-    'gemini-2.5-flash'
+    'gemini-3.6-flash',
+    'gemini-3.1-flash',
+    'gemini-2.0-flash'
   ];
-  const unidos = [...deLista, ...fallback];
-  return [...new Set(unidos)];
+  return vivos([...new Set([...deLista, ...fallback])]);
 }
 
 function modelosParaTexto(): string[] {
-  const lista = modelosDisponibles();
-  return lista.length ? lista : ['gemini-flash-lite-latest'];
+  const lista = vivos(modelosDisponibles());
+  return lista.length ? lista : ['gemini-flash-latest'];
 }
 
 async function textoDelPdf(buf: Buffer): Promise<{ paginas: number; texto: string }> {
@@ -209,6 +214,13 @@ async function llamarModelo(
 
   if (!res.ok) {
     const cuerpo = (await res.text()).slice(0, 280).replace(/\s+/g, ' ');
+    if (res.status === 404 || /no longer available|NOT_FOUND/i.test(cuerpo)) {
+      if (!retirados.has(modelo)) {
+        retirados.add(modelo);
+        console.log(`\n  modelo retirado por Google, se descarta: ${modelo}`);
+      }
+      return { ok: false, error: `${modelo}: retirado` };
+    }
     if (conEsquema && res.status === 400 && /response_schema|responseSchema|Proto field/i.test(cuerpo)) {
       return llamarModelo(modelo, clave, parts, false);
     }
@@ -290,6 +302,7 @@ export async function revalidarCifrasAnomalas(
       ];
 
   const modelos = texto.length >= 400 ? modelosParaTexto() : modelosParaPdf();
+  if (!modelos.length) return { ok: false, error: 'sin modelos disponibles' };
   const cadencia = new Cadencia(modelos[0]);
   for (const modelo of modelos) {
     await cadencia.esperar();
@@ -309,7 +322,10 @@ export async function revalidarCifrasAnomalas(
         })
       }
     );
-    if (!res.ok) continue;
+    if (!res.ok) {
+      if (res.status === 404) retirados.add(modelo);
+      continue;
+    }
     const cuerpo = await res.json();
     const raw = (cuerpo.candidates?.[0]?.content?.parts ?? [])
       .map((p: any) => p.text ?? '').join('');
@@ -362,7 +378,7 @@ export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos
       const r1 = await llamarModelo(modelo, clave, [{ text: promptTexto }]);
       if (r1.ok) return { ok: true, datos: r1.datos, modelo: `${modelo}+texto` };
       ultimoError = r1.error;
-      if (/HTTP 404/.test(r1.error)) continue;
+      if (/HTTP 404|retirado/.test(r1.error)) continue;
     }
   }
 
@@ -377,12 +393,12 @@ export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos
     ]);
     if (r2.ok) return { ok: true, datos: r2.datos, modelo: `${modelo}+pdf` };
     ultimoError = r2.error;
-    if (/HTTP 400|HTTP 404|not supported|INVALID_ARGUMENT/i.test(r2.error)) continue;
+    if (/HTTP 400|HTTP 404|retirado|not supported|INVALID_ARGUMENT/i.test(r2.error)) continue;
   }
 
   return {
     ok: false,
-    error: ultimoError || (tieneTexto
+    error: ultimoError || (retirados.size ? `todos los modelos retirados: ${[...retirados].join(', ')}` : '') || (tieneTexto
       ? 'No se pudo parsear el texto del PDF'
       : 'PDF escaneado y ningun modelo Gemini acepto el PDF. Pon MODELO_BIENES=gemini-2.0-flash en .env')
   };
