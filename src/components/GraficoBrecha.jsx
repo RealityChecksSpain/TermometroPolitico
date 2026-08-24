@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { traerPromesaVsVoto } from '../lib/cliente.js';
 
 const C = {
@@ -7,6 +8,7 @@ const C = {
 };
 
 export default function GraficoBrecha({ compacto }) {
+  const reducido = useReducedMotion();
   const [datos, setDatos] = useState(null);
   const [encima, setEncima] = useState(null);
 
@@ -52,21 +54,27 @@ export default function GraficoBrecha({ compacto }) {
                 <div style={{
                   position: 'absolute', top: 7, left: 0, right: 0, height: 1, background: '#3A4048'
                 }} />
-                <div style={{
+                <motion.div style={{
                   position: 'absolute', top: 7, height: 2, borderRadius: 2,
-                  left: `${Math.min(a, b)}%`, width: `${Math.abs(b - a)}%`,
                   background: d.color || '#8E9299', opacity: 0.55
-                }} />
+                }}
+                  initial={reducido ? false : { left: `${a}%`, width: '0%' }}
+                  whileInView={{ left: `${Math.min(a, b)}%`, width: `${Math.abs(b - a)}%` }}
+                  viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+                  transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.1 }} />
                 <div style={{
                   position: 'absolute', top: 3, left: `${a}%`, width: 11, height: 11,
                   marginLeft: -5.5, borderRadius: 11,
                   border: `2px solid ${d.color || '#8E9299'}`, background: C.pizarra
                 }} />
-                <div style={{
-                  position: 'absolute', top: 3, left: `${b}%`, width: 11, height: 11,
-                  marginLeft: -5.5, borderRadius: 11, background: d.color || '#8E9299',
-                  transform: activo ? 'scale(1.3)' : 'none', transition: 'transform 160ms ease'
-                }} />
+                <motion.div style={{
+                  position: 'absolute', top: 3, width: 11, height: 11,
+                  marginLeft: -5.5, borderRadius: 11, background: d.color || '#8E9299'
+                }}
+                  initial={reducido ? false : { left: `${a}%` }}
+                  whileInView={{ left: `${b}%`, scale: activo ? 1.3 : 1 }}
+                  viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+                  transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.1 }} />
               </div>
 
               <span className="em" style={{

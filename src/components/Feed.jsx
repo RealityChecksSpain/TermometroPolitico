@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, motionValue, useReducedMotion } from 'framer-motion';
+import { Cifra, Item, Lista, SALIDA } from './Movimiento.jsx';
 import { traerFeed } from '../lib/cliente.js';
 import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
 
@@ -21,7 +23,6 @@ function fechaCorta(f) {
   return `${d.getDate()} ${MESES[d.getMonth()]}${d.getFullYear() !== hoy.getFullYear() ? ' ' + d.getFullYear() : ''}`;
 }
 
-/** @deprecated usa fraseCortaDeNorma; se mantiene el export para Inicio. */
 export function fraseCorta(n) {
   return fraseCortaDeNorma(n, 52);
 }
@@ -78,12 +79,13 @@ function BarrasVoto({ si, no, abs }) {
         <div key={et} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="em" style={{ width: 58, fontSize: 9.5, color: C.tenue, flexShrink: 0 }}>{et}</span>
           <div style={{ flex: 1, height: 8, background: '#EDEDE6', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{
-              width: `${(v / t) * 100}%`, height: '100%', background: col, borderRadius: 2,
-              transition: 'width 400ms ease'
-            }} />
+            <motion.div style={{ height: '100%', background: col, borderRadius: 2 }}
+              initial={{ width: 0 }} whileInView={{ width: `${(v / t) * 100}%` }}
+              viewport={{ once: true, margin: '0px 0px -40px 0px' }} transition={SALIDA} />
           </div>
-          <span className="em" style={{ width: 28, fontSize: 10, color: C.media, textAlign: 'right' }}>{v}</span>
+          <span className="em" style={{ width: 28, fontSize: 10, color: C.media, textAlign: 'right' }}>
+            <Cifra valor={v} />
+          </span>
         </div>
       ))}
     </div>
@@ -91,31 +93,24 @@ function BarrasVoto({ si, no, abs }) {
 }
 
 function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
+  const reducido = useReducedMotion();
   const aprobada = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-  const frase = fraseCortaDeNorma(n, 46);
+  const frase = fraseCortaDeNorma(n, destacada ? 120 : 88);
   const tituloLegal = limpiarTitular
     ? limpiarTitular(n.titular || n.subtitulo || n.titulo)
     : nombreOficialNorma(n);
   const efectos = Array.isArray(n.efectos) ? n.efectos : [];
 
   return (
-    <article onClick={() => onAbrir(n)} style={{
-      background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3,
+    <motion.article onClick={() => onAbrir(n)} style={{
+      background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 2,
       padding: destacada ? 'clamp(16px, 2.5vw, 22px)' : '14px 15px',
-      cursor: 'pointer', transition: 'border-color 140ms ease, transform 140ms ease, box-shadow 180ms ease',
-      borderLeft: `4px solid ${n.materia_color || C.linea}`,
+      cursor: 'pointer', borderLeft: `4px solid ${n.materia_color || C.linea}`,
       position: 'relative'
     }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = C.tinta;
-        e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(20,22,26,0.06)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = C.linea;
-        e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.boxShadow = 'none';
-      }}>
+      whileHover={reducido ? undefined : { y: -3, borderColor: C.tinta }}
+      whileTap={reducido ? undefined : { y: -1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 26 }}>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         {n.materia_nombre ? (
@@ -146,13 +141,13 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
         fontSize: destacada ? 'clamp(20px, 2.8vw, 28px)' : 'clamp(16px, 2vw, 19px)',
         fontWeight: 600, lineHeight: 1.25, letterSpacing: '-0.015em', margin: 0, color: C.tinta
       }}>
-        {frase || (String(tituloLegal).length > 90 ? String(tituloLegal).slice(0, 87) + '…' : tituloLegal)}
+        {frase || (String(tituloLegal).length > 130 ? String(tituloLegal).slice(0, 127) + '…' : tituloLegal)}
       </h3>
 
       <div className="em" style={{
         fontSize: 11, color: C.tenue, lineHeight: 1.45, marginTop: 8
       }} title={tituloLegal}>
-        {String(tituloLegal).length > 150 ? String(tituloLegal).slice(0, 147) + '…' : tituloLegal}
+        {String(tituloLegal).length > 260 ? String(tituloLegal).slice(0, 257) + '…' : tituloLegal}
       </div>
 
       <div style={{
@@ -173,34 +168,91 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
           ))}
         </div>
       )}
-    </article>
+    </motion.article>
   );
 }
 
+const FRANJAS = ['#E0492E', '#EE7B3A', '#F2A93E', '#F7E2B4', '#0E3550', '#1A6B8A', '#17836F'];
+const VAIVEN = [1.7, 2.4, 1.3, 3.1, 2.0, 2.7, 1.5];
+const FASE = [0, 1.9, 3.4, 0.8, 4.6, 2.6, 5.4];
+const GROSOR = 13;
+const CARRILES = 7;
+const SALIENTE = 58;
+const DESFASE = 130;
+const HUECO = CARRILES * 13 + 12;
+
 export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
+  const reducido = useReducedMotion();
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [fin, setFin] = useState(false);
+  const [fallo, setFallo] = useState(null);
+  const valores = useRef([]);
   const centinela = useRef(null);
+  const pista = useRef(null);
   const pagina = useRef(0);
   const clave = JSON.stringify(filtros ?? {});
+  const valorDe = i => {
+    if (!valores.current[i]) valores.current[i] = motionValue(0);
+    return valores.current[i];
+  };
+
+  const barras = Array.from({ length: CARRILES }, (_, i) => valorDe(i));
 
   const cargar = useCallback(async (reset) => {
     setCargando(true);
     try {
       const desde = reset ? 0 : pagina.current * 20;
       const nuevos = await traerFeed(20, desde, filtros ?? {});
+      setFallo(null);
       setItems(prev => reset ? nuevos : [...prev, ...nuevos]);
       setFin(nuevos.length < 20);
       pagina.current = reset ? 1 : pagina.current + 1;
-    } catch {
+    } catch (e) {
+      console.error('traerFeed', e);
+      setFallo(e?.message || String(e));
       setFin(true);
     } finally {
       setCargando(false);
     }
   }, [clave]);
 
-  useEffect(() => { pagina.current = 0; setFin(false); cargar(true); }, [clave]);
+  useEffect(() => {
+    pagina.current = 0;
+    setFin(false);
+    cargar(true);
+  }, [clave]);
+
+  useEffect(() => {
+    if (reducido) return;
+    let pedido = 0;
+    const medir = () => {
+      pedido = 0;
+      const cont = pista.current;
+      if (!cont) return;
+      const marco = cont.getBoundingClientRect();
+      if (marco.height <= 0) return;
+      const linea = window.innerHeight * 0.62;
+      const bruto = (linea - marco.top) / marco.height;
+      const avance = bruto < 0 ? 0 : bruto > 1 ? 1 : bruto;
+      const resto = 1 - avance;
+      const brecha = DESFASE * 0.55 * resto;
+      for (let i = 0; i < CARRILES; i++) {
+        const vaiven = Math.sin(avance * VAIVEN[i] * 6.2832 + FASE[i]) * DESFASE * 1.42 * resto;
+        const punta = (linea - i * brecha + vaiven - marco.top) / marco.height;
+        valorDe(i).set(punta < 0 ? 0 : punta > 1 ? 1 : punta);
+      }
+    };
+    const alMover = () => { if (!pedido) pedido = requestAnimationFrame(medir); };
+    medir();
+    window.addEventListener('scroll', alMover, { passive: true });
+    window.addEventListener('resize', alMover);
+    return () => {
+      if (pedido) cancelAnimationFrame(pedido);
+      window.removeEventListener('scroll', alMover);
+      window.removeEventListener('resize', alMover);
+    };
+  }, [items.length, reducido]);
 
   useEffect(() => {
     if (fin || cargando) return;
@@ -214,10 +266,21 @@ export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
   return (
     <div>
       {cabecera}
-      <div style={{ display: 'grid', gap: 10 }}>
+      <div ref={pista} style={{ position: 'relative', marginLeft: -SALIENTE, paddingLeft: HUECO + SALIENTE }}>
+      {!reducido && items.length > 0 ? barras.map((v, i) => (
+        <motion.span key={i} style={{
+          position: 'absolute', left: i * GROSOR, top: 0, height: '100%', width: GROSOR,
+          borderRadius: GROSOR, background: FRANJAS[i % FRANJAS.length],
+          transformOrigin: 'top', scaleY: v, pointerEvents: 'none'
+        }} />
+      )) : null}
+      <Lista style={{ display: 'grid', gap: 10 }}>
         {items.map((n, i) => (
-          <Tarjeta key={n.clave_norma} n={n} onAbrir={onAbrir} destacada={i === 0} limpiarTitular={limpiarTitular} />
+          <Item key={n.clave_norma}>
+            <Tarjeta n={n} onAbrir={onAbrir} destacada={i === 0} limpiarTitular={limpiarTitular} />
+          </Item>
         ))}
+      </Lista>
       </div>
 
       {cargando && (
@@ -226,9 +289,23 @@ export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
         </div>
       )}
 
-      {!cargando && items.length === 0 && (
+      {!cargando && items.length === 0 && !fallo && (
         <div style={{ padding: 36, textAlign: 'center', color: C.tenue, fontSize: 13 }}>
           No hay leyes con esos filtros.
+        </div>
+      )}
+
+      {!cargando && fallo && (
+        <div style={{
+          padding: 20, margin: '12px 0', borderRadius: 2, fontSize: 13, lineHeight: 1.6,
+          background: '#FFF8E6', border: '1px solid #E8D9A8', color: '#6B5518'
+        }}>
+          <strong>No se han podido cargar las leyes.</strong>
+          <div className="em" style={{ fontSize: 11, marginTop: 6, color: '#8A6D1F' }}>{fallo}</div>
+          <button onClick={() => { pagina.current = 0; setFin(false); cargar(true); }} className="em" style={{
+            marginTop: 12, padding: '6px 12px', fontSize: 11.5, cursor: 'pointer',
+            background: 'transparent', border: '1px solid #C8A85A', borderRadius: 2, color: '#6B5518'
+          }}>Reintentar</button>
         </div>
       )}
 
@@ -236,7 +313,7 @@ export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
 
       {fin && items.length > 0 && (
         <div className="em" style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 11 }}>
-          Has llegado al final · {items.length} normas
+          Has llegado al final · <Cifra valor={items.length} /> normas
         </div>
       )}
     </div>

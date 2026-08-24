@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DestelloSuave, EntradaSuave } from './Destello.jsx';
 import Feed from './Feed.jsx';
 import GraficoBrecha from './GraficoBrecha.jsx';
 import Hallazgos from './Hallazgos.jsx';
 import Portada from './Portada.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
+import { nombreColectivo } from '../lib/etiquetas.js';
 import { implicacionDe } from '../lib/implicaciones.js';
 import {
   cargarPerfilGuardado, guardarPerfil, borrarPerfilGuardado,
   marcarVistoAhora, ultimaVista, filtrarNovedades
 } from '../lib/alertas.js';
 import { traerUltimas, traerLideres } from '../lib/cliente.js';
-import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
+import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
 
 const C = {
   papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
@@ -94,10 +94,10 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
     }
   }, []);
 
-  const nombreColectivo = s => {
-    const tip = implicacionDe(s);
-    return tip?.etiqueta ?? (colectivos ?? []).find(c => c.slug === s)?.nombre ?? s;
-  };
+  function cambiarPerfil(t) {
+    setPerfil(t);
+    setDeteccion(detectarPerfil(t));
+  }
 
   const tips = useMemo(
     () => (deteccion.colectivos ?? []).map(s => ({ slug: s, ...implicacionDe(s) })).filter(t => t.implica),
@@ -109,16 +109,19 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
     const mat = !col ? (d.materias[0] ?? null) : null;
     if (!col && !mat) return;
     setFiltro({ colectivo: col, materia: mat });
-    setEtiqueta(col ? nombreColectivo(col) : (facetas?.materias ?? []).find(m => m.slug === mat)?.nombre ?? null);
+    setEtiqueta(col ? nombreColectivo(col, colectivos) : (facetas?.materias ?? []).find(m => m.slug === mat)?.nombre ?? null);
     setTimeout(() => document.getElementById('resultados')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   }
 
-  async function buscar() {
-    if (deteccion.colectivos.length || deteccion.materias.length) { aplicar(deteccion); return; }
-    if (perfil.trim().length < 3) return;
+  async function buscar(textoDirecto) {
+    const texto = typeof textoDirecto === 'string' ? textoDirecto : perfil;
+    const local = typeof textoDirecto === 'string' ? detectarPerfil(textoDirecto) : deteccion;
+    if (typeof textoDirecto === 'string') setDeteccion(local);
+    if (local.colectivos.length || local.materias.length) { aplicar(local); return; }
+    if (texto.trim().length < 3) return;
     setPensando(true);
     try {
-      const d = await detectarPerfilAmpliado(perfil);
+      const d = await detectarPerfilAmpliado(texto);
       setDeteccion(d);
       aplicar(d);
     } finally { setPensando(false); }
@@ -150,231 +153,64 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
 
   return (
     <div>
-      <Portada onIr={onIr} escanos={cobertura?.escanos ?? 350} leyes={cobertura?.normas} />
-      <Hallazgos onIr={onIr} />
-      <section style={{
-        position: 'relative',
-        borderRadius: 4,
-        overflow: 'hidden',
-        background: `linear-gradient(135deg, ${C.pizarra} 0%, #2A3038 55%, #1A3A32 100%)`,
-        padding: 'clamp(22px, 4vw, 40px)',
-        marginBottom: 22
-      }}>
+      <Portada onIr={onIr} onLey={onVotacion} ultimas={ultimas} colectivos={colectivos}
+        escanos={cobertura?.escanos ?? 350} leyes={cobertura?.normas}
+        valor={perfil} onValor={cambiarPerfil} onEnviar={buscar}
+        pensando={pensando} ejemplos={EJEMPLOS} />
+
+      {(etiqueta || deteccion.colectivos.length > 0 || deteccion.materias.length > 0) && (
         <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.35,
-          background: 'radial-gradient(ellipse at 85% 20%, rgba(94,191,146,0.35), transparent 45%), radial-gradient(ellipse at 10% 90%, rgba(176,140,60,0.2), transparent 40%)'
-        }} />
-        <DestelloSuave color="rgba(242,243,240,0.45)" n={10} />
-
-        <EntradaSuave>
-        <div style={{
-          position: 'relative',
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: 22,
-          alignItems: 'start'
-        }} className="inicioHero">
-          <style>{`
-            @media(min-width:900px){
-              .inicioHero{grid-template-columns:1.25fr minmax(280px,.85fr)!important;gap:32px!important}
-            }
-          `}</style>
-
-          <div>
-            <div className="em" style={{
-              fontSize: 10.5, color: '#9AA0A6', letterSpacing: '.08em', textTransform: 'uppercase',
-              fontWeight: 600, marginBottom: 14
-            }}>
-              Congreso · lo que acaba de votarse
-              {cobertura?.ultima_sesion ? ` · ${cobertura.ultima_sesion}` : ''}
-            </div>
-
-            <h1 className="ed" style={{
-              fontSize: 'clamp(32px, 5.6vw, 54px)', fontWeight: 600, lineHeight: 1.02,
-              letterSpacing: '-0.028em', margin: 0, color: '#F2F3F0'
-            }}>
-              ¿Qué acaba de<br />aprobar el Congreso?
-            </h1>
-            <p style={{
-              fontSize: 'clamp(15px, 2vw, 18px)', color: '#B4BAC0', lineHeight: 1.5,
-              margin: '16px 0 0', maxWidth: 480
-            }}>
-              Cada ley votada, quién la apoyó y a quién afecta. Escribe tu situación
-              y te enseño solo las que te tocan a ti.
-            </p>
-
-            <div style={{
-              display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 22,
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 3, padding: 8
-            }}>
-              <input
-                value={perfil}
-                onChange={e => { setPerfil(e.target.value); setDeteccion(detectarPerfil(e.target.value)); }}
-                onKeyDown={e => e.key === 'Enter' && buscar()}
-                placeholder="Soy autónoma y vivo de alquiler…"
-                style={{
-                  flex: '1 1 220px', padding: '13px 14px', fontSize: 15,
-                  border: 'none', borderRadius: 2, background: '#F8F6EE', color: C.tinta, outline: 'none'
-                }} />
-              <button onClick={buscar} disabled={pensando} style={{
-                padding: '13px 20px', fontSize: 14.5, fontWeight: 600, cursor: 'pointer',
-                background: '#F2F3F0', color: C.tinta, border: 'none', borderRadius: 2,
-                opacity: pensando ? 0.6 : 1
-              }}>{pensando ? 'pensando…' : 'Ver mis leyes'}</button>
-            </div>
-
-            {(deteccion.colectivos.length > 0 || deteccion.materias.length > 0) && (
-              <div style={{ marginTop: 12 }}>
-                <div className="em" style={{ fontSize: 10, color: '#9AA0A6', marginBottom: 6, letterSpacing: '.04em' }}>
-                  Detectado en tu texto · elige uno para filtrar
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {deteccion.colectivos.map(s => {
-                    const activo = filtro?.colectivo === s;
-                    return (
-                      <button key={s} onClick={() => aplicar(deteccion, s)} style={{
-                        padding: '6px 12px', fontSize: 12, cursor: 'pointer', borderRadius: 2,
-                        border: `1px solid ${activo ? '#F2F3F0' : 'rgba(255,255,255,0.22)'}`,
-                        background: activo ? '#F2F3F0' : 'transparent',
-                        color: activo ? C.tinta : '#DDE1E5', fontWeight: activo ? 600 : 400
-                      }}>{nombreColectivo(s)}</button>
-                    );
-                  })}
-                  {deteccion.materias.map(s => {
-                    const activo = filtro?.materia === s;
-                    const nom = (facetas?.materias ?? []).find(m => m.slug === s)?.nombre ?? s;
-                    return (
-                      <button key={`m-${s}`} onClick={() => {
-                        setFiltro({ colectivo: null, materia: s });
-                        setEtiqueta(nom);
-                      }} style={{
-                        padding: '6px 12px', fontSize: 12, cursor: 'pointer', borderRadius: 2,
-                        border: `1px solid ${activo ? '#F2F3F0' : 'rgba(255,255,255,0.22)'}`,
-                        background: activo ? '#F2F3F0' : 'transparent',
-                        color: activo ? C.tinta : '#C9CDD2'
-                      }}>{nom}</button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {!etiqueta && deteccion.colectivos.length === 0 && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-                {EJEMPLOS.slice(0, 4).map(e => (
-                  <button key={e} onClick={() => { setPerfil(e); const d = detectarPerfil(e); setDeteccion(d); aplicar(d); }}
-                    style={{
-                      padding: '6px 12px', fontSize: 12, cursor: 'pointer',
-                      background: 'transparent', border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: 20, color: '#C9CDD2'
-                    }}>{e}</button>
-                ))}
-              </div>
-            )}
-
-            {etiqueta && (
-              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ color: '#F2F3F0', fontSize: 14 }}>Filtro: <strong>{etiqueta}</strong></span>
-                <button onClick={limpiar} style={{
-                  background: 'none', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 20,
-                  color: '#C9CDD2', fontSize: 12, padding: '4px 10px', cursor: 'pointer'
-                }}>× quitar</button>
-                <button onClick={guardarAlerta} style={{
-                  background: 'rgba(95,191,146,0.18)', border: '1px solid rgba(95,191,146,0.45)',
-                  borderRadius: 20, color: '#A8E0C4', fontSize: 12, padding: '4px 12px', cursor: 'pointer'
-                }}>
-                  {guardado ? 'Actualizar alerta' : 'Guardar para avisarme'}
-                </button>
-                {guardado && (
-                  <button onClick={olvidarAlerta} className="em" style={{
-                    background: 'none', border: 'none', color: '#8E959C', fontSize: 11, cursor: 'pointer', padding: 0
-                  }}>olvidar perfil</button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <aside style={{
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 3,
-            padding: '14px 14px 10px',
-            backdropFilter: 'blur(8px)'
-          }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10
-            }}>
-              <div className="em" style={{
-                fontSize: 10, color: '#9AA0A6', letterSpacing: '.07em', textTransform: 'uppercase', fontWeight: 600
-              }}>Lo último votado</div>
-              <button onClick={() => onIr('leyes')} className="em" style={{
-                background: 'none', border: 'none', color: '#C9CDD2', fontSize: 11, cursor: 'pointer', padding: 0
-              }}>Ver todas →</button>
-            </div>
-
-            {ultimas.slice(0, 5).map((n, i) => {
-              const ok = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
-              const frase = fraseCortaDeNorma(n, 42) || String(nombreOficialNorma(n)).slice(0, 42);
-              const oficial = nombreOficialNorma(n);
-              const efectos = Array.isArray(n.efectos) ? n.efectos
-                : (Array.isArray(n.colectivos) ? n.colectivos.map(s => ({ slug: s, nombre: s })) : []);
-              return (
-                <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  background: i === 0 ? 'rgba(0,0,0,0.22)' : 'transparent',
-                  border: 'none',
-                  borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                  borderRadius: i === 0 ? 2 : 0,
-                  cursor: 'pointer',
-                  padding: i === 0 ? '12px' : '11px 4px'
-                }}>
-                  <div className="em" style={{
-                    fontSize: 9.5, marginBottom: 5, display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap'
-                  }}>
-                    {n.materia_nombre && (
-                      <span style={{
-                        color: '#fff', background: n.materia_color || '#5A6067',
-                        padding: '2px 7px', borderRadius: 2, fontWeight: 700, letterSpacing: '.04em',
-                        textTransform: 'uppercase'
-                      }}>{n.materia_nombre}</span>
-                    )}
-                    <span style={{ color: '#8E959C' }}>{corta(n.fecha)}</span>
-                    <span style={{
-                      marginLeft: 'auto', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
-                      color: ok ? '#5FBF92' : '#E08278'
-                    }}>{ok ? 'Aprobada' : 'Rechazada'}</span>
-                  </div>
-                  <div className="ed" style={{
-                    fontSize: i === 0 ? 15 : 13.5, fontWeight: 600, color: '#F2F3F0', lineHeight: 1.3
-                  }}>{frase}</div>
-                  <div className="em" style={{
-                    fontSize: 10, color: '#8E959C', lineHeight: 1.4, marginTop: 5
-                  }} title={oficial}>
-                    {oficial.length > 110 ? oficial.slice(0, 107) + '…' : oficial}
-                  </div>
-                  {efectos.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
-                      {efectos.slice(0, 3).map(e => (
-                        <span key={e.slug || e.nombre} className="em" style={{
-                          fontSize: 9.5, padding: '2px 7px', borderRadius: 2,
-                          border: '1px solid rgba(255,255,255,0.18)', color: '#C9CDD2'
-                        }}>{e.nombre || e.slug}</span>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-
-            {ultimas.length === 0 && (
-              <div className="em" style={{ fontSize: 11.5, color: '#8E959C', padding: '12px 0' }}>cargando…</div>
-            )}
-          </aside>
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '12px 14px', marginBottom: 18, borderRadius: 3,
+          background: C.superficie, border: `1px solid ${C.linea}`
+        }}>
+          <span className="em" style={{ fontSize: 10.5, color: C.tenue, letterSpacing: '.05em', textTransform: 'uppercase' }}>
+            Detectado en tu texto
+          </span>
+          {deteccion.colectivos.map(s2 => {
+            const activo = filtro?.colectivo === s2;
+            return (
+              <button key={s2} onClick={() => aplicar(deteccion, s2)} style={{
+                padding: '5px 11px', fontSize: 12, cursor: 'pointer', borderRadius: 20,
+                border: `1px solid ${activo ? C.tinta : C.linea}`,
+                background: activo ? C.tinta : 'transparent',
+                color: activo ? '#F2F3F0' : C.media, fontWeight: activo ? 600 : 400
+              }}>{nombreColectivo(s2, colectivos)}</button>
+            );
+          })}
+          {deteccion.materias.map(s2 => {
+            const activo = filtro?.materia === s2;
+            const nom = (facetas?.materias ?? []).find(m => m.slug === s2)?.nombre ?? s2;
+            return (
+              <button key={`m-${s2}`} onClick={() => { setFiltro({ colectivo: null, materia: s2 }); setEtiqueta(nom); }} style={{
+                padding: '5px 11px', fontSize: 12, cursor: 'pointer', borderRadius: 20,
+                border: `1px solid ${activo ? C.tinta : C.linea}`,
+                background: activo ? C.tinta : 'transparent',
+                color: activo ? '#F2F3F0' : C.media
+              }}>{nom}</button>
+            );
+          })}
+          {etiqueta && (
+            <>
+              <button onClick={limpiar} className="em" style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: C.tenue, fontSize: 11, padding: 0, marginLeft: 4
+              }}>× quitar</button>
+              <button onClick={guardarAlerta} style={{
+                marginLeft: 'auto', padding: '5px 12px', fontSize: 12, cursor: 'pointer',
+                borderRadius: 20, border: `1px solid ${C.si}`, background: 'transparent', color: C.si
+              }}>{guardado ? 'Actualizar alerta' : 'Avisarme de nuevas'}</button>
+              {guardado && (
+                <button onClick={olvidarAlerta} className="em" style={{
+                  background: 'none', border: 'none', color: C.tenue, fontSize: 11, cursor: 'pointer', padding: 0
+                }}>olvidar perfil</button>
+              )}
+            </>
+          )}
         </div>
-        </EntradaSuave>
-      </section>
+      )}
 
+      <Hallazgos onIr={onIr} />
       {novedades.length > 0 && (
         <div style={{
           marginBottom: 18, padding: 14, borderRadius: 3,

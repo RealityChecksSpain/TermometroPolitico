@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Cifra, SALIDA } from './Movimiento.jsx';
 import { desgloseBienes } from '../lib/inmuebles.js';
 import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
 import AvatarPartido from './AvatarPartido.jsx';
@@ -11,16 +13,21 @@ const C = {
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abst.', no_vota: 'No votó' };
 const COLOR = { si: C.si, no: C.no, abstencion: C.abs, no_vota: C.tenue };
 
-function Dato({ etiqueta, valor }) {
+function Dato({ etiqueta, valor, sufijo = '' }) {
+  const numero = Number(valor);
+  const animable = valor != null && valor !== '' && !Number.isNaN(numero);
   return (
     <div>
-      <div className="ed" style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>{valor}</div>
+      <div className="ed" style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>
+        {animable ? <><Cifra valor={numero} />{sufijo}</> : (valor ?? '—')}
+      </div>
       <div style={{ fontSize: 11, color: C.tenue, marginTop: 3 }}>{etiqueta}</div>
     </div>
   );
 }
 
 export default function FichaDiputado({ d, onCerrar, onVotacion }) {
+  const reducido = useReducedMotion();
   const [votos, setVotos] = useState(null);
   const [resumen, setResumen] = useState(null);
   const [fallo, setFallo] = useState(null);
@@ -54,12 +61,21 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
   const nDisidencias = Number(resumen?.disidencias ?? 0);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,22,26,0.55)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onCerrar}>
-      <div className="e" onClick={e => e.stopPropagation()} style={{
-        background: C.superficie, width: '100%', maxWidth: 620, borderRadius: '4px 4px 0 0',
-        maxHeight: '92vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'contain'
-      }}>
+    <motion.div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(20,22,26,0.55)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={onCerrar}
+      initial={reducido ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.24 }}>
+      <motion.div className="e" onClick={e => e.stopPropagation()}
+        initial={reducido ? false : { y: 44, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.9 }}
+        style={{
+          background: C.superficie, width: '100%', maxWidth: 620, borderRadius: '4px 4px 0 0',
+          maxHeight: '92vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain'
+        }}>
         <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.linea}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12, minWidth: 0 }}>
@@ -109,19 +125,22 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                 <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: '#E4E4DC' }}>
                   {[[resumen.si, C.si], [resumen.abstencion, C.abs], [resumen.no, C.no], [resumen.no_vota, '#C4C8CC']]
                     .map(([v, col], i) => Number(v) > 0 && (
-                      <div key={i} style={{ width: `${(Number(v) / Number(resumen.total_votos || 1)) * 100}%`, background: col }} />
+                      <motion.div key={i} style={{ background: col }}
+                        initial={reducido ? false : { width: 0 }}
+                        animate={{ width: `${(Number(v) / Number(resumen.total_votos || 1)) * 100}%` }}
+                        transition={{ ...SALIDA, delay: 0.14 + i * 0.07 }} />
                     ))}
                 </div>
                 <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap', fontSize: 12 }}>
-                  <span><strong style={{ color: C.si }}>{resumen.si}</strong> a favor</span>
-                  <span><strong style={{ color: C.no }}>{resumen.no}</strong> en contra</span>
-                  <span><strong style={{ color: C.abs }}>{resumen.abstencion}</strong> abstenciones</span>
-                  <span style={{ color: C.tenue }}><strong>{resumen.no_vota}</strong> ausencias</span>
+                  <span><strong style={{ color: C.si }}><Cifra valor={Number(resumen.si) || 0} /></strong> a favor</span>
+                  <span><strong style={{ color: C.no }}><Cifra valor={Number(resumen.no) || 0} /></strong> en contra</span>
+                  <span><strong style={{ color: C.abs }}><Cifra valor={Number(resumen.abstencion) || 0} /></strong> abstenciones</span>
+                  <span style={{ color: C.tenue }}><strong><Cifra valor={Number(resumen.no_vota) || 0} /></strong> ausencias</span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 22, marginTop: 16, flexWrap: 'wrap' }}>
-                <Dato etiqueta="Asistencia" valor={`${d.asistencia}%`} />
+                <Dato etiqueta="Asistencia" valor={d.asistencia} sufijo="%" />
                 <Dato etiqueta="Intervenciones" valor={d.intervenciones} />
                 <Dato etiqueta="Minutos hablando" valor={d.minutos_tribuna} />
                 <Dato etiqueta="Votos a distancia" valor={resumen.telematicos} />
@@ -362,7 +381,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
             }}>Cargar 60 votos más</button>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

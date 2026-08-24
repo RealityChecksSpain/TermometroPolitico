@@ -1,4 +1,9 @@
 import React, { useMemo, useState, useRef, useCallback } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+
+const ESTILO_BASE = { pointerEvents: 'none' };
+const ESTILO_ACTIVO = { pointerEvents: 'none', filter: 'url(#brillo)' };
+const ESCALON = 1.4;
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
 const esTactil = typeof window !== 'undefined' &&
@@ -38,6 +43,7 @@ export default function Hemiciclo({
   onSeleccionar, seleccionado = null, filas = 11, compacto = false,
   encimaExterno = null, onEncima = null
 }) {
+  const reducido = useReducedMotion();
   const [encimaLocal, setEncimaLocal] = useState(null);
   const encima = encimaExterno ?? encimaLocal;
   const setEncima = useCallback(v => { setEncimaLocal(v); onEncima?.(v); }, [onEncima]);
@@ -51,6 +57,11 @@ export default function Hemiciclo({
 
   const asientos = useMemo(() => calcularAsientos(diputados.length, filasReales), [diputados.length, filasReales]);
   const mapaVotos = useMemo(() => votos ? new Map(votos.map(v => [v.mandato_id, v.voto])) : null, [votos]);
+
+  const claveBrote = useMemo(
+    () => (reducido ? 'fijo' : `${votos?.[0]?.votacion_id ?? 'sin'}:${mapaVotos?.size ?? 0}:${diputados.length}`),
+    [reducido, votos, mapaVotos, diputados.length]
+  );
 
   // Radio visual ≈ 0.062; umbral amplio para que no haya que acertar el centro exacto.
   const r = 0.062;
@@ -108,6 +119,18 @@ export default function Hemiciclo({
         {/* Zona invisible de captura: el hit-test lo hacemos nosotros con la matriz SVG */}
         <rect x="-2.75" y="-2.82" width="5.5" height="3.05" fill="transparent" />
 
+        <style>{`
+.escano{transition:opacity 260ms cubic-bezier(.22,1,.36,1),r 380ms cubic-bezier(.34,1.5,.5,1),stroke-width 260ms ease,fill 260ms ease;
+transform-box:fill-box;transform-origin:center;pointer-events:none}
+.escanoBrote>*{animation:escanoBrota 520ms cubic-bezier(.34,1.56,.56,1) both;
+animation-delay:calc(var(--i,0) * 1.4ms)}
+@keyframes escanoBrota{
+0%{transform:scale(.18);opacity:0}
+52%{transform:scale(1.16);opacity:1}
+78%{transform:scale(.95)}
+100%{transform:scale(1);opacity:1}}`}</style>
+
+        <g key={claveBrote} className="escanoBrote">
         {diputados.map((d, i) => {
           const a = asientos[i];
           if (!a) return null;
@@ -120,33 +143,30 @@ export default function Hemiciclo({
           const color = d.color || '#8E9299';
           const op = visible ? (hover ? 1 : 0.94) : 0.1;
           const escala = hover ? 1.55 : sel ? 1.4 : 1;
-          const estilo = {
-            transition: 'opacity 180ms ease, r 220ms cubic-bezier(.34,1.56,.64,1), stroke-width 220ms ease',
-            filter: hover ? 'url(#brillo)' : 'none',
-            pointerEvents: 'none'
-          };
+          const estilo = hover || sel ? ESTILO_ACTIVO : ESTILO_BASE;
 
           if (forma === 'anillo') {
-            return <circle key={d.mandato_id} style={estilo} cx={a.cx} cy={a.cy}
+            return <circle key={d.mandato_id} className="escano" style={{ ...estilo, "--i": i }} cx={a.cx} cy={a.cy}
               r={r * 0.9 * escala} fill="none" stroke={color}
               strokeWidth={r * (hover ? 0.75 : 0.6)} opacity={op} />;
           }
           if (forma === 'punto') {
             return (
-              <g key={d.mandato_id} style={estilo} opacity={op}>
+              <g key={d.mandato_id} className="escano" style={{ ...estilo, opacity: op, "--i": i }}>
                 <circle cx={a.cx} cy={a.cy} r={r * escala} fill={color} opacity={0.2} />
                 <circle cx={a.cx} cy={a.cy} r={r * 0.36 * escala} fill={color} />
               </g>
             );
           }
           if (forma === 'tenue') {
-            return <circle key={d.mandato_id} style={estilo} cx={a.cx} cy={a.cy}
+            return <circle key={d.mandato_id} className="escano" style={{ ...estilo, "--i": i }} cx={a.cx} cy={a.cy}
               r={r * 0.55 * escala} fill={color} opacity={op * 0.32} />;
           }
-          return <circle key={d.mandato_id} style={estilo} cx={a.cx} cy={a.cy}
+          return <circle key={d.mandato_id} className="escano" style={{ ...estilo, "--i": i }} cx={a.cx} cy={a.cy}
             r={r * escala} fill={color} opacity={op}
             stroke={sel ? '#FFFFFF' : 'none'} strokeWidth={sel ? r * 0.4 : 0} />;
         })}
+        </g>
       </svg>
 
       <div style={{

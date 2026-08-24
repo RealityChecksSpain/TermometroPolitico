@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { DestelloSuave } from './Destello.jsx';
 import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos } from '../lib/cliente.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
 const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
+
+const VIAJE = { type: 'spring', stiffness: 90, damping: 20, mass: 1 };
 
 const C = {
   papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
@@ -354,28 +357,43 @@ export default function Mapa({ onDiputados }) {
                     opacity={on ? 1 : 0.16}
                     pointerEvents="none">
                     {desviada && (
-                      <line x1={p.cx} y1={p.cy + p.radio} x2={p.cx} y2={p.labelY - 0.045}
+                      <motion.line
+                        initial={false}
+                        animate={{ x1: p.cx, y1: p.cy + p.radio, x2: p.cx, y2: p.labelY - 0.045 }}
+                        transition={VIAJE}
                         stroke="#5A6067" strokeWidth="0.005" />
                     )}
                     {fuente === 'votos' && encima === p.partido && (p.ex > 0 || p.ey > 0) && (
-                      <ellipse cx={p.cx} cy={p.cy}
-                        rx={Math.max(p.ex, p.radio * 1.3)} ry={Math.max(p.ey, p.radio * 1.3)}
+                      <motion.ellipse
+                        initial={false}
+                        animate={{
+                          cx: p.cx, cy: p.cy,
+                          rx: Math.max(p.ex, p.radio * 1.3), ry: Math.max(p.ey, p.radio * 1.3)
+                        }}
+                        transition={VIAJE}
                         fill={p.color || '#8E9299'} opacity="0.16"
                         stroke={p.color || '#8E9299'} strokeOpacity="0.35" strokeWidth="0.006" />
                     )}
-                    <circle cx={p.cx} cy={p.cy}
-                      r={encima === p.partido ? p.radio * 1.22 : p.radio}
+                    <motion.circle
+                      initial={false}
+                      animate={{
+                        cx: p.cx, cy: p.cy,
+                        r: encima === p.partido ? p.radio * 1.22 : p.radio
+                      }}
+                      transition={VIAJE}
                       fill={p.nulo ? 'none' : (p.color || '#8E9299')}
                       stroke={p.nulo ? (p.color || '#8E9299') : C.pizarra}
                       strokeWidth={p.nulo ? 0.018 : 0.014}
-                      strokeDasharray={p.nulo ? '0.035 0.028' : undefined}
-                      style={{ transition: 'r 200ms cubic-bezier(.34,1.56,.64,1)' }} />
-                    <text x={p.cx} y={p.labelY}
+                      strokeDasharray={p.nulo ? '0.035 0.028' : undefined} />
+                    <motion.text
+                      initial={false}
+                      animate={{ x: p.cx, y: p.labelY }}
+                      transition={VIAJE}
                       fill={encima === p.partido ? '#FFFFFF' : '#C9CDD2'}
                       fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace"
                       fontWeight={encima === p.partido ? 500 : 400}>
                       {p.siglas}
-                    </text>
+                    </motion.text>
                   </g>
                 );
               })}

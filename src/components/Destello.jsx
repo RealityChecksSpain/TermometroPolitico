@@ -1,10 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 
-/**
- * Destellos suaves (no “cenizas de juego”): puntos estáticos con opacidad
- * que respiran muy despacio para resaltar un bloque sin parecer particulas de acción.
- */
+
 export function DestelloSuave({ color = 'rgba(255,255,255,0.35)', n = 8 }) {
   const pts = useMemo(() => Array.from({ length: n }, (_, i) => ({
     id: i,

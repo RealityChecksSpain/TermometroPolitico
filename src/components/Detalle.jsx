@@ -1,4 +1,6 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Cifra, Entrada, SALIDA } from './Movimiento.jsx';
 import { traerVotacionesDeNorma, traerRelacionadas } from '../lib/cliente.js';
 import HistorialNorma from './HistorialNorma.jsx';
 import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
@@ -69,7 +71,7 @@ function Sello({ aprobada }) {
 
 function Bloque({ titulo, children, aviso }) {
   return (
-    <div style={{
+    <Entrada desde={12} style={{
       background: aviso ? '#FFF8E6' : C.superficie,
       border: `1px solid ${aviso ? '#E8D9A8' : C.linea}`,
       borderRadius: 3, padding: 14, marginTop: 12
@@ -79,7 +81,7 @@ function Bloque({ titulo, children, aviso }) {
         letterSpacing: '0.05em', fontWeight: 600, marginBottom: 10
       }}>{titulo}</div>
       {children}
-    </div>
+    </Entrada>
   );
 }
 
@@ -361,13 +363,19 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
         </div>
 
         <div style={{ display: 'flex', height: 7, borderRadius: 4, overflow: 'hidden', background: '#E4E4DC', marginTop: 12 }}>
-          {seg.map(([v, col], i) => v > 0 && <div key={i} style={{ width: `${(v / total) * 100}%`, background: col }} />)}
+          {seg.map(([v, col], i) => v > 0 && (
+            <motion.div key={i} style={{ background: col }}
+              initial={{ width: 0 }} animate={{ width: `${(v / total) * 100}%` }}
+              transition={{ ...SALIDA, delay: 0.1 + i * 0.07 }} />
+          ))}
         </div>
         <div className="em" style={{ fontSize: 12, marginTop: 7, display: 'flex', gap: 14 }}>
-          <span style={{ color: C.si }}>Sí {votacion.total_si}</span>
-          <span style={{ color: C.no }}>No {votacion.total_no}</span>
-          <span style={{ color: C.abs }}>Abs {votacion.total_abstencion}</span>
-          <span style={{ color: C.tenue, marginLeft: 'auto' }}>{votacion.total_presentes} presentes</span>
+          <span style={{ color: C.si }}>Sí <Cifra valor={votacion.total_si ?? 0} /></span>
+          <span style={{ color: C.no }}>No <Cifra valor={votacion.total_no ?? 0} /></span>
+          <span style={{ color: C.abs }}>Abs <Cifra valor={votacion.total_abstencion ?? 0} /></span>
+          <span style={{ color: C.tenue, marginLeft: 'auto' }}>
+            <Cifra valor={votacion.total_presentes ?? 0} /> presentes
+          </span>
         </div>
       </div>
 

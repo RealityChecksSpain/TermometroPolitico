@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import Hemiciclo, { LeyendaVoto } from './components/Hemiciclo.jsx';
+import Marca from './components/Marca.jsx';
+import { desgloseBienes } from './lib/inmuebles.js';
 import Detalle, { DetalleLey } from './components/Detalle.jsx';
 import FichaDiputado from './components/FichaDiputado.jsx';
 import Mapa from './components/Mapa.jsx';
@@ -38,7 +41,7 @@ button,input{font-family:inherit}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(239,239,233,.94);
 backdrop-filter:blur(10px);border-top:1px solid ${C.linea};display:flex}
 @media(min-width:900px){.nav{position:static;background:none;backdrop-filter:none;border-top:none;
-border-bottom:2px solid ${C.tinta};margin-bottom:20px;gap:2px}}
+border-bottom:none;margin-bottom:0;gap:2px}}
 .navb{flex:1;padding:9px 4px 8px;background:none;border:none;cursor:pointer;
 display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:${C.tenue};
 border-top:2px solid transparent}
@@ -50,10 +53,10 @@ border-top:none;border-bottom:2px solid transparent;margin-bottom:-2px}}
 box-shadow:0 1px 0 rgba(20,22,26,0.03)}
 .fila{transition:background 140ms ease, transform 140ms ease}
 .fila:hover{background:#EDEBE0}
-.chip{padding:5px 11px;font-size:11px;font-weight:600;border-radius:2px;cursor:pointer;
+.chip{padding:6px 12px;font-size:11px;font-weight:600;border-radius:0;cursor:pointer;
 display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:transparent;
 color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,color 140ms ease,border-color 140ms ease,transform 140ms ease}
-.chip:hover{border-color:${C.tinta};transform:translateY(-1px)}
+.chip:hover{border-color:${C.tinta}}
 .chip[data-on="1"]{background:${C.tinta};color:${C.papel};border-color:${C.tinta}}
 .navb{transition:color 140ms ease,border-color 140ms ease}
 .hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
@@ -132,8 +135,8 @@ cursor:pointer;color:inherit;min-height:88px}
 line-height:1.28;letter-spacing:-0.016em;animation:entra 380ms cubic-bezier(.2,.7,.3,1)}
 .hallazgoCuerpo:hover .hallazgoTitular{color:#FFFFFF;text-decoration:underline;text-underline-offset:3px;
 text-decoration-thickness:1px;text-decoration-color:#6C737B}
-.hallazgoDetalle{display:block;color:#A8B4AE;font-size:12.5px;line-height:1.55;margin-top:var(--s2);
-max-width:78ch;overflow-wrap:anywhere}
+.hallazgoDetalle{display:block;color:#BFC9C2;font-size:13px;line-height:1.6;margin-top:var(--s2);
+max-width:none;overflow-wrap:anywhere}
 @keyframes entra{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .hallazgosPuntos{display:flex;gap:5px;margin-top:var(--s3)}
 .hallazgosPuntos button{width:16px;height:3px;border-radius:3px;border:none;padding:0;cursor:pointer;
@@ -145,6 +148,8 @@ background:#3A4048;transition:background 220ms ease,width 220ms ease}
 .panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
 .panelGrupos::-webkit-scrollbar{width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
+.filete{height:2px;background:${C.tinta};margin:0 0 12px}
+@media(max-width:899px){.filete{display:none}}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .rot{font-size:10px;color:${C.tenue};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
 
@@ -160,25 +165,6 @@ transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
 .chipsCcaaLista button span{font-family:'DM Mono',ui-monospace,monospace;font-size:10px;color:#8E959C}
 .chipsCcaaLista button[data-on="1"]{background:#E8C56A;border-color:#E8C56A;color:#15171A;font-weight:600}
 .chipsCcaaLista button[data-on="1"] span{color:#5C4A14}
-
-.portada{position:relative;width:100vw;margin-left:calc(50% - 50vw);margin-bottom:var(--s5);
-background:#EFE1C4;background-image:repeating-linear-gradient(22deg,#DFCCA2 0 1px,transparent 1px 16px);
-border-radius:0;overflow:hidden;border-bottom:3px solid #15171A}
-.portadaInterior{position:relative;max-width:1120px;margin:0 auto;
-aspect-ratio:1120/520;min-height:clamp(430px,58vh,520px)}
-.portadaLienzo{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
-.portadaTitulo{position:absolute;left:3.6%;top:11%;z-index:2;max-width:min(52%,540px);
-pointer-events:none}
-.portadaTitulo .rotulo{color:#7A6132;margin:0 0 var(--s2)}
-.portadaTitular{font-size:clamp(26px,4vw,50px);font-weight:600;letter-spacing:-0.03em;
-line-height:1.02;color:#15171A;margin:0}
-.portadaBajada{margin:var(--s3) 0 0;font-size:clamp(12px,1.3vw,15px);line-height:1.55;
-color:#4A4130;max-width:38ch}
-@media(max-width:860px){
-.portadaInterior{aspect-ratio:auto;min-height:620px}
-.portadaTitulo{position:relative;left:0;top:0;max-width:100%;padding:var(--s4) var(--s3) 0}
-.portadaLienzo{position:relative;inset:auto;height:auto}
-}
 
 .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
 flex-wrap:wrap;padding:var(--s4) 0 var(--s3)}
@@ -391,10 +377,15 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 14px', flexWrap: 'wrap' }}>
           <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
+            aria-label="Ir al inicio"
             className="ed display" style={{
+              display: 'flex', alignItems: 'center', gap: 12,
               background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.tinta
             }}>
-            Escaño
+            <img src="/logo.svg" alt="" width="64" height="64"
+              style={{ display: 'block', flexShrink: 0 }}
+              onError={e => { e.currentTarget.style.display = 'none'; }} />
+            Lente Negra
           </button>
           {cobertura && (
             <div className="em" style={{ fontSize: 10, color: C.tenue }}>
@@ -402,6 +393,8 @@ export default function App() {
             </div>
           )}
         </div>
+
+        <div className="filete" />
 
         <nav className="nav">
           {secciones.map(([k, t]) => (
@@ -412,7 +405,17 @@ export default function App() {
           ))}
         </nav>
 
-        <div data-seccion={seccion} className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}>
+        <Marca key={`marca-${seccion}`} quieta={seccion === 'inicio'} />
+
+        <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={seccion} data-seccion={seccion}
+          className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}
+          initial={{ y: 18 }}
+          animate={{ y: 0 }}
+          exit={{ y: -10 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 26, mass: 0.7 }}
+          style={{ position: 'relative' }}>
+
           {mostrarHemiciclo && (
             <div className="izq">
               <div className="hero">
@@ -736,7 +739,9 @@ export default function App() {
               </div>
               <div className="listaFilete">
                 {listaDip.slice(0, 200).map((d, i) => (
-                  <button key={d.mandato_id} className="fila" data-top={i < 3 ? '1' : '0'} onClick={() => setSel(d)}
+                  <motion.button key={d.mandato_id} className="fila" data-top={i < 3 ? '1' : '0'} onClick={() => setSel(d)}
+                    layout={i < 24 ? 'position' : false}
+                    transition={{ type: 'spring', stiffness: 260, damping: 30 }}
                     onMouseEnter={() => setEncimaEscano(d.mandato_id)}
                     onMouseLeave={() => setEncimaEscano(null)}
                     style={{
@@ -824,7 +829,7 @@ export default function App() {
                         </>);
                       })()}
                     </span>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
@@ -851,7 +856,8 @@ export default function App() {
           {seccion === 'metodo' && <div className="solo1"><Metodologia cobertura={cobertura} /></div>}
           {seccion === 'datos' && <div className="solo1"><Descargas /></div>}
           </div>
-        </div>
+        </motion.div>
+        </AnimatePresence>
 
         <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 10, color: C.tenue, lineHeight: 1.6 }}>
           Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.
