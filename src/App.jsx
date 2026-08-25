@@ -35,7 +35,7 @@ button,input{font-family:inherit}
 @media(min-width:900px){.app{padding:0 28px 40px}}
 .hero{background:${C.pizarra};border-radius:4px;padding:20px 18px 14px}
 @media(min-width:900px){.hero{padding:26px 32px 18px}}
-.cols{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.cols{display:grid;grid-template-columns:1fr;gap:20px;margin-top:8px}
 @media(min-width:900px){.cols{grid-template-columns:1fr 1fr;gap:28px;align-items:start}}
 .solo1{grid-column:1/-1}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(239,239,233,.94);
@@ -71,7 +71,7 @@ color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,co
 .contents{display:contents}
 .ejesGuia{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:820px){.ejesGuia{grid-template-columns:1fr 1fr}}
-.split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+.split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:8px}
 @media(min-width:960px){.split{grid-template-columns:minmax(380px,1.15fr) minmax(300px,.9fr);gap:18px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
 @media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(420px,1.35fr) minmax(260px,.72fr);gap:18px}}
@@ -148,8 +148,6 @@ background:#3A4048;transition:background 220ms ease,width 220ms ease}
 .panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
 .panelGrupos::-webkit-scrollbar{width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
-.filete{height:2px;background:${C.tinta};margin:0 0 12px}
-@media(max-width:899px){.filete{display:none}}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .rot{font-size:10px;color:${C.tenue};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
 
@@ -375,7 +373,7 @@ export default function App() {
       <style>{estilos}</style>
       <div className="e app">
 
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 0', flexWrap: 'wrap' }}>
           <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
             aria-label="Ir al inicio"
             className="ed display" style={{
@@ -387,14 +385,12 @@ export default function App() {
               onError={e => { e.currentTarget.style.display = 'none'; }} />
             Lente Negra
           </button>
-          {cobertura && (
-            <div className="em" style={{ fontSize: 10, color: C.tenue }}>
-              última sesión {cobertura.ultima_sesion}
-            </div>
-          )}
+          <div className="em" style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: C.tenue }}>
+            XV legislatura
+          </div>
         </div>
 
-        <div className="filete" />
+        <Marca key={`marca-${seccion}`} quieta={seccion === 'inicio'} />
 
         <nav className="nav">
           {secciones.map(([k, t]) => (
@@ -404,8 +400,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-
-        <Marca key={`marca-${seccion}`} quieta={seccion === 'inicio'} />
 
         <AnimatePresence mode="wait" initial={false}>
         <motion.div key={seccion} data-seccion={seccion}

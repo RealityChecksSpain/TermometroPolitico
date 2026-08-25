@@ -37,13 +37,13 @@ function diseno(cfg) {
 const AMPLIO = diseno({
   W: 1120, H: 380, cx: 560, ny: 141, s: 0.69, base: 366, arco0: 150, arcoPaso: 27,
   barra: { x1: 150, x2: 970, y1: 288, y2: 356 }, lupaR: 26, alzada: 78,
-  copia: { arr: 0.30, izq: 0.134, ancho: 0.732, escala: 3.1 }
+  copia: { arr: 0.52, izq: 0.134, ancho: 0.732, escala: 3.1 }
 });
 
 const COMPACTO = diseno({
   W: 640, H: 640, cx: 320, ny: 185, s: 0.88, base: 610, arco0: 150, arcoPaso: 30,
   barra: { x1: 20, x2: 620, y1: 494, y2: 574 }, lupaR: 30, alzada: 118,
-  copia: { arr: 0.30, izq: 0.06, ancho: 0.88, escala: 6.4 }
+  copia: { arr: 0.62, izq: 0.06, ancho: 0.88, escala: 6.4 }
 });
 
 const QUIEN = [
@@ -100,13 +100,12 @@ export function pulsoEscanos() {
 }
 
 const estilos = `
-.pvPortada{position:relative;width:100vw;margin-left:calc(50% - 50vw);background:${PAPEL};padding:18px 0 26px;margin-bottom:var(--s5,32px);overflow-x:clip;overflow-y:visible}
+.pvPortada{position:relative;width:100vw;margin-left:calc(50% - 50vw);background:${PAPEL};padding:18px 0 18px;margin-bottom:var(--s4,20px);overflow-x:clip;overflow-y:visible}
 .pvCentro{max-width:1120px;margin:0 auto;padding:0 20px}
 .pvCabecera{text-align:center;max-width:900px;margin:0 auto}
-.pvRotulo{margin:0 0 10px;color:#7A6132;font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 .pvTitular{margin:0;font-size:clamp(26px,3.9vw,46px);font-weight:600;letter-spacing:-.03em;line-height:1.05;color:#14161A}
-.pvBajada{margin:10px auto 0;max-width:580px;font-size:clamp(12px,1.25vw,15px);line-height:1.5;color:#4A5057}
-.pvEscena{position:relative;width:100%;container-type:inline-size;margin-top:-2px}
+.pvBajada{margin:6px auto 0;max-width:580px;font-size:clamp(12px,1.25vw,15px);line-height:1.5;color:#4A5057}
+.pvEscena{position:relative;width:100%;max-width:1000px;container-type:inline-size;margin:2px auto 0}
 .pvLienzo{position:absolute;inset:0;width:100%;height:100%;display:block}
 .pvCopia{position:absolute;text-align:center;pointer-events:none}
 .pvPregunta{margin:0;font-weight:600;letter-spacing:-.02em;color:#14161A;line-height:1.1}
@@ -125,14 +124,13 @@ const estilos = `
 .pvTodas:hover{color:${TINTA}}
 .pvTarjetas{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 auto}
 .pvCelda{position:relative}
-.pvTarjeta{position:relative;width:100%;text-align:left;background:${TINTA};border:0;border-radius:2px;padding:22px 15px 15px;cursor:pointer;color:${HUESO};font:inherit;display:flex;flex-direction:column;gap:9px;min-height:100px}
+.pvTarjeta{position:relative;width:100%;text-align:left;background:${TINTA};border:0;border-radius:2px;padding:15px;cursor:pointer;color:${HUESO};font:inherit;display:flex;flex-direction:column;gap:9px;min-height:100px}
 .pvTarjeta:focus-visible{outline:2px solid ${ROJO};outline-offset:2px}
 .pvPunto{position:absolute;top:13px;right:13px;width:9px;height:9px;opacity:.9}
 .pvAncla{position:absolute;left:-12px;right:-12px;top:0;z-index:20;pointer-events:none}
 .pvTarjetaAlta{padding:19px 20px;overflow:hidden;will-change:height,transform;pointer-events:auto;cursor:pointer;outline:2px solid ${PAPEL};outline-offset:-2px;box-shadow:0 0 0 1px rgba(21,23,26,.18)}
-.pvTarjetaAlta .pvEtiqueta{position:static;align-self:flex-start;margin-bottom:1px}
 .pvFraseGrande{font-size:15px;line-height:1.3;font-weight:600;color:#F7F3EA}
-.pvEtiqueta{position:absolute;top:-11px;left:13px;padding:4px 9px;border-radius:0;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${PAPEL}}
+.pvEtiqueta{align-self:flex-start;padding:4px 9px;border-radius:0;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${PAPEL}}
 .pvFrase{font-size:13.5px;line-height:1.34;color:#F2E9D6;font-weight:500}
 .pvVoto{display:flex;height:5px;border-radius:0;overflow:hidden;background:#2B2F34;margin-top:auto}
 .pvVoto i{display:block;height:100%}
@@ -142,7 +140,7 @@ const estilos = `
 .pvChips{display:flex;gap:4px;flex-wrap:wrap}
 .pvChip{font-size:9.5px;padding:2px 7px;border-radius:0;border:1px solid rgba(198,176,132,.38);color:#E2D6BC}
 @media(max-width:700px){
-.pvPortada{padding:14px 0 22px}
+.pvPortada{padding:12px 0 14px}
 .pvEncabezado{margin-top:26px}
 .pvCentro{padding:0 14px}
 .pvTarjetas{grid-template-columns:1fr;gap:22px;margin-top:26px}
@@ -365,11 +363,6 @@ export default function Portada({
       <style>{estilos}</style>
       <div className="pvCentro">
         <div className="pvCabecera">
-          <motion.p className="em pvRotulo"
-            initial={reducido ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}>
-            Congreso de los Diputados · XV Legislatura
-          </motion.p>
           <motion.h1 className="ed pvTitular"
             initial={reducido ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, duration: 0.6 }}>

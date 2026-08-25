@@ -2,13 +2,21 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { cabeza, figura, limitar, mezcla, remate, trazo } from '../lib/morfo.js';
 
-const HUECO = 92;
-const LIENZO = 92;
-const ESCALA = 0.155;
-const NEUTRO = 30;
+const HUECO = 30;
+const LIENZO = 30;
+const ESCALA = 0.045;
+const NEUTRO = 10.5;
 const RESPIRO = 900;
+const ARCO = 5;
 
-export default function Marca({ tinta = '#15171A', acento = '#B4552F', quieta = false }) {
+const BANDA_ALTA = 19;
+const BANDA_BAJA = 24;
+const ALA = 4;
+const MELLA = 26;
+const COLA = 30;
+const CABEZA_R = 8;
+
+export default function Marca({ tinta = '#15171A', acento = '#E0492E', quieta = false }) {
   const reducido = useReducedMotion();
   const caja = useRef(null);
   const [ancho, setAncho] = useState(0);
@@ -37,21 +45,27 @@ export default function Marca({ tinta = '#15171A', acento = '#B4552F', quieta = 
     return () => clearTimeout(t);
   }, [reducido, quieta, avance]);
 
-  const cx = Math.min(56, ancho / 2);
+  const util = Math.max(ancho, 1);
+  const cola = Math.min(COLA, util * 0.05);
+  const mella = Math.min(MELLA, util * 0.045);
+  const ala = Math.min(ALA, util * 0.009);
+  const radio = Math.min(CABEZA_R, util * 0.022);
+
+  const cx = Math.min(60, util / 2);
   const silueta = figura(cx, NEUTRO, ESCALA);
-  const linea = remate(0, Math.max(ancho, 1), 79, 83, 8, 22);
+  const linea = remate(0, util, BANDA_ALTA, BANDA_BAJA, ala, mella, cola);
 
   const cabezaIni = cabeza(cx, NEUTRO, ESCALA);
-  const cabezaFin = { x: Math.max(ancho - 7, 7), y: 81, r: 7 };
+  const cabezaFin = { x: util - mella - radio, y: (BANDA_ALTA + BANDA_BAJA) / 2, r: radio };
 
   const d = useTransform([px, py], ([a, b]) => trazo(silueta, linea, a, b));
   const bolaX = useTransform(ph, v => mezcla(cabezaIni.x, cabezaFin.x, v));
-  const bolaY = useTransform(ph, v => mezcla(cabezaIni.y, cabezaFin.y, v) - 14 * Math.sin(Math.PI * limitar(v)));
+  const bolaY = useTransform(ph, v => mezcla(cabezaIni.y, cabezaFin.y, v) - ARCO * Math.sin(Math.PI * limitar(v)));
   const bolaR = useTransform(ph, v => mezcla(cabezaIni.r, cabezaFin.r, limitar(v)));
 
   return (
     <div ref={caja} aria-hidden="true" style={{
-      position: 'relative', width: '100%', height: HUECO, marginBottom: 16, pointerEvents: 'none'
+      position: 'relative', width: '100%', height: HUECO, marginTop: -10, marginBottom: 4, pointerEvents: 'none'
     }}>
       {ancho > 0 && (
         <svg width="100%" height={LIENZO} viewBox={`0 0 ${ancho} ${LIENZO}`} preserveAspectRatio="none"

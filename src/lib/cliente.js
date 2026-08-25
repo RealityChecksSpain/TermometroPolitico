@@ -415,10 +415,11 @@ export async function traerAuditoriaEjeVotos() {
 }
 
 export async function traerHallazgos() {
-  const { data, error } = await supabase.from('v_hallazgos_todos')
+  const { data, error } = await supabase.from('v_hallazgos_publicos')
     .select('*').order('relevancia', { ascending: false, nullsFirst: false }).order('orden');
   if (error) {
-    const alt = await supabase.from('v_hallazgos_todos').select('*').order('orden');
+    const alt = await supabase.from('v_hallazgos_todos')
+      .select('*').order('relevancia', { ascending: false, nullsFirst: false }).order('orden');
     return (alt.data ?? []).filter(h => h.titular);
   }
   return (data ?? []).filter(h => h.titular);

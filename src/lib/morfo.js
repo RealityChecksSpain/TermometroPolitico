@@ -48,18 +48,19 @@ export function pildora(x1, x2, y1, y2) {
   ];
 }
 
-export function remate(x1, x2, y1, y2, hondo, pie) {
+export function remate(x1, x2, y1, y2, ala, mella, cola) {
+  const cy = (y1 + y2) / 2;
   return [
-    { x: x1 + 40, y: y1, k: 0 },
-    { x: x1, y: y1, k: 0 },
-    { x: x1, y: y2 + hondo, k: 0 },
-    { x: x1 + pie, y: y2 + hondo, k: 0 },
-    { x: x1 + pie, y: y2, k: 0 },
-    { x: x2 - pie, y: y2, k: 0 },
-    { x: x2 - pie, y: y2 + hondo, k: 0 },
-    { x: x2, y: y2 + hondo, k: 0 },
-    { x: x2, y: y1, k: 0 },
-    { x: x2 - 40, y: y1, k: 0 }
+    { x: x1 + cola, y: y1, k: 0 },
+    { x: x1, y: y1 - ala, k: 0 },
+    { x: x1 + mella, y: cy, k: 0 },
+    { x: x1, y: y2 + ala, k: 0 },
+    { x: x1 + cola, y: y2, k: 0 },
+    { x: x2 - cola, y: y2, k: 0 },
+    { x: x2, y: y2 + ala, k: 0 },
+    { x: x2 - mella, y: cy, k: 0 },
+    { x: x2, y: y1 - ala, k: 0 },
+    { x: x2 - cola, y: y1, k: 0 }
   ];
 }
 
