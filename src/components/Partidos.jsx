@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { traerProgramas, traerPromesas } from '../lib/cliente.js';
+import { traerProgramas, traerPromesas, traerResumenPromesas } from '../lib/cliente.js';
 import { Cifra, Rotulo } from './Movimiento.jsx';
+import { siglasPartido } from '../lib/etiquetas.js';
 
 const ESTADO = {
   cumplida: { icono: '✓', color: '#2E7D5B', fondo: '#E6F2EB', texto: 'cumplida' },
@@ -11,6 +12,27 @@ const ESTADO = {
 };
 
 const ORDEN = ['cumplida', 'apoyada_sin_aprobar', 'contradicha', 'pendiente'];
+
+const MUESTRA_MINIMA = 10;
+
+function desdeResumen(f) {
+  if (!f) return null;
+  const total = Number(f.total ?? 0);
+  const juzgadas = Number(f.juzgadas ?? 0);
+  const intentadas = Number(f.intentadas ?? 0);
+  return {
+    cumplida: Number(f.cumplida ?? 0),
+    apoyada_sin_aprobar: Number(f.apoyada_sin_aprobar ?? 0),
+    contradicha: Number(f.contradicha ?? 0),
+    pendiente: Number(f.pendiente ?? 0),
+    total,
+    juzgadas,
+    intentadas,
+    cobertura: total ? Math.round((juzgadas / total) * 100) : 0,
+    pct: juzgadas >= MUESTRA_MINIMA ? Math.round((intentadas / juzgadas) * 100) : null,
+    servidor: true
+  };
+}
 
 const C = { superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1' };
 
@@ -48,13 +70,37 @@ function contar(filas) {
   }
   const total = verificables.length;
   const juzgadas = total - n.pendiente;
-  return { ...n, total, juzgadas, pct: juzgadas ? Math.round((n.cumplida / juzgadas) * 100) : null };
+  const intentadas = n.cumplida + n.apoyada_sin_aprobar;
+  return {
+    ...n, total, juzgadas, intentadas,
+    cobertura: total ? Math.round((juzgadas / total) * 100) : 0,
+    pct: juzgadas >= MUESTRA_MINIMA ? Math.round((intentadas / juzgadas) * 100) : null,
+    servidor: false
+  };
+}
+
+function Disco({ pct, color, animar }) {
+  const R = 11.5;
+  return (
+    <svg width="46" height="46" viewBox="0 0 48 48" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
+      <circle cx="24" cy="24" r="23" fill="#E6E2D6" />
+      {pct != null && (
+        <motion.circle cx="24" cy="24" r={R} fill="none"
+          stroke={color || '#8E9299'} strokeWidth="23"
+          transform="rotate(-90 24 24)"
+          initial={animar ? { pathLength: 0 } : false}
+          animate={{ pathLength: Math.max(0, Math.min(1, pct / 100)) }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} />
+      )}
+      <path d="M24 24L24 1" stroke="#F3F1E8" strokeWidth="1.6" fill="none" />
+    </svg>
+  );
 }
 
 function Balanza({ c, color, animar }) {
   if (!c.total) return null;
   return (
-    <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: '#EDEBE2' }}>
+    <div style={{ display: 'flex', height: 8, overflow: 'hidden', background: '#EDEBE2' }}>
       {ORDEN.map(k => c[k] > 0 && (
         <motion.i key={k} title={`${c[k]} ${ESTADO[k].texto}`}
           style={{ display: 'block', background: k === 'pendiente' ? '#DCD9CE' : ESTADO[k].color }}
@@ -77,8 +123,8 @@ function frase(p, c) {
   const cola = trozos.length > 1
     ? `${trozos.slice(0, -1).join(', ')} y ${trozos[trozos.length - 1]}`
     : trozos[0];
-  const aviso = c.juzgadas < 10 ? ' Muestra pequeña.' : '';
-  return `De ${c.juzgadas} compromisos ya votados, ${p.siglas} ${cola}.${aviso}`;
+  const aviso = c.juzgadas < MUESTRA_MINIMA ? ' Muestra pequeña.' : '';
+  return `De ${c.juzgadas} compromisos ya votados, ${siglasPartido(p.siglas)} ${cola}.${aviso}`;
 }
 
 export default function Partidos({ onDiputados }) {
@@ -88,7 +134,10 @@ export default function Partidos({ onDiputados }) {
   const [soloVerificables, setSoloVerificables] = useState(true);
   const [fMateria, setFMateria] = useState(null);
 
+  const [resumen, setResumen] = useState(null);
+
   useEffect(() => { traerProgramas().then(setProgramas).catch(() => setProgramas([])); }, []);
+  useEffect(() => { traerResumenPromesas().then(setResumen).catch(() => setResumen(null)); }, []);
 
   useEffect(() => {
     if (!programas?.length) return;
@@ -103,19 +152,29 @@ export default function Partidos({ onDiputados }) {
 
   const cuentas = useMemo(() => {
     const m = {};
-    for (const k of Object.keys(promesas)) m[k] = contar(promesas[k]);
+    for (const p of programas ?? []) {
+      const clave = String(p.siglas ?? p.partido ?? '').trim().toUpperCase();
+      const delServidor = desdeResumen(resumen?.[clave]);
+      if (delServidor) m[p.partido] = delServidor;
+    }
+    for (const k of Object.keys(promesas)) {
+      if (!m[k]) m[k] = contar(promesas[k]);
+    }
     return m;
-  }, [promesas]);
+  }, [promesas, programas, resumen]);
 
   const ordenados = useMemo(() => {
     if (!programas) return [];
     return [...programas].sort((a, b) => {
       const ca = cuentas[a.partido];
       const cb = cuentas[b.partido];
-      if (ca?.pct == null && cb?.pct == null) return (b.promesas ?? 0) - (a.promesas ?? 0);
-      if (ca?.pct == null) return 1;
-      if (cb?.pct == null) return -1;
-      return cb.pct - ca.pct;
+      const ia = ca?.intentadas ?? -1;
+      const ib = cb?.intentadas ?? -1;
+      if (ib !== ia) return ib - ia;
+      const ja = ca?.juzgadas ?? 0;
+      const jb = cb?.juzgadas ?? 0;
+      if (jb !== ja) return jb - ja;
+      return (b.promesas ?? 0) - (a.promesas ?? 0);
     });
   }, [programas, cuentas]);
 
@@ -172,27 +231,32 @@ export default function Partidos({ onDiputados }) {
             a.n++; m.set(x.materia, a); return m;
           }, new Map()).entries()
         ).sort((a, b) => b[1].n - a[1].n);
-        const lista = fMateria ? todas.filter(x => x.materia === fMateria) : todas;
+        const filtradas = fMateria ? todas.filter(x => x.materia === fMateria) : todas;
+        const lista = [...filtradas].sort(
+          (x, y) => (ORDEN.indexOf(x.estado) + 1 || 99) - (ORDEN.indexOf(y.estado) + 1 || 99)
+        );
 
         return (
           <motion.div key={p.id} layout
             transition={{ type: 'spring', stiffness: 260, damping: 30 }}
             style={{
-              border: `1px solid ${activo ? p.color : C.linea}`, borderRadius: 3,
+              border: `1px solid ${activo ? p.color : C.linea}`, borderRadius: 2,
               background: C.superficie, marginBottom: 8, overflow: 'hidden'
             }}>
             <button onClick={() => abrir(p)} style={{
               display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left',
               padding: '14px 15px', background: 'transparent', border: 'none', cursor: 'pointer'
             }}>
-              <span style={{ width: 5, height: 46, background: p.color || '#8E9299', borderRadius: 5, flexShrink: 0 }} />
+              <Disco pct={c?.pct} color={p.color} animar={indice < 8} />
 
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span className="ed" style={{ fontSize: 16, fontWeight: 600 }}>{p.siglas}</span>
-                  {c?.pct != null && (
+                  <span className="ed" style={{ fontSize: 16, fontWeight: 600 }}>{siglasPartido(p.siglas)}</span>
+                  {c && (
                     <span className="em" style={{ fontSize: 11, color: C.tenue }}>
-                      <Cifra valor={c.pct} sufijo="%" /> cumplido sobre {c.juzgadas} votados
+                      {c.pct != null
+                        ? <><Cifra valor={c.intentadas} /> a favor de {c.juzgadas} ya votados (<Cifra valor={c.pct} sufijo="%" />)</>
+                        : <><Cifra valor={c.intentadas} /> a favor de {c.juzgadas} ya votados</>}
                     </span>
                   )}
                 </span>
@@ -202,6 +266,7 @@ export default function Partidos({ onDiputados }) {
                 {!cargando && <Balanza c={c} color={p.color} animar={indice < 8} />}
                 <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue, marginTop: 6 }}>
                   {p.promesas} compromisos en el programa · {p.verificables} verificables · {p.paginas} páginas
+                  {c ? <> · emparejados con una votación: <Cifra valor={c.juzgadas} /> de {c.total} (<Cifra valor={c.cobertura} sufijo="%" />)</> : null}
                 </span>
               </span>
 
@@ -281,7 +346,7 @@ export default function Partidos({ onDiputados }) {
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.linea}` }}>
                   <a href={OFICIALES[p.partido] ?? '#'} target="_blank" rel="noreferrer" className="em"
                     style={{ fontSize: 11, color: C.media, display: 'block' }}>
-                    Web oficial de {p.siglas} · descarga allí el programa completo →
+                    Web oficial de {siglasPartido(p.siglas)} · descarga allí el programa completo →
                   </a>
                   <div style={{ fontSize: 10, color: C.tenue, marginTop: 7, lineHeight: 1.5 }}>
                     No alojamos los programas: son obra de cada partido. Aquí solo se publican

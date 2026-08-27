@@ -3,7 +3,7 @@ import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
-const VERSION = process.env.VERSION_CODIGO ?? 'codigo-v1-2026-08';
+const VERSION = process.env.VERSION_CODIGO ?? 'codigo-v3-2026-08';
 
 const DIR = { type: 'string', enum: ['aumenta', 'reduce', 'neutro'] };
 
@@ -16,14 +16,25 @@ const ESQUEMA = {
     derechos_individuales: DIR,
     apertura_migratoria: DIR,
     descentralizacion: DIR,
+    moral_tradicional: DIR,
+    religion_estado: DIR,
+    orden_publico: DIR,
+    diversidad_cultural: DIR,
+    igualdad_trato: DIR,
+    medio_ambiente: DIR,
+    integracion_europea: DIR,
+    calidad_democratica: DIR,
     justificacion: { type: 'string' }
   },
   required: ['gasto_publico', 'impuestos', 'regulacion_mercado',
-    'derechos_individuales', 'apertura_migratoria', 'descentralizacion', 'justificacion']
+    'derechos_individuales', 'apertura_migratoria', 'descentralizacion',
+    'moral_tradicional', 'religion_estado', 'orden_publico', 'diversidad_cultural',
+    'igualdad_trato', 'medio_ambiente', 'integracion_europea', 'calidad_democratica',
+    'justificacion']
 };
 
 function prompt(p: any): string {
-  return `Codificas compromisos electorales segun SEIS dimensiones objetivas.
+  return `Codificas compromisos electorales segun CATORCE dimensiones objetivas.
 No opinas sobre ideologia. Solo describes que hace la medida.
 
 COMPROMISO:
@@ -57,8 +68,67 @@ Para cada dimension responde "aumenta", "reduce" o "neutro".
    aumenta: transfiere competencias, recursos o capacidad de decision a comunidades autonomas.
    reduce: recentraliza competencias o refuerza el control del Estado sobre ellas.
 
+7. moral_tradicional
+   reduce: refuerza la familia tradicional, restringe aborto, divorcio, eutanasia o identidad
+           de genero, o censura contenidos por inmoralidad.
+   aumenta: amplia aborto, divorcio, eutanasia, matrimonio o identidad de genero.
+
+8. religion_estado
+   reduce: amplia privilegios, financiacion, ensenanza o simbolos de una confesion.
+   aumenta: retira privilegios, financiacion o simbolos confesionales del ambito publico.
+
+9. orden_publico
+   reduce: amplia poderes policiales, penas, vigilancia o limita reunion y protesta.
+   aumenta: limita poderes policiales, rebaja penas o refuerza garantias procesales.
+
+10. diversidad_cultural
+   reduce: impone asimilacion, restringe lenguas o culturas minoritarias.
+   aumenta: protege lenguas, culturas o minorias, o reconoce pluralidad.
+11. igualdad_trato
+   aumenta: amplia el acceso a servicios o la proteccion frente a la discriminacion por
+            raza, origen, religion, estado civil, orientacion, genero, discapacidad,
+            edad o posicion economica.
+   reduce: restringe ese acceso o retira protecciones antidiscriminatorias.
+   Aqui van accesibilidad, inclusion, no discriminacion y cobertura universal de un
+   servicio. NO confundir con derechos_individuales, que es autonomia personal.
+
+12. medio_ambiente
+   aumenta: refuerza proteccion ambiental, clima, biodiversidad, agua o transicion energetica.
+   reduce: relaja exigencias ambientales o amplia usos extractivos.
+
+13. integracion_europea
+   aumenta: cede competencias a la UE, aplica normativa europea o refuerza su papel.
+   reduce: recupera soberania, rechaza normativa europea o su jurisdiccion.
+
+14. calidad_democratica
+   aumenta: refuerza transparencia, control del poder, independencia judicial,
+            lucha contra la corrupcion o participacion directa.
+   reduce: debilita controles, opacidad, o somete organos independientes al poder politico.
+
+
 REGLAS ESTRICTAS:
+- derechos_individuales es SOLO autonomia personal sobre la propia conducta: aborto,
+  eutanasia, divorcio, identidad de genero, orientacion sexual, intimidad, libertad de
+  expresion, sustancias, libertad reproductiva. Accesibilidad, discapacidad, servicios
+  sanitarios, proteccion al consumidor o derechos digitales NO van aqui: van a
+  igualdad_trato, gasto_publico o regulacion_mercado segun corresponda.
+- La palabra "derecho" en el texto no determina la dimension. Mira que hace la medida.
+- Codifica por el efecto sobre quien ejerce la conducta, no sobre quien la presta:
+  permitir la objecion de conciencia sanitaria es derechos_individuales reduce.
+- Elegir centro o tipo de educacion por motivos religiosos toca religion_estado.
 - Codifica solo lo que la medida hace de forma directa, no sus efectos indirectos.
+- gasto_publico solo si el Estado desembolsa dinero de forma directa e identificable:
+  una partida, una subvencion, una prestacion, una plantilla o una inversion.
+  El coste indirecto de aplicar una ley NO es gasto_publico.
+- Los verbos de intencion sin instrumento concreto van a neutro en todas las dimensiones:
+  impulsar, promover, fomentar, avanzar en, trabajar por, salvo que la promesa diga
+  con que dinero o con que norma se hace.
+- Una medida penal o de seguridad es orden_publico, nunca gasto_publico.
+  Endurecer penas por conducta privada es derechos_individuales reduce; por delitos
+  comunes es orden_publico reduce. No marques las dos por lo mismo.
+- En las dimensiones 7 a 10, reduce significa siempre menos autonomia personal o menos
+  pluralidad, y aumenta siempre lo contrario. Manten ese sentido aunque suene raro.
+- Una promesa puede responder distinto en cada dimension. No busques coherencia entre ellas.
 - Subir el salario minimo NO es gasto publico: es regulacion_mercado aumenta.
 - Bajar un impuesto NO es "reduce gasto_publico": es impuestos reduce.
 - Ante la duda, "neutro". Preferimos no codificar a codificar mal.
@@ -98,7 +168,9 @@ const progreso = SOLO_INFORME
 
     const d = r.datos;
     const campos = ['gasto_publico', 'impuestos', 'regulacion_mercado',
-      'derechos_individuales', 'apertura_migratoria', 'descentralizacion'];
+      'derechos_individuales', 'apertura_migratoria', 'descentralizacion',
+      'moral_tradicional', 'religion_estado', 'orden_publico', 'diversidad_cultural',
+      'igualdad_trato', 'medio_ambiente', 'integracion_europea', 'calidad_democratica'];
 
     const valido = (v: any) => ['aumenta', 'reduce', 'neutro'].includes(v) ? v : 'neutro';
     const fila: any = { promesa_id: p.id, justificacion: String(d.justificacion ?? '').slice(0, 200),

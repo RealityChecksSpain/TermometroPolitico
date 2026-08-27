@@ -5,10 +5,11 @@ import { traerVotacionesDeNorma, traerRelacionadas } from '../lib/cliente.js';
 import HistorialNorma from './HistorialNorma.jsx';
 import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
 import { implicacionDe } from '../lib/implicaciones.js';
+import { VOTO } from '../lib/paleta.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
-  linea: '#DCDCD3', si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
+  linea: '#DCDCD3', ...VOTO
 };
 
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abstención', no_vota: 'No vota' };

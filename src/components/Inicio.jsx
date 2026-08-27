@@ -12,11 +12,12 @@ import {
 } from '../lib/alertas.js';
 import { traerUltimas, traerLideres } from '../lib/cliente.js';
 import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
+import { VOTO } from '../lib/paleta.js';
 
 const C = {
   papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1',
-  si: '#2E7D5B', no: '#B23A2E'
+  ...VOTO
 };
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];

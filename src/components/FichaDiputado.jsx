@@ -4,10 +4,11 @@ import { Cifra, SALIDA } from './Movimiento.jsx';
 import { desgloseBienes } from '../lib/inmuebles.js';
 import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
 import AvatarPartido from './AvatarPartido.jsx';
+import { VOTO } from '../lib/paleta.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
-  linea: '#E3DFD1', si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
+  linea: '#E3DFD1', ...VOTO
 };
 
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abst.', no_vota: 'No votó' };

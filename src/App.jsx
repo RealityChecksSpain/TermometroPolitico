@@ -16,11 +16,12 @@ import {
   faltaConfig, problemasConfig, traerDiputados, traerVotaciones, traerVotos,
   traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
 } from './lib/cliente.js';
+import { VOTO } from './lib/paleta.js';
 
 const C = {
   papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1',
-  si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
+  ...VOTO
 };
 
 const estilos = `
@@ -74,7 +75,21 @@ color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,co
 .split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:8px}
 @media(min-width:960px){.split{grid-template-columns:minmax(380px,1.15fr) minmax(300px,.9fr);gap:18px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
-@media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(420px,1.35fr) minmax(260px,.72fr);gap:18px}}
+.split.splitDiputados{grid-template-columns:1fr}
+@media(min-width:960px){.split.splitDiputados{grid-template-columns:1fr;gap:14px}
+.split.splitDiputados>.izq{position:static;top:auto}
+.split.splitDiputados .hemiSvg{max-height:240px;width:auto;margin:0 auto}}
+.rejillaDip .fila{display:grid;grid-template-columns:26px 34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;cursor:pointer;border:none}
+@media(min-width:960px){.rejillaDip .fila{grid-template-columns:26px 34px minmax(0,1fr) 150px 130px}}
+.rejillaDip .celdaNombre{min-width:0}
+.rejillaDip .dipNombre{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rejillaDip .fila[data-top="1"] .dipNombre{font-weight:600}
+.rejillaDip .dipMeta{display:block;font-size:9.5px;color:${C.tenue};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.rejillaDip .celdaCirc{display:none;font-size:10.5px;color:${C.tenue};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(min-width:960px){.rejillaDip .celdaCirc{display:block}}
+.rejillaDip .celdaDato{text-align:right;min-width:0}
+.rejillaDip .fila[data-top="1"] .dato{font-size:clamp(19px,2.1vw,26px)}
+.rejillaDip .datoUnidad{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 :root{
 --s1:4px;--s2:8px;--s3:12px;--s4:20px;--s5:32px;--s6:52px;
 --radio:3px;--radioG:5px;
@@ -104,8 +119,8 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #3D7A
 
 .listaFilete{background:transparent;border:0;box-shadow:none}
 .listaFilete .fila{border-top:1px solid var(--acentoTenue,#E3DFD1)}
-.listaFilete .fila:first-child{border-top:2px solid var(--acento,#16181B)}
-.listaFilete .fila:last-child{border-bottom:2px solid var(--acento,#16181B)}
+.listaFilete .fila:first-child{border-top:1px solid var(--acentoTenue,#E3DFD1)}
+.listaFilete .fila:last-child{border-bottom:1px solid var(--acentoTenue,#E3DFD1)}
 .dato{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
 font-size:clamp(19px,2.1vw,26px);font-weight:500;letter-spacing:-0.03em;line-height:1;
 color:var(--acento,#16181B)}
@@ -169,19 +184,61 @@ flex-wrap:wrap;padding:var(--s4) 0 var(--s3)}
 
 `;
 
+function IconoInicio({ acento }) {
+  return (<>
+    <path fillRule="evenodd" clipRule="evenodd"
+      d="M1 12C6 5 18 5 23 12C18 19 6 19 1 12ZM3.8 12C7.6 7.4 16.4 7.4 20.2 12C16.4 16.6 7.6 16.6 3.8 12Z" />
+    <circle cx="12" cy="12" r="3.2" fill={acento} />
+  </>);
+}
+
+function IconoLeyes({ acento }) {
+  return (<>
+    <rect x="3" y="3.6" width="18" height="2.6" />
+    <rect x="3" y="9" width="12.5" height="2.6" />
+    <rect x="6.5" y="14.4" width="14.5" height="2.6" fill={acento} />
+    <rect x="3" y="19.8" width="8.5" height="2.6" />
+  </>);
+}
+
+function IconoDiputados({ acento }) {
+  return (<>
+    <circle cx="12" cy="6" r="4.3" fill={acento} />
+    <path d="M3.6 22L6.6 12.6H17.8L20.6 22Z" />
+  </>);
+}
+
+function IconoPartidos({ acento, papel }) {
+  return (<>
+    <circle cx="12" cy="12" r="10.5" />
+    <path d="M12 12L12 1.5A10.5 10.5 0 0 1 21.1 17.2Z" fill={acento} />
+    <path d="M12 12L2.9 17.25" stroke={papel} strokeWidth="1.4" fill="none" />
+  </>);
+}
+
+function IconoEjes({ acento }) {
+  return (<>
+    <path d="M12 0.8L13.9 10.1L23.2 12L13.9 13.9L12 23.2L10.1 13.9L0.8 12L10.1 10.1Z" />
+    <circle cx="17.6" cy="6.8" r="2.3" fill={acento} />
+  </>);
+}
+
 const ICONOS = {
-  inicio: 'M3 11l9-8 9 8 M5 10v10h14V10',
-  leyes: 'M4 3h11l5 5v13H4z M15 3v5h5',
-  diputados: 'M8 11a4 4 0 100-8 4 4 0 000 8z M2 21a6 6 0 0112 0 M17 11a3 3 0 100-6 M16 21a5 5 0 016-5',
-  partidos: 'M3 21h18 M5 21V8l7-5 7 5v13 M10 21v-6h4v6',
-  ejes: 'M3 3v18h18 M7 15l4-5 3 3 5-7'
+  inicio: IconoInicio,
+  leyes: IconoLeyes,
+  diputados: IconoDiputados,
+  partidos: IconoPartidos,
+  ejes: IconoEjes
 };
 
-function Icono({ d }) {
-  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    {d.split(' M').map((p, i) => <path key={i} d={(i ? 'M' : '') + p} />)}
-  </svg>;
+function Icono({ tipo }) {
+  const Figura = ICONOS[tipo] ?? IconoInicio;
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
+      style={{ flexShrink: 0 }}>
+      <Figura acento="#E0492E" papel={C.papel} />
+    </svg>
+  );
 }
 
 const ORDENES = [
@@ -396,7 +453,7 @@ export default function App() {
           {secciones.map(([k, t]) => (
             <button key={k} className="navb" data-on={seccion === k ? '1' : '0'}
               onClick={() => { setSeccion(k); setVotacionSel(null); setBusqueda(''); }}>
-              <Icono d={ICONOS[k]} />{t}
+              <Icono tipo={k} />{t}
             </button>
           ))}
         </nav>
@@ -731,100 +788,85 @@ export default function App() {
                   return d ? <span style={{ color: C.media }}> · {d.nombre_completo}</span> : null;
                 })()}
               </div>
-              <div className="listaFilete">
-                {listaDip.slice(0, 200).map((d, i) => (
-                  <motion.button key={d.mandato_id} className="fila" data-top={i < 3 ? '1' : '0'} onClick={() => setSel(d)}
-                    layout={i < 24 ? 'position' : false}
-                    transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-                    onMouseEnter={() => setEncimaEscano(d.mandato_id)}
-                    onMouseLeave={() => setEncimaEscano(null)}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'auto auto minmax(0,1fr) auto',
-                      alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-                      padding: i < 3 ? '13px 10px' : '9px 10px', cursor: 'pointer',
-                      background: encimaEscano === d.mandato_id ? 'var(--acentoTenue)' : 'transparent',
-                      border: 'none',
-                      boxShadow: encimaEscano === d.mandato_id ? `inset 3px 0 0 ${d.color || '#8E9299'}` : 'none'
-                    }}>
-                    <span className="puesto">{i + 1}</span>
-                    <AvatarPartido
-                      foto={d.foto_url}
-                      color={d.color}
-                      siglas={d.partido_siglas || d.grupo}
-                      nombre={d.nombre_completo}
-                      w={i < 3 ? 34 : 28}
-                      h={i < 3 ? 43 : 35}
-                    />
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{
-                        display: 'block', fontSize: i < 3 ? 14.5 : 12.5, fontWeight: i < 3 ? 600 : 400,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                      }}>{d.nombre_completo}</span>
-                      <span className="em" style={{
-                        display: 'block', fontSize: 9.5, color: C.tenue, whiteSpace: 'nowrap',
-                        overflow: 'hidden', textOverflow: 'ellipsis'
+              <div className="listaFilete rejillaDip">
+                {listaDip.slice(0, 200).map((d, i) => {
+                  const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
+                  const fmtEuro = v => {
+                    if (v == null || v === '\u2014' || Number.isNaN(Number(v))) return '\u2014';
+                    const n = Number(v);
+                    if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(1) + ' M';
+                    if (Math.abs(n) >= 1000) return Math.round(n / 1000) + ' mil';
+                    return String(Math.round(n));
+                  };
+                  const casas = d.n_casas ?? d.n_inmuebles;
+                  const nVeh = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
+                  const etiquetas = {
+                    nombre: ['min', d.minutos_tribuna],
+                    ausencias: ['aus.', d.ausencias],
+                    disidencias: ['contra', d.disidencias],
+                    tribuna: ['min', d.minutos_tribuna],
+                    intervenciones: ['int.', d.intervenciones],
+                    abstenciones: ['abs.', d.abstenciones],
+                    telematicos: ['tel.', d.telematicos],
+                    patrimonio: ['\u20AC', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
+                    inmuebles: ['bienes', d.n_inmuebles_propios ?? casas ?? '\u2014'],
+                    inmuebles_todos: ['bienes', casas ?? '\u2014'],
+                    vehiculos: ['veh.', nVeh || '\u2014'],
+                    donaciones: ['don.', d.donaciones],
+                    privadas: ['priv.', d.actividades_privadas]
+                  };
+                  const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
+                  let sub = et;
+                  if (cfg[0] === 'inmuebles' && casas != null) sub = 'inmuebles';
+                  if (cfg[0] === 'vehiculos') {
+                    const partes = [];
+                    if (d.n_coches) partes.push(`${d.n_coches} coche${d.n_coches === 1 ? '' : 's'}`);
+                    if (d.n_motos) partes.push(`${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}`);
+                    if (d.n_embarcaciones) partes.push(`${d.n_embarcaciones} emb.`);
+                    if (d.n_aeronaves) partes.push(`${d.n_aeronaves} aer.`);
+                    sub = partes.length ? partes.join(' \u00B7 ') : 'veh\u00EDculos';
+                  }
+                  if (cfg[0] === 'patrimonio' && casas != null) sub = `${casas} inm.`;
+
+                  const trozos = desgloseBienes(d).map(x => x.texto);
+                  const patrimonial = cfg[0] === 'inmuebles' || cfg[0] === 'inmuebles_todos' || cfg[0] === 'patrimonio';
+                  const linea2 = patrimonial && trozos.length
+                    ? trozos.join(' \u00B7 ')
+                    : `${d.partido_siglas || d.grupo || '\u2014'} \u00B7 ${d.grupo || '\u2014'}`;
+
+                  return (
+                    <motion.button key={d.mandato_id} className="fila" data-top={i < 3 ? '1' : '0'}
+                      onClick={() => setSel(d)}
+                      layout={i < 24 ? 'position' : false}
+                      transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+                      onMouseEnter={() => setEncimaEscano(d.mandato_id)}
+                      onMouseLeave={() => setEncimaEscano(null)}
+                      style={{
+                        background: encimaEscano === d.mandato_id ? 'var(--acentoTenue)' : 'transparent',
+                        boxShadow: `inset 3px 0 0 ${d.color || '#8E9299'}`
                       }}>
-                        {d.partido_siglas || d.grupo || '—'} · {d.circunscripcion ?? '—'}
+                      <span className="puesto">{i + 1}</span>
+                      <AvatarPartido
+                        foto={d.foto_url}
+                        color={d.color}
+                        siglas={d.partido_siglas || d.grupo}
+                        nombre={d.nombre_completo}
+                        w={28}
+                        h={35}
+                      />
+                      <span className="celdaNombre">
+                        <span className="dipNombre">{d.nombre_completo}</span>
+                        <span className="em dipMeta">{linea2}</span>
                       </span>
-                      {(orden === 'inmuebles' || orden === 'inmuebles_todos') && desgloseBienes(d).length > 0 && (
-                        <span className="em" style={{
-                          display: 'block', fontSize: 9.5, color: '#8E959C', marginTop: 2,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                        }}>
-                          {desgloseBienes(d).map(x => x.texto).join(' · ')}
-                        </span>
-                      )}
-                    </span>
-                    <span style={{ textAlign: 'right', flexShrink: 0, maxWidth: 120 }}>
-                      {(() => {
-                        const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
-                        const fmtEuro = v => {
-                          if (v == null || v === '—' || Number.isNaN(Number(v))) return '—';
-                          const n = Number(v);
-                          if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' M';
-                          if (Math.abs(n) >= 1000) return Math.round(n / 1000) + ' mil';
-                          return String(Math.round(n));
-                        };
-                        const casas = d.n_casas ?? d.n_inmuebles;
-                        const nVeh = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
-                        const etiquetas = {
-                          nombre: ['min', d.minutos_tribuna],
-                          ausencias: ['aus.', d.ausencias],
-                          disidencias: ['contra', d.disidencias],
-                          tribuna: ['min', d.minutos_tribuna],
-                          intervenciones: ['int.', d.intervenciones],
-                          abstenciones: ['abs.', d.abstenciones],
-                          telematicos: ['tel.', d.telematicos],
-                          patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
-                          inmuebles: ['bienes', d.n_inmuebles_propios ?? casas ?? '—'],
-                          inmuebles_todos: ['bienes', casas ?? '—'],
-                          vehiculos: ['veh.', nVeh || '—'],
-                          donaciones: ['don.', d.donaciones],
-                          privadas: ['priv.', d.actividades_privadas]
-                        };
-                        const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
-                        let sub = et;
-                        if (cfg[0] === 'inmuebles' && casas != null) sub = 'inmuebles';
-                        if (cfg[0] === 'vehiculos') {
-                          const partes = [];
-                          if (d.n_coches) partes.push(`${d.n_coches} coche${d.n_coches === 1 ? '' : 's'}`);
-                          if (d.n_motos) partes.push(`${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}`);
-                          if (d.n_embarcaciones) partes.push(`${d.n_embarcaciones} emb.`);
-                          if (d.n_aeronaves) partes.push(`${d.n_aeronaves} aer.`);
-                          sub = partes.length ? partes.join(' · ') : 'vehículos';
-                        }
-                        if (cfg[0] === 'patrimonio' && casas != null) sub = `${casas} inm.`;
-                        return (<>
-                          <span className="dato" style={{ display: 'block' }}>{val ?? 0}</span>
-                          <span className="datoUnidad" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {sub}
-                          </span>
-                        </>);
-                      })()}
-                    </span>
-                  </motion.button>
-                ))}
+                      <span className="em celdaCirc">{d.circunscripcion ?? '\u2014'}</span>
+                      <span className="celdaDato">
+                        <span className="dato">{val ?? 0}</span>
+                        <span className="datoUnidad">{sub}</span>
+                      </span>
+                    </motion.button>
+                  );
+                })}
+
               </div>
             </div>
           )}

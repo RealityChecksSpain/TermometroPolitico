@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { DestelloSuave } from './Destello.jsx';
-import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos } from '../lib/cliente.js';
+import { VOTO } from '../lib/paleta.js';
+import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos, traerSubejes, traerBaseComun, traerVotosPorClase, traerIniciativasPartido } from '../lib/cliente.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
 const esTactil = typeof window !== 'undefined' &&
@@ -29,7 +30,39 @@ function listarDims(dims) {
   return partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
 }
 
-const ESCALA_VOTOS = 1.7;
+const ESCALA_VOTOS = 1.24;
+
+const NOMBRE_CLASE = {
+  ley_final: 'Votaciones finales de norma',
+  decisoria: 'Tomas en consideración y totalidad',
+  enmienda: 'Enmiendas a leyes en trámite',
+  tramite: 'Trámite parlamentario',
+  no_vinculante: 'Declaraciones sin valor de ley'
+};
+
+const NOMBRE_SUBEJE = {
+  gasto_publico: 'Gasto público',
+  impuestos: 'Impuestos',
+  regulacion_mercado: 'Regulación de empresas',
+  derechos_individuales: 'Derechos individuales',
+  apertura_migratoria: 'Migración',
+  moral_tradicional: 'Moral y familia',
+  religion_estado: 'Religión y Estado',
+  orden_publico: 'Orden público',
+  diversidad_cultural: 'Diversidad cultural'
+};
+
+const ETIQUETA_DIM = {
+  gasto_publico: ['recortar gasto', 'ampliar gasto'],
+  impuestos: ['bajar impuestos', 'subir impuestos'],
+  regulacion_mercado: ['desregular', 'regular más'],
+  derechos_individuales: ['restringir derechos', 'ampliar derechos'],
+  apertura_migratoria: ['cerrar la migración', 'abrir la migración'],
+  moral_tradicional: ['la moral tradicional', 'la autonomía personal'],
+  religion_estado: ['privilegios confesionales', 'la laicidad'],
+  orden_publico: ['más poder policial', 'más garantías'],
+  diversidad_cultural: ['la asimilación', 'la pluralidad']
+};
 
 function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
   return (
@@ -69,6 +102,10 @@ function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
 
 export default function Mapa({ onDiputados }) {
   const [datos, setDatos] = useState(null);
+  const [subejes, setSubejes] = useState(null);
+  const [baseComun, setBaseComun] = useState(null);
+  const [votosClase, setVotosClase] = useState(null);
+  const [iniciativas, setIniciativas] = useState(null);
   const [fuente, setFuente] = useState('programa');
   const [encima, setEncima] = useState(null);
   const [sesgo, setSesgo] = useState(null);
@@ -106,6 +143,10 @@ export default function Mapa({ onDiputados }) {
     traerMapaPartidos().then(setDatos).catch(() => setDatos([]));
     traerSesgo().then(setSesgo).catch(() => setSesgo(null));
     traerAuditoriaEjeVotos().then(setAuditoria).catch(() => setAuditoria(null));
+    traerSubejes().then(setSubejes).catch(() => setSubejes(null));
+    traerBaseComun().then(setBaseComun).catch(() => setBaseComun(null));
+    traerVotosPorClase().then(setVotosClase).catch(() => setVotosClase(null));
+    traerIniciativasPartido().then(setIniciativas).catch(() => setIniciativas(null));
   }, []);
 
   const ejeEcoValido = !auditoria || auditoria.etiqueta_permitida === 'izquierda-derecha';
@@ -332,20 +373,22 @@ export default function Mapa({ onDiputados }) {
               role="img"
               aria-label="Mapa de partidos en dos ejes">
               <rect x="-1.45" y="-1.5" width="2.9" height="3.05" fill="transparent" />
-                            <rect x="-1.24" y="-1.24" width="1.24" height="1.24" fill="#F2A7A018" />
-              <rect x="0" y="-1.24" width="1.24" height="1.24" fill="#8EB8F018" />
-              <rect x="-1.24" y="0" width="1.24" height="1.24" fill="#6ECFBC14" />
-              <rect x="0" y="0" width="1.24" height="1.24" fill="#E8C56A14" />
-              <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#3A4048" strokeWidth="0.006" />
-              <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#3A4048" strokeWidth="0.006" />
+              <rect x="-1.24" y="-1.24" width="1.24" height="1.24" fill="#EE7B3A14" />
+              <rect x="0" y="-1.24" width="1.24" height="1.24" fill="#1A6B8A18" />
+              <rect x="-1.24" y="0" width="1.24" height="1.24" fill="#17836F14" />
+              <rect x="0" y="0" width="1.24" height="1.24" fill="#F2A93E12" />
+              <line x1="-1.24" y1="0" x2="1.24" y2="0" stroke="#EDE7D4" strokeOpacity="0.5" strokeWidth="0.013" />
+              <line x1="0" y1="-1.24" x2="0" y2="1.24" stroke="#EDE7D4" strokeOpacity="0.5" strokeWidth="0.013" />
+              <path d="M0 -0.13L0.0221 -0.0221L0.13 0L0.0221 0.0221L0 0.13L-0.0221 0.0221L-0.13 0L-0.0221 -0.0221Z"
+                fill="#EDE7D4" fillOpacity="0.62" />
 
-                            <text x="-1.32" y="-1.28" fill="#F2A7A0" fontSize="0.092" fontWeight="700"
+                            <text x="-1.32" y="-1.28" fill="#EE7B3A" fontSize="0.092" fontWeight="700"
                 fontFamily="DM Mono, monospace" letterSpacing="0.02">{sustituido ? 'OPOSICIÓN' : 'IZQUIERDA'}</text>
-              <text x="1.32" y="-1.28" fill="#8EB8F0" fontSize="0.092" fontWeight="700"
+              <text x="1.32" y="-1.28" fill="#4E9BBE" fontSize="0.092" fontWeight="700"
                 textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{sustituido ? 'GOBIERNO' : 'DERECHA'}</text>
-              <text x="0" y="-1.40" fill="#E8C56A" fontSize="0.092" fontWeight="700"
+              <text x="0" y="-1.40" fill="#F2A93E" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">CONSERVADOR</text>
-              <text x="0" y="1.48" fill="#6ECFBC" fontSize="0.092" fontWeight="700"
+              <text x="0" y="1.48" fill="#2FA98F" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">PROGRESISTA</text>
 
               {conEtiqueta.map(p => {
@@ -390,6 +433,8 @@ export default function Mapa({ onDiputados }) {
                       animate={{ x: p.cx, y: p.labelY }}
                       transition={VIAJE}
                       fill={encima === p.partido ? '#FFFFFF' : '#C9CDD2'}
+                      stroke={C.pizarra} strokeWidth="0.014" strokeOpacity="0.75"
+                      paintOrder="stroke" strokeLinejoin="round"
                       fontSize="0.058" textAnchor="middle" fontFamily="DM Mono, monospace"
                       fontWeight={encima === p.partido ? 500 : 400}>
                       {p.siglas}
@@ -413,7 +458,11 @@ export default function Mapa({ onDiputados }) {
                       ? `solo hay ${auditoria.n_economico ?? '—'} normas económicas votadas con división real, y hacen falta 8.`
                       : auditoria.etiqueta_permitida === 'sin poder discriminante'
                         ? `solo ${auditoria.economico_significativos ?? 0} partidos tienen posición distinguible del centro.`
-                        : `barajando al azar las etiquetas de las normas se obtiene un rango parecido (p = ${Number(auditoria.p_economico ?? 1).toFixed(3)}), así que el orden no viene del contenido.`}
+                        : auditoria.etiqueta_permitida === 'placebo caducado'
+                          ? 'han entrado datos nuevos desde la última comprobación contra el azar, así que la anterior ya no vale para estas posiciones.'
+                          : auditoria.etiqueta_permitida === 'placebo sin calcular'
+                            ? 'todavía no se ha comprobado que estas posiciones no salgan por azar.'
+                            : `barajando al azar las etiquetas de las normas se obtiene un rango parecido (p = ${Number(auditoria.p_economico ?? 1).toFixed(3)}), así que el orden no viene del contenido.`}
                     {' '}En su lugar se muestra el alineamiento con el Gobierno, que sí está medido.
                   </div>
                 )}
@@ -423,7 +472,11 @@ export default function Mapa({ onDiputados }) {
                       ? `solo ${auditoria.n_social ?? '—'} normas con división real, hacen falta 8.`
                       : auditoria.etiqueta_permitida_social === 'sin poder discriminante'
                         ? `solo ${auditoria.social_significativos ?? 0} partidos tienen posición distinguible del centro.`
-                        : `el test de permutación no lo distingue del azar (p = ${Number(auditoria.p_social ?? 1).toFixed(3)}).`}
+                        : auditoria.etiqueta_permitida_social === 'placebo caducado'
+                          ? 'han entrado datos nuevos desde la última comprobación contra el azar.'
+                          : auditoria.etiqueta_permitida_social === 'placebo sin calcular'
+                            ? 'todavía no se ha comprobado contra el azar.'
+                            : `el test de permutación no lo distingue del azar (p = ${Number(auditoria.p_social ?? 1).toFixed(3)}).`}
                   </div>
                 )}
               </div>
@@ -450,6 +503,94 @@ export default function Mapa({ onDiputados }) {
                     {fuente === 'votos' && activo.ey > 0 && ` ±${(activo.ey / ESCALA_VOTOS).toFixed(2)}`}
                     {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'votos codificados'}
                   </div>
+                  {(() => {
+                    const f = iniciativas?.[String(activo.siglas ?? '').trim().toUpperCase()];
+                    if (!f || !f.presentadas) return null;
+                    return (
+                      <div className="em" style={{ fontSize: 10.5, color: '#A8AEB4', marginTop: 8, lineHeight: 1.6 }}>
+                        su grupo presenta {f.presentadas} iniciativas
+                        {f.grupo_compartido && (
+                          <span style={{ display: 'block', color: '#7C8288', fontSize: 9.5 }}>
+                            comparte el Grupo Mixto con otros {f.partidos_en_grupo - 1} partidos: la autoría es del grupo, no del partido
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {(() => {
+                    const clases = votosClase?.[String(activo.siglas ?? '').trim().toUpperCase()] ?? [];
+                    const orden = { ley_final: 0, decisoria: 1, enmienda: 2, tramite: 3, no_vinculante: 4 };
+                    const lista = [...clases]
+                      .filter(c => c.clase !== 'sin_clasificar')
+                      .sort((a2, b2) => (orden[a2.clase] ?? 9) - (orden[b2.clase] ?? 9));
+                    if (!lista.length) return null;
+                    return (
+                      <div style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid #3A4048' }}>
+                        <div className="em" style={{ fontSize: 9.5, color: '#7C8288', letterSpacing: '.09em', textTransform: 'uppercase', marginBottom: 6 }}>
+                          cómo vota
+                        </div>
+                        {lista.map(c => {
+                          const total = Number(c.si) + Number(c.no) + Number(c.abstencion) || 1;
+                          const trozos = [
+                            [Number(c.si), VOTO.si],
+                            [Number(c.no), VOTO.no],
+                            [Number(c.abstencion), VOTO.abs]
+                          ];
+                          return (
+                            <div key={c.clase} style={{ marginBottom: 7 }}>
+                              <div className="em" style={{ fontSize: 10.5, color: '#C9CDD2', marginBottom: 3 }}>
+                                {NOMBRE_CLASE[c.clase] ?? c.clase}
+                                <span style={{ color: '#7C8288' }}> · {c.votaciones} votaciones</span>
+                              </div>
+                              <div style={{ display: 'flex', height: 9, overflow: 'hidden' }}>
+                                {trozos.map(([v, col], i) => v > 0 && (
+                                  <div key={i} style={{ background: col, width: `${(v / total) * 100}%` }} />
+                                ))}
+                              </div>
+                              <div className="em" style={{ fontSize: 9.5, color: '#8E959C', marginTop: 3 }}>
+                                {c.si} sí · {c.no} no · {c.abstencion} abstenciones
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {fuente === 'votos' && (() => {
+                    const filas = subejes?.[String(activo.siglas ?? '').trim().toUpperCase()] ?? [];
+                    const dentro = filas.filter(f => !baseComun || baseComun.has(`${f.eje}|${f.dim}`));
+                    if (!dentro.length) return null;
+                    const orden = { economico: 0, social: 1 };
+                    const lista = [...dentro].sort((a2, b2) =>
+                      (orden[a2.eje] ?? 9) - (orden[b2.eje] ?? 9) || Math.abs(b2.bruto) - Math.abs(a2.bruto));
+                    return (
+                      <div style={{ marginTop: 10, paddingTop: 9, borderTop: '1px solid #3A4048' }}>
+                        <div className="em" style={{ fontSize: 9.5, color: '#7C8288', letterSpacing: '.09em', textTransform: 'uppercase', marginBottom: 6 }}>
+                          por qué está ahí
+                        </div>
+                        {lista.map(f => {
+                          const pct = Math.round(Math.abs(Number(f.bruto)) * 100);
+                          const hacia = Number(f.bruto) >= 0 ? ETIQUETA_DIM[f.dim]?.[0] : ETIQUETA_DIM[f.dim]?.[1];
+                          return (
+                            <div key={`${f.eje}-${f.dim}`} style={{ marginBottom: 5 }}>
+                              <div className="em" style={{ fontSize: 10.5, color: '#C9CDD2' }}>
+                                {NOMBRE_SUBEJE[f.dim] ?? f.dim}
+                              </div>
+                              <div className="em" style={{ fontSize: 10, color: '#8E959C', lineHeight: 1.5 }}>
+                                {pct === 0
+                                  ? `sin diferencia sobre ${f.n_reduce + f.n_aumenta} normas`
+                                  : `${pct} % más de apoyo a ${hacia}`}
+                                {' · '}{f.n_reduce} y {f.n_aumenta} normas
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
                   {fuente === 'votos' && activo.voto_apoyo_gobierno != null && (
                     <div className="em" style={{ color: '#7C8288', fontSize: 10.5, marginTop: 3 }}>
                       apoya el {Math.round(Number(activo.voto_apoyo_gobierno) * 100)} % de las normas del Gobierno

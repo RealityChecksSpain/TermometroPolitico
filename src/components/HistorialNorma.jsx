@@ -1,14 +1,12 @@
 import React from 'react';
+import { VOTO } from '../lib/paleta.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
-  linea: '#DCDCD3', si: '#2E7D5B', no: '#B23A2E'
+  linea: '#DCDCD3', ...VOTO
 };
 
-/**
- * Línea de tiempo precisa de votaciones de una misma norma.
- * Solo muestra datos del Congreso (fecha, título de votación, sí/no, resultado).
- */
+
 export default function HistorialNorma({ enmiendas, compacto }) {
   if (!enmiendas?.length) return null;
 

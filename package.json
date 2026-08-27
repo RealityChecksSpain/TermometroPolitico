@@ -48,6 +48,7 @@
     "cargos": "node --env-file=.env --import tsx scripts/asignar-cargos.ts",
     "cargos:candidatos": "node --env-file=.env --import tsx scripts/asignar-cargos.ts --candidatos",
     "cargos:auto": "node --env-file=.env --import tsx scripts/cargar-cargos.ts",
+    "placebo": "node --env-file=.env --import tsx scripts/placebo.ts",
     "fichas": "node --env-file=.env --import tsx scripts/cargar-fichas.ts"
   },
   "dependencies": {

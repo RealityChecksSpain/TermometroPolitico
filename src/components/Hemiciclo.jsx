@@ -100,7 +100,7 @@ export default function Hemiciclo({
 
   return (
     <div style={{ position: 'relative' }}>
-      <svg ref={svgRef}
+      <svg ref={svgRef} className="hemiSvg"
         viewBox="-2.75 -2.82 5.5 3.05"
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: 'auto', display: 'block', touchAction: 'manipulation', cursor: 'crosshair' }}

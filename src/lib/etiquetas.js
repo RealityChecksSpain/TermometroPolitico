@@ -20,3 +20,15 @@ export function etiquetasDeNorma(n, lista) {
     .map(c => (typeof c === 'string' ? nombreColectivo(c, lista) : (c?.nombre || nombreColectivo(c?.slug, lista))))
     .filter(Boolean);
 }
+
+const ALIAS_PARTIDO = {
+  'EH BILDU': 'BILDU',
+  'EH-BILDU': 'BILDU',
+  'EHBILDU': 'BILDU'
+};
+
+export function siglasPartido(s) {
+  if (!s) return s;
+  const clave = String(s).trim().toUpperCase();
+  return ALIAS_PARTIDO[clave] ?? s;
+}

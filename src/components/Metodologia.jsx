@@ -101,11 +101,56 @@ export default function Metodologia({ cobertura }) {
           votaciones nominales reflejan mayorías, no convicciones.
         </p>
         <p style={{ margin: '10px 0 0' }}>
-          En su lugar, cada promesa y cada norma se etiqueta según seis preguntas de hecho, y la
-          posición es una resta entre esas cuentas, normalizada entre −1 y +1. Puedes reproducir el
-          número contando tú mismo. Se calcula dos veces: sobre los programas electorales de 2023
-          y sobre las leyes que cada partido ha votado. La distancia entre ambas posiciones es lo
-          que revela la diferencia entre el discurso y la práctica.
+          En su lugar, cada norma se etiqueta según diez preguntas de hecho, una por dimensión:
+          gasto público, impuestos, regulación de empresas, derechos individuales, migración, moral
+          y familia, religión y Estado, orden público, diversidad cultural y descentralización. Cada
+          pregunta se responde por separado, así que un decreto que sube el gasto y endurece penas
+          puntúa en las dos sin anularse.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Para cada partido y cada dimensión se calcula una resta: el porcentaje de normas que
+          recortan que apoyó, menos el porcentaje de las que amplían. Va de −1 a +1 y puedes
+          reproducirlo contando tú mismo. Al pulsar un partido en el mapa se muestra esa cuenta
+          dimensión por dimensión, con cuántas normas hay de cada lado.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Tres reglas evitan los extremos falsos. Una dimensión solo cuenta si hay al menos tres
+          normas en cada sentido. El resultado se encoge hacia el centro cuando hay pocas normas,
+          de modo que nadie aparece en un extremo por haber votado poco. Y un eje se compone solo
+          con las dimensiones que tienen los trece partidos, para que las posiciones sean
+          comparables entre sí: si a un grupo le falta una dimensión, esa dimensión sale del
+          cálculo para todos.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          El borde del mapa no es el partido más alejado: es el máximo posible, apoyar todas las
+          normas que recortan y ninguna de las que amplían. Por eso ningún partido se acerca al
+          borde. Sobre las 456 normas codificadas, el eje económico completo mide 0,52 de un
+          recorrido posible de 2,0, y el social 0,61.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Antes de publicar cada eje se comprueba contra el azar: se barajan 200 veces las
+          etiquetas de las normas y se mide qué separación entre partidos sale por casualidad. Si
+          la observada no destaca, el eje no se rotula. Y la comprobación caduca sola en cuanto
+          entran datos nuevos, así que un eje etiquetado siempre lo está sobre los datos actuales.
+        </p>
+      </Seccion>
+
+      <Seccion titulo="Qué no mide el mapa">
+        <p style={{ margin: 0 }}>
+          Solo la actividad legislativa. Las proposiciones no de ley y las mociones consecuencia de
+          interpelación, que son 897 de las 2.055 votaciones del pleno, no se pueden usar: el
+          Congreso no las publica en su portal de datos abiertos como iniciativas, así que no hay
+          texto que codificar. El mapa describe cómo vota cada partido las leyes, no las
+          declaraciones de intenciones.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Tampoco mide todo por igual en los dos ejes. En lo económico, nueve de los trece partidos
+          tienen una posición que no se distingue del centro una vez descontado el margen de error;
+          en lo social son dos de trece. El eje que de verdad separa a esta cámara es el social.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Y no mide monarquía ni forma de Estado: son cuestiones constitucionales que apenas se
+          votan y que las escalas comparadas internacionales no incluyen en este eje.
         </p>
       </Seccion>
 

@@ -3,11 +3,12 @@ import { motion, motionValue, useReducedMotion } from 'framer-motion';
 import { Cifra, Item, Lista, SALIDA } from './Movimiento.jsx';
 import { traerFeed } from '../lib/cliente.js';
 import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
+import { VOTO } from '../lib/paleta.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
   tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCDCD3',
-  si: '#2E7D5B', no: '#B23A2E', abs: '#B8912E'
+  ...VOTO
 };
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -27,67 +28,61 @@ export function fraseCorta(n) {
   return fraseCortaDeNorma(n, 52);
 }
 
-function MiniResultado({ si, no, abs, aprobada }) {
-  const t = si + no + abs || 1;
-  const R = 28;
-  const stroke = 7;
-  const c = 2 * Math.PI * R;
-  const segs = [
-    [(si / t) * c, C.si],
-    [(abs / t) * c, C.abs],
-    [(no / t) * c, C.no]
-  ];
-  let offset = 0;
-  return (
-    <div style={{ position: 'relative', width: 72, height: 72, flexShrink: 0 }}>
-      <svg width="72" height="72" viewBox="0 0 72 72">
-        <circle cx="36" cy="36" r={R} fill="none" stroke="#E4E4DC" strokeWidth={stroke} />
-        {segs.map(([len, col], i) => {
-          if (len <= 0) return null;
-          const el = (
-            <circle key={i} cx="36" cy="36" r={R} fill="none" stroke={col} strokeWidth={stroke}
-              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset}
-              strokeLinecap="butt" transform="rotate(-90 36 36)" />
-          );
-          offset += len;
-          return el;
-        })}
-      </svg>
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexDirection: 'column', pointerEvents: 'none'
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: aprobada ? C.si : C.no }}>
-          {aprobada ? 'SÍ' : 'NO'}
-        </span>
-        <span className="em" style={{ fontSize: 8, color: C.tenue }}>{Math.round((si / t) * 100)}%</span>
-      </div>
-    </div>
-  );
-}
 
-function BarrasVoto({ si, no, abs }) {
-  const t = si + no + abs || 1;
-  const filas = [
-    ['A favor', si, C.si],
-    ['En contra', no, C.no],
-    ['Abs.', abs, C.abs]
+function Franja({ si, no, abs, aprobada, destacada }) {
+  const s = Number(si ?? 0);
+  const n = Number(no ?? 0);
+  const a = Number(abs ?? 0);
+  const t = s + n + a || 1;
+  const segs = [
+    ['A favor', s, C.si, aprobada],
+    ['En contra', n, C.no, !aprobada],
+    ['Abstención', a, C.abs, false]
   ];
+  const alto = destacada ? 26 : 20;
+  const resalte = 7;
   return (
-    <div style={{ display: 'grid', gap: 4, minWidth: 0, flex: 1 }}>
-      {filas.map(([et, v, col]) => v > 0 && (
-        <div key={et} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="em" style={{ width: 58, fontSize: 9.5, color: C.tenue, flexShrink: 0 }}>{et}</span>
-          <div style={{ flex: 1, height: 8, background: '#EDEDE6', borderRadius: 2, overflow: 'hidden' }}>
-            <motion.div style={{ height: '100%', background: col, borderRadius: 2 }}
-              initial={{ width: 0 }} whileInView={{ width: `${(v / t) * 100}%` }}
-              viewport={{ once: true, margin: '0px 0px -40px 0px' }} transition={SALIDA} />
-          </div>
-          <span className="em" style={{ width: 28, fontSize: 10, color: C.media, textAlign: 'right' }}>
-            <Cifra valor={v} />
+    <div style={{ marginTop: 14 }}>
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', width: '100%',
+        height: alto + resalte, overflow: 'hidden'
+      }}>
+        {segs.map(([et, v, col, gana], i) => v > 0 && (
+          <motion.div key={et}
+            style={{
+              background: col, height: gana ? alto + resalte : alto, minWidth: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5
+            }}
+            initial={{ width: 0 }}
+            whileInView={{ width: `${(v / t) * 100}%` }}
+            viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+            transition={{ ...SALIDA, delay: i * 0.06 }}>
+            {gana && (
+              <span style={{
+                width: 7, height: 7, borderRadius: 7, background: '#F3F1E8', flexShrink: 0
+              }} />
+            )}
+            <span className="em" style={{
+              fontSize: gana ? 11 : 10, fontWeight: 700, color: '#F3F1E8',
+              whiteSpace: 'nowrap', padding: '0 4px'
+            }}>
+              <Cifra valor={v} />
+            </span>
+          </motion.div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 14, marginTop: 6, flexWrap: 'wrap' }}>
+        {segs.map(([et, v, col, gana]) => v > 0 && (
+          <span key={et} className="em" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9.5,
+            color: gana ? C.tinta : C.media, fontWeight: gana ? 700 : 400,
+            letterSpacing: '.06em', textTransform: 'uppercase'
+          }}>
+            <span style={{ width: 8, height: 8, background: col, flexShrink: 0 }} />
+            {et}
           </span>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -132,8 +127,9 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
           </span>
         )}
         <span className="em" style={{
-          fontSize: 10, fontWeight: 700, marginLeft: 'auto',
-          color: aprobada ? C.si : C.no, textTransform: 'uppercase', letterSpacing: '.05em'
+          fontSize: 10, fontWeight: 700, marginLeft: 'auto', color: '#F3F1E8',
+          background: aprobada ? C.si : C.no, padding: '3px 8px',
+          textTransform: 'uppercase', letterSpacing: '.06em'
         }}>{aprobada ? 'Aprobada' : 'Rechazada'}</span>
       </div>
 
@@ -150,13 +146,7 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
         {String(tituloLegal).length > 260 ? String(tituloLegal).slice(0, 257) + '…' : tituloLegal}
       </div>
 
-      <div style={{
-        display: 'flex', gap: 14, alignItems: 'center', marginTop: 14,
-        padding: '10px 12px', background: C.papel, borderRadius: 3
-      }}>
-        <MiniResultado si={n.total_si} no={n.total_no} abs={n.total_abstencion} aprobada={aprobada} />
-        <BarrasVoto si={n.total_si} no={n.total_no} abs={n.total_abstencion} />
-      </div>
+      <Franja si={n.total_si} no={n.total_no} abs={n.total_abstencion} aprobada={aprobada} destacada={destacada} />
 
       {efectos.length > 0 && (
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 12 }}>

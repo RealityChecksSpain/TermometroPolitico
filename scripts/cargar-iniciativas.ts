@@ -5,6 +5,12 @@ const legislaturaId = exigirEnv('LEGISLATURA_ACTIVA_ID');
 
 const TIPOS: Record<string, string> = {
   'proyecto de ley': 'proyecto_ley',
+  'proposición no de ley': 'otro',
+  'proposicion no de ley': 'otro',
+  'moción': 'otro',
+  'mocion': 'otro',
+  'interpelación': 'otro',
+  'interpelacion': 'otro',
   'proposición de ley': 'proposicion_ley',
   'proposicion de ley': 'proposicion_ley',
   'propuesta de reforma': 'otro',
@@ -70,12 +76,35 @@ console.log('\nLocalizando ficheros...');
 const html = await descargarHtml(`${BASE_CONGRESO}/es/opendata/iniciativas`);
 const todos = extraerUrls(html, /webpublica\/opendata\/iniciativas\/[^"'\s<>]+\.json/);
 
-const familias = ['IniciativasLegislativasAprobadas', 'ProyectosDeLey', 'PropuestasDeReforma', 'ProposicionesDeLey'];
+const nombreFamilia = (u: string) => (u.split('/').pop() ?? '').split('__')[0].replace(/\.json$/, '');
+const disponibles = [...new Set(todos.map(nombreFamilia))].sort();
+
+console.log('\nFamilias publicadas por el portal:');
+disponibles.forEach(f => console.log('  ' + f));
+
+const PATRONES = [
+  /IniciativasLegislativasAprobadas/i,
+  /ProyectosDeLey/i,
+  /PropuestasDeReforma/i,
+  /ProposicionesDeLey/i,
+  /ProposicionesNoDeLey/i,
+  /Mociones/i,
+  /Interpelaciones/i
+];
+
+const familias = disponibles.filter(f => PATRONES.some(p => p.test(f)));
 const elegidos = familias
-  .map(f => masReciente(todos.filter(u => u.includes(f))))
+  .map(f => masReciente(todos.filter(u => nombreFamilia(u) === f)))
   .filter(Boolean) as string[];
 
+console.log('\nDescargando:');
 elegidos.forEach(u => console.log('  ' + u.split('/').pop()));
+
+const ignoradas = disponibles.filter(f => !familias.includes(f));
+if (ignoradas.length) {
+  console.log('\nNo descargadas (revisa si falta alguna):');
+  ignoradas.forEach(f => console.log('  ' + f));
+}
 
 const vistos = new Set<string>();
 const lote: any[] = [];

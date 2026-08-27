@@ -290,6 +290,14 @@ export async function traerPromesas(partido, soloVerificables = false, limite = 
   return d2 ?? [];
 }
 
+export async function traerResumenPromesas() {
+  const { data, error } = await supabase.from('v_promesa_resumen').select('*');
+  if (error) return null;
+  const m = {};
+  for (const f of data ?? []) m[String(f.siglas ?? '').trim().toUpperCase()] = f;
+  return m;
+}
+
 export async function traerCoherencia() {
   const { data, error } = await supabase
     .from('mv_coherencia').select('*').order('pct_coherencia', { ascending: false, nullsFirst: false });
@@ -406,6 +414,42 @@ export async function traerActividades(mandatoId) {
   const { data, error } = await supabase.rpc('actividades_de_diputado', { p_mandato_id: mandatoId });
   if (error) return [];
   return data ?? [];
+}
+
+export async function traerIniciativasPartido() {
+  const { data, error } = await supabase.from('v_partido_iniciativas').select('*');
+  if (error) return null;
+  const m = {};
+  for (const f of data ?? []) m[String(f.siglas ?? '').trim().toUpperCase()] = f;
+  return m;
+}
+
+export async function traerVotosPorClase() {
+  const { data, error } = await supabase.from('v_partido_votos').select('*');
+  if (error) return null;
+  const m = {};
+  for (const f of data ?? []) {
+    const k = String(f.siglas ?? '').trim().toUpperCase();
+    (m[k] ??= []).push(f);
+  }
+  return m;
+}
+
+export async function traerSubejes() {
+  const { data, error } = await supabase.from('v_subejes_partido').select('*');
+  if (error) return null;
+  const m = {};
+  for (const f of data ?? []) {
+    const k = String(f.siglas ?? '').trim().toUpperCase();
+    (m[k] ??= []).push(f);
+  }
+  return m;
+}
+
+export async function traerBaseComun() {
+  const { data, error } = await supabase.from('v_base_comun').select('*').eq('comun', true);
+  if (error) return null;
+  return new Set((data ?? []).map(f => `${f.eje}|${f.dim}`));
 }
 
 export async function traerAuditoriaEjeVotos() {
