@@ -157,12 +157,17 @@ export default function Mapa({ onDiputados }) {
     let list = datos
       .map(d => ({
         ...d,
-        x: fuente === 'programa' ? d.prog_economico : d.voto_economico,
-        y: fuente === 'programa' ? d.prog_social : d.voto_social,
-        n: fuente === 'programa' ? d.promesas_codificadas : d.voto_n_economico,
-        ex: fuente === 'programa' ? null : d.voto_err_economico,
+        x: fuente === 'programa' ? d.prog_economico
+          : fuente === 'territorio' ? d.voto_territorial : d.voto_economico,
+        y: fuente === 'programa' ? d.prog_social
+          : fuente === 'territorio' ? d.voto_social : d.voto_social,
+        n: fuente === 'programa' ? d.promesas_codificadas
+          : fuente === 'territorio' ? d.voto_n_territorial : d.voto_n_economico,
+        ex: fuente === 'programa' ? null
+          : fuente === 'territorio' ? d.voto_err_territorial : d.voto_err_economico,
         ey: fuente === 'programa' ? null : d.voto_err_social,
-        nulo: fuente === 'programa' ? false : Boolean(d.voto_eco_nulo && d.voto_soc_nulo)
+        nulo: fuente === 'programa' ? false
+          : fuente === 'territorio' ? false : Boolean(d.voto_eco_nulo && d.voto_soc_nulo)
       }))
       .map(d => (fuente === 'votos' && !ejeEcoValido)
         ? { ...d, x: d.voto_alineamiento, ex: 0, n: d.voto_n_social }
@@ -170,7 +175,7 @@ export default function Mapa({ onDiputados }) {
       .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
       .map(d => ({ ...d, x: Number(d.x), y: Number(d.y) }));
 
-    if (fuente === 'votos') {
+    if (fuente !== 'programa') {
       list = list.map(p => ({
         ...p,
         x: Number(p.x) * ESCALA_VOTOS,
@@ -277,7 +282,7 @@ export default function Mapa({ onDiputados }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {[['programa', 'Lo que prometieron'], ['votos', 'Lo que han votado']].map(([k, t]) => (
+        {[['programa', 'Lo que prometieron'], ['votos', 'Lo que han votado'], ['territorio', 'Territorialidad']].map(([k, t]) => (
           <button key={k} onClick={() => setFuente(k)} style={{
             padding: '9px 16px', fontSize: 13.5, cursor: 'pointer', borderRadius: 2,
             fontWeight: fuente === k ? 600 : 400,
@@ -311,30 +316,54 @@ export default function Mapa({ onDiputados }) {
           `}</style>
 
           <div className="mapaLado">
+            {fuente === 'votos' && auditoria?.economico_margen_escaso && (
+              <div style={{
+                background: '#2A2E35', border: '1px solid #3A4048', borderRadius: 2,
+                padding: '9px 11px', marginBottom: 10, fontSize: 11.5,
+                color: '#C9CDD2', lineHeight: 1.5
+              }}>
+                <strong style={{ color: '#E8C56A' }}>Margen escaso.</strong> Este eje supera la
+                comprobación contra el azar por poco (p = {Number(auditoria.p_economico).toFixed(3)},
+                el límite es 0,05) y solo {auditoria.economico_significativos ?? 0} de{' '}
+                {auditoria.partidos_economico ?? 13} partidos tienen posición distinguible del centro.
+                En esta legislatura el Congreso apenas ha votado normas que recorten gasto o
+                desregulen, así que hay poco contraste que medir.
+              </div>
+            )}
             <GuiaEje
-              titulo={sustituido ? 'Eje de bloque' : 'Eje económico'}
-              intro={sustituido
-                ? 'No hay suficientes normas económicas contestadas en ambos sentidos para situar a los partidos en izquierda-derecha por sus votos. Mientras tanto, este eje mide lo que sí se puede medir: cuánto apoya cada partido las normas que trae el Gobierno.'
-                : 'Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades.'}
+              titulo={fuente === 'territorio' ? 'Eje territorial' : sustituido ? 'Eje de bloque' : 'Eje económico'}
+              intro={fuente === 'territorio'
+                ? 'Mide dónde debe residir el poder: en el Estado central o en las comunidades autónomas. Es independiente de los otros dos ejes y en España es el que más separa a los partidos.'
+                : sustituido
+                  ? 'No hay suficientes normas económicas contestadas en ambos sentidos para situar a los partidos en izquierda-derecha por sus votos. Mientras tanto, este eje mide lo que sí se puede medir: cuánto apoya cada partido las normas que trae el Gobierno.'
+                  : 'Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades.'}
               colorA="#C45C52"
               colorB="#3D7AB8"
-              a={sustituido ? {
+              a={fuente === 'territorio' ? {
+                titulo: 'Descentralizador',
+                texto: 'Las competencias y los recursos deben acercarse a quien conoce el territorio. Incluye transferencias, financiación autonómica y reconocimiento de lenguas y culturas propias.'
+              } : sustituido ? {
                 titulo: 'Oposición',
                 texto: 'El partido vota en contra de la mayor parte de lo que el Gobierno lleva al pleno. No dice nada sobre su ideología: un partido puede oponerse desde la izquierda o desde la derecha.'
               } : {
                 titulo: 'Izquierda económica',
                 texto: 'El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto público, impuestos progresivos y reglas que limiten el poder de las empresas. Es la línea que va de Marx a la socialdemocracia de posguerra.'
               }}
-              b={sustituido ? {
+              b={fuente === 'territorio' ? {
+                titulo: 'Centralista',
+                texto: 'La igualdad entre ciudadanos exige reglas comunes y un Estado que las garantice. Incluye recentralizar competencias, unidad de mercado y una lengua común en la Administración.'
+              } : sustituido ? {
                 titulo: 'Gobierno',
                 texto: 'El partido apoya la mayor parte de lo que el Gobierno lleva al pleno. Tampoco dice nada sobre ideología: puede ser socio de investidura, puede negociar apoyos puntuales, o puede coincidir en el fondo.'
               } : {
                 titulo: 'Derecha económica',
                 texto: 'El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación. Es el argumento de Hayek y Friedman.'
               }}
-              miramos={sustituido
-                ? <>Propensión de cada partido a votar que sí, sobre {auditoria?.n_economico ?? '—'} normas.</>
-                : <>Gasto público, impuestos y regulación empresarial, sobre normas que se votaron divididas. Nada más.</>}
+              miramos={fuente === 'territorio'
+                ? <>Descentralización y competencias europeas, sobre {auditoria?.n_territorial ?? '—'} normas.</>
+                : sustituido
+                  ? <>Propensión de cada partido a votar que sí, sobre {auditoria?.n_economico ?? '—'} normas.</>
+                  : <>Gasto público, impuestos, regulación, propiedad pública, protección laboral y proteccionismo, sobre {auditoria?.n_economico ?? '—'} normas.</>}
             />
           </div>
 
@@ -383,9 +412,9 @@ export default function Mapa({ onDiputados }) {
                 fill="#EDE7D4" fillOpacity="0.62" />
 
                             <text x="-1.32" y="-1.28" fill="#EE7B3A" fontSize="0.092" fontWeight="700"
-                fontFamily="DM Mono, monospace" letterSpacing="0.02">{sustituido ? 'OPOSICIÓN' : 'IZQUIERDA'}</text>
+                fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'DESCENTRALIZADOR' : sustituido ? 'OPOSICIÓN' : 'IZQUIERDA'}</text>
               <text x="1.32" y="-1.28" fill="#4E9BBE" fontSize="0.092" fontWeight="700"
-                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{sustituido ? 'GOBIERNO' : 'DERECHA'}</text>
+                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'CENTRALISTA' : sustituido ? 'GOBIERNO' : 'DERECHA'}</text>
               <text x="0" y="-1.40" fill="#F2A93E" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">CONSERVADOR</text>
               <text x="0" y="1.48" fill="#2FA98F" fontSize="0.092" fontWeight="700"

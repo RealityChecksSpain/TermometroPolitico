@@ -265,8 +265,6 @@ const ORDENES = [
     const n = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
     return (d.vehiculos_detalle || n > 0) ? Number(n) : -1;
   }, true],
-  ['donaciones', 'Más donaciones recibidas', d => Number(d.donaciones ?? 0), true],
-  ['privadas', 'Más cargos en el sector privado', d => Number(d.actividades_privadas ?? 0), true]
 ];
 
 function Chip({ on, onClick, color, children, titulo }) {
@@ -400,7 +398,7 @@ export default function App() {
     if (seccion !== 'diputados' || orden === 'nombre') { setLideres([]); return; }
     const mapa = { ausencias: 'ausencias', disidencias: 'disidencias', tribuna: 'tribuna',
       intervenciones: 'intervenciones', abstenciones: 'abstenciones', telematicos: 'telematicos',
-      donaciones: 'donaciones', privadas: 'privadas' };
+    };
     if (!mapa[orden]) { setLideres([]); return; }
     traerLideres(mapa[orden]).then(setLideres).catch(() => setLideres([]));
   }, [seccion, orden]);
@@ -708,14 +706,6 @@ export default function App() {
                 ))}
               </div>
 
-              {(orden === 'privadas' || orden === 'donaciones') && (
-                <div className="nota">
-                  Esto <strong>no mide dinero ni patrimonio</strong>. Es el número de cargos o donaciones
-                  que cada diputado declaró en su registro de intereses económicos. El Congreso no
-                  publica los importes en formato reutilizable, así que aquí no hay ninguna cifra en euros.
-                </div>
-              )}
-
               {orden === 'patrimonio' && (
                 <div className="nota">
                   Dinero declarado aproximado: depósitos + valores + planes − deuda.
@@ -812,8 +802,6 @@ export default function App() {
                     inmuebles: ['bienes', d.n_inmuebles_propios ?? casas ?? '\u2014'],
                     inmuebles_todos: ['bienes', casas ?? '\u2014'],
                     vehiculos: ['veh.', nVeh || '\u2014'],
-                    donaciones: ['don.', d.donaciones],
-                    privadas: ['priv.', d.actividades_privadas]
                   };
                   const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
                   let sub = et;

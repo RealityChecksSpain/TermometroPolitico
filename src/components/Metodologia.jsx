@@ -101,11 +101,20 @@ export default function Metodologia({ cobertura }) {
           votaciones nominales reflejan mayorías, no convicciones.
         </p>
         <p style={{ margin: '10px 0 0' }}>
-          En su lugar, cada norma se etiqueta según diez preguntas de hecho, una por dimensión:
-          gasto público, impuestos, regulación de empresas, derechos individuales, migración, moral
-          y familia, religión y Estado, orden público, diversidad cultural y descentralización. Cada
-          pregunta se responde por separado, así que un decreto que sube el gasto y endurece penas
-          puntúa en las dos sin anularse.
+          En su lugar, cada norma se etiqueta según veinte preguntas de hecho, una por dimensión.
+          Seis componen el eje económico: gasto público, impuestos, regulación de empresas,
+          propiedad pública, protección laboral y proteccionismo. Ocho el social: derechos
+          individuales, migración, moral y familia, religión y Estado, orden público, diversidad
+          cultural, nacionalismo y autoridad del Ejecutivo. Dos el territorial: descentralización
+          e integración europea. Y cuatro se calculan pero no componen ningún eje, porque la
+          literatura comparada no las sitúa en ninguno: ortodoxia fiscal, igualdad de trato,
+          medio ambiente y calidad democrática.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Cada pregunta se responde por separado, así que un decreto que sube el gasto y endurece
+          penas puntúa en las dos sin anularse. Las dimensiones y sus definiciones siguen el
+          esquema de codificación del Manifesto Project y la encuesta de expertos de Chapel Hill,
+          no un criterio propio.
         </p>
         <p style={{ margin: '10px 0 0' }}>
           Para cada partido y cada dimensión se calcula una resta: el porcentaje de normas que
@@ -132,6 +141,26 @@ export default function Metodologia({ cobertura }) {
           etiquetas de las normas y se mide qué separación entre partidos sale por casualidad. Si
           la observada no destaca, el eje no se rotula. Y la comprobación caduca sola en cuanto
           entran datos nuevos, así que un eje etiquetado siempre lo está sobre los datos actuales.
+        </p>
+      </Seccion>
+
+      <Seccion titulo="Por qué el eje económico mide poco">
+        <p style={{ margin: 0 }}>
+          De las 456 normas codificadas, <strong>182 amplían gasto público y 7 lo recortan</strong>.
+          En protección laboral son 38 frente a 1; en privatizaciones, 6 frente a 1; en
+          proteccionismo, 7 frente a 1. Solo impuestos tiene los dos sentidos poblados, con 58
+          bajadas y 23 subidas.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Una posición se calcula restando el apoyo a las normas que recortan menos el apoyo a las
+          que amplían. Si casi no hay normas que recorten, no hay contraste que medir. Por eso el
+          eje horizontal supera la comprobación contra el azar por poco margen y la mayoría de los
+          partidos no se distinguen del centro. No es un defecto del método: es que esta
+          legislatura apenas ha votado en una de las dos direcciones.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          En los programas electorales sí aparecen las dos direcciones. Que un partido prometa
+          recortar y luego no vote ningún recorte es, en sí mismo, algo que este mapa permite ver.
         </p>
       </Seccion>
 

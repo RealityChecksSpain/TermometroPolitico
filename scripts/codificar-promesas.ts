@@ -3,7 +3,7 @@ import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
 
 exigirEnv('GEMINI_API_KEY');
-const VERSION = process.env.VERSION_CODIGO ?? 'codigo-v3-2026-08';
+const VERSION = process.env.VERSION_CODIGO ?? 'codigo-v5-2026-08';
 
 const DIR = { type: 'string', enum: ['aumenta', 'reduce', 'neutro'] };
 
@@ -24,17 +24,25 @@ const ESQUEMA = {
     medio_ambiente: DIR,
     integracion_europea: DIR,
     calidad_democratica: DIR,
+    propiedad_publica: DIR,
+    proteccion_laboral: DIR,
+    ortodoxia_fiscal: DIR,
+    proteccionismo: DIR,
+    nacionalismo: DIR,
+    autoridad_estatal: DIR,
     justificacion: { type: 'string' }
   },
   required: ['gasto_publico', 'impuestos', 'regulacion_mercado',
     'derechos_individuales', 'apertura_migratoria', 'descentralizacion',
     'moral_tradicional', 'religion_estado', 'orden_publico', 'diversidad_cultural',
     'igualdad_trato', 'medio_ambiente', 'integracion_europea', 'calidad_democratica',
+    'propiedad_publica', 'proteccion_laboral', 'ortodoxia_fiscal',
+    'proteccionismo', 'nacionalismo', 'autoridad_estatal',
     'justificacion']
 };
 
 function prompt(p: any): string {
-  return `Codificas compromisos electorales segun CATORCE dimensiones objetivas.
+  return `Codificas compromisos electorales segun VEINTE dimensiones objetivas.
 No opinas sobre ideologia. Solo describes que hace la medida.
 
 COMPROMISO:
@@ -106,6 +114,32 @@ Para cada dimension responde "aumenta", "reduce" o "neutro".
    reduce: debilita controles, opacidad, o somete organos independientes al poder politico.
 
 
+15. propiedad_publica
+   reduce: privatiza, externaliza o vende empresa o servicio publico.
+   aumenta: nacionaliza, remunicipaliza o crea empresa publica.
+
+16. proteccion_laboral
+   reduce: facilita el despido, abarata la contratacion, debilita la negociacion colectiva.
+   aumenta: refuerza derechos laborales, negociacion colectiva, estabilidad o salario minimo.
+
+17. ortodoxia_fiscal
+   reduce: relaja reglas de gasto, deficit o deuda.
+   aumenta: refuerza estabilidad presupuestaria, techo de gasto o reduccion de deuda.
+   Ojo al sentido: aqui "aumenta" es mas disciplina fiscal, que es posicion de derecha
+   economica. Es la unica dimension economica con este sentido invertido.
+
+18. proteccionismo
+   reduce: abre mercados, elimina aranceles o barreras comerciales.
+   aumenta: impone aranceles, cuotas o barreras a la competencia exterior.
+
+19. nacionalismo
+   reduce: relativiza simbolos, lengua comun o identidad nacional espanola.
+   aumenta: refuerza simbolos, lengua comun, patriotismo o identidad nacional espanola.
+
+20. autoridad_estatal
+   reduce: refuerza organismos independientes, contrapesos o autonomia de agencias.
+   aumenta: concentra poder en el Ejecutivo o somete organos independientes al Gobierno.
+
 REGLAS ESTRICTAS:
 - derechos_individuales es SOLO autonomia personal sobre la propia conducta: aborto,
   eutanasia, divorcio, identidad de genero, orientacion sexual, intimidad, libertad de
@@ -116,6 +150,16 @@ REGLAS ESTRICTAS:
 - Codifica por el efecto sobre quien ejerce la conducta, no sobre quien la presta:
   permitir la objecion de conciencia sanitaria es derechos_individuales reduce.
 - Elegir centro o tipo de educacion por motivos religiosos toca religion_estado.
+- ortodoxia_fiscal SOLO se activa si la norma habla de reglas fiscales: deficit, techo
+  de gasto, deuda publica, estabilidad presupuestaria, senda de consolidacion o regla
+  de gasto. Que una medida cueste dinero NO es ortodoxia_fiscal: eso es gasto_publico.
+  Que una medida baje la recaudacion NO es ortodoxia_fiscal: eso es impuestos reduce.
+  Una bonificacion, una deduccion o un tipo reducido son impuestos, nunca ortodoxia_fiscal.
+- Despido, convenios, temporalidad y salario minimo van a proteccion_laboral, no a
+  regulacion_mercado. regulacion_mercado es normativa sobre la actividad de las empresas.
+- Deficit, deuda y reglas de gasto van a ortodoxia_fiscal, no a gasto_publico.
+- Lengua y simbolos del Estado van a nacionalismo; lenguas minoritarias a diversidad_cultural.
+- autoridad_estatal es poder politico del Ejecutivo; orden_publico es policia, penas y protesta.
 - Codifica solo lo que la medida hace de forma directa, no sus efectos indirectos.
 - gasto_publico solo si el Estado desembolsa dinero de forma directa e identificable:
   una partida, una subvencion, una prestacion, una plantilla o una inversion.
@@ -170,7 +214,9 @@ const progreso = SOLO_INFORME
     const campos = ['gasto_publico', 'impuestos', 'regulacion_mercado',
       'derechos_individuales', 'apertura_migratoria', 'descentralizacion',
       'moral_tradicional', 'religion_estado', 'orden_publico', 'diversidad_cultural',
-      'igualdad_trato', 'medio_ambiente', 'integracion_europea', 'calidad_democratica'];
+      'igualdad_trato', 'medio_ambiente', 'integracion_europea', 'calidad_democratica',
+      'propiedad_publica', 'proteccion_laboral', 'ortodoxia_fiscal',
+      'proteccionismo', 'nacionalismo', 'autoridad_estatal'];
 
     const valido = (v: any) => ['aumenta', 'reduce', 'neutro'].includes(v) ? v : 'neutro';
     const fila: any = { promesa_id: p.id, justificacion: String(d.justificacion ?? '').slice(0, 200),

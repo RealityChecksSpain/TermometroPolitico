@@ -8,12 +8,19 @@ const DIMS: [string, string][] = [
   ['gasto_publico', 'economico'],
   ['impuestos', 'economico'],
   ['regulacion_mercado', 'economico'],
+  ['propiedad_publica', 'economico'],
+  ['proteccion_laboral', 'economico'],
+  ['proteccionismo', 'economico'],
   ['derechos_individuales', 'social'],
   ['apertura_migratoria', 'social'],
   ['moral_tradicional', 'social'],
   ['religion_estado', 'social'],
   ['orden_publico', 'social'],
-  ['diversidad_cultural', 'social']
+  ['diversidad_cultural', 'social'],
+  ['nacionalismo', 'social'],
+  ['autoridad_estatal', 'social'],
+  ['descentralizacion', 'territorial'],
+  ['integracion_europea', 'territorial']
 ];
 
 type Apoyo = { partido_id: string; iniciativa_id: string; apoyo: number | null };
@@ -94,7 +101,7 @@ function posiciones(
   const comunes = dims.filter(dim => {
     let n = 0;
     for (const m of sub.values()) if (m.has(dim)) n++;
-    return n >= totalPartidos;
+    return n >= Math.ceil(totalPartidos * 0.8);
   });
   if (!comunes.length) return [];
 
@@ -108,7 +115,7 @@ function posiciones(
       num += e.valor * e.peso;
       den += e.peso;
     }
-    if (den > 0) salida.push(num / den);
+    if (den >= 10) salida.push(num / den);
   }
   return salida;
 }
@@ -150,7 +157,7 @@ for (const [dim] of DIMS) {
 
 const salida: any[] = [];
 
-for (const eje of ['economico', 'social'] as const) {
+for (const eje of ['economico', 'social', 'territorial'] as const) {
   const obs = posiciones(eje, dirPorDim, apoyoPorPartido);
   const rangoObservado = rango(obs);
   const bimObservada = bimodalidad(obs);
