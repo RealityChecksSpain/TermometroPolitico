@@ -220,7 +220,7 @@ const progreso = SOLO_INFORME
 
     const valido = (v: any) => ['aumenta', 'reduce', 'neutro'].includes(v) ? v : 'neutro';
     const fila: any = { promesa_id: p.id, justificacion: String(d.justificacion ?? '').slice(0, 200),
-      modelo: modeloActivo(), version_prompt: VERSION };
+      modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION };
     campos.forEach(c => { fila[c] = valido(d[c]); });
 
     if (campos.every(c => fila[c] === 'neutro')) todoNeutro++;

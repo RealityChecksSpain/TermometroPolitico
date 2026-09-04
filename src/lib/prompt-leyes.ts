@@ -50,8 +50,17 @@ Para cada dimension responde "aumenta", "reduce" o "neutro".
                           reduce: restringe conductas personales o endurece penas por conducta privada.
 5. apertura_migratoria  aumenta: facilita entrada, regularizacion o acogida.
                         reduce: endurece requisitos, expulsiones o control de fronteras.
-6. descentralizacion  aumenta: transfiere competencias o recursos a comunidades autonomas.
-                      reduce: recentraliza competencias.
+6. descentralizacion  aumenta: cambia quien manda, pasando competencias del Estado a las
+                              comunidades autonomas, o modifica el sistema de financiacion
+                              autonomica, el Concierto o el Convenio.
+                      reduce: recentraliza competencias en el Estado, o impone reglas comunes
+                              que anulan las autonomicas.
+                      neutro: mandar dinero a las comunidades sin cambiar quien decide.
+                              Ayudas por catastrofe, subvenciones, transferencias
+                              extraordinarias y planes de gasto ejecutados por las
+                              comunidades son NEUTRO: financiar no es descentralizar.
+                              Si la norma solo menciona a las comunidades porque son
+                              quienes la aplican, es neutro.
 7. moral_tradicional  reduce: refuerza la familia tradicional, restringe aborto, divorcio,
                               eutanasia o identidad de genero, o censura por inmoralidad.
                       aumenta: amplia aborto, divorcio, eutanasia, matrimonio o identidad de genero.

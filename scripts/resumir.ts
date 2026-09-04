@@ -104,7 +104,7 @@ const progreso = await procesarLote(
 
     const { error: e } = await db().from('resumenes_ia').upsert({
       iniciativa_id: i.id,
-      modelo: modeloActivo(),
+      modelo: r.modelo ?? modeloActivo(),
       version_prompt: VERSION,
       resumen: r.datos.resumen,
       frase_corta: String(r.datos.frase_corta ?? '').slice(0, 180) || null,

@@ -105,7 +105,7 @@ const progreso = await procesarLote(
       coherente,
       similitud: c.similitud,
       justificacion: String(r.datos.justificacion ?? '').slice(0, 300),
-      modelo: modeloActivo(),
+      modelo: r.modelo ?? modeloActivo(),
       version_prompt: VERSION
     }, { onConflict: 'promesa_id,votacion_id' });
 

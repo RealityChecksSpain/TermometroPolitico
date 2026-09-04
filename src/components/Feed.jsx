@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, motionValue, useReducedMotion } from 'framer-motion';
 import { Cifra, Item, Lista, SALIDA } from './Movimiento.jsx';
-import { traerFeed } from '../lib/cliente.js';
+import { traerFeed, traerMaterias } from '../lib/cliente.js';
+import { estaSeguido } from '../lib/seguimientos.js';
+import BotonSeguir from './BotonSeguir.jsx';
 import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
 import { VOTO } from '../lib/paleta.js';
 
@@ -87,8 +89,9 @@ function Franja({ si, no, abs, aprobada, destacada }) {
   );
 }
 
-function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
+function Tarjeta({ n, onAbrir, destacada, limpiarTitular, materiaId }) {
   const reducido = useReducedMotion();
+  const [seguida, setSeguida] = useState(() => (materiaId ? estaSeguido('materia', materiaId) : false));
   const aprobada = (n.resultado_final ?? n.resultado_ultima) === 'aprobada';
   const frase = fraseCortaDeNorma(n, destacada ? 120 : 88);
   const tituloLegal = limpiarTitular
@@ -119,6 +122,17 @@ function Tarjeta({ n, onAbrir, destacada, limpiarTitular }) {
             fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600,
             color: C.media, border: `1px solid ${C.linea}`, padding: '3px 9px', borderRadius: 2
           }}>Sin materia</span>
+        )}
+        {materiaId && (
+          <span onClick={e => { e.stopPropagation(); }} style={{ display: 'inline-flex' }}>
+            <BotonSeguir
+              tipo="materia"
+              id={materiaId}
+              seguido={seguida}
+              alCambiar={(_t, _i, ahora) => setSeguida(ahora)}
+              compacto
+            />
+          </span>
         )}
         <span className="em" style={{ fontSize: 10.5, color: C.tenue }}>{fechaCorta(n.fecha)}</span>
         {n.votaciones_norma > 1 && (
@@ -174,6 +188,7 @@ const HUECO = CARRILES * 13 + 12;
 export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
   const reducido = useReducedMotion();
   const [items, setItems] = useState([]);
+  const [materias, setMaterias] = useState(new Map());
   const [cargando, setCargando] = useState(true);
   const [fin, setFin] = useState(false);
   const [fallo, setFallo] = useState(null);
@@ -206,6 +221,14 @@ export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
       setCargando(false);
     }
   }, [clave]);
+
+  useEffect(() => {
+    let vivo = true;
+    traerMaterias()
+      .then(lista => { if (vivo) setMaterias(new Map(lista.map(m => [m.slug, m.id]))); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
 
   useEffect(() => {
     pagina.current = 0;
@@ -267,7 +290,8 @@ export default function Feed({ filtros, onAbrir, cabecera, limpiarTitular }) {
       <Lista style={{ display: 'grid', gap: 10 }}>
         {items.map((n, i) => (
           <Item key={n.clave_norma}>
-            <Tarjeta n={n} onAbrir={onAbrir} destacada={i === 0} limpiarTitular={limpiarTitular} />
+            <Tarjeta n={n} onAbrir={onAbrir} destacada={i === 0} limpiarTitular={limpiarTitular}
+              materiaId={materias.get(n.materia) ?? null} />
           </Item>
         ))}
       </Lista>

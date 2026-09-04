@@ -50,7 +50,8 @@
     "cargos:auto": "node --env-file=.env --import tsx scripts/cargar-cargos.ts",
     "placebo": "node --env-file=.env --import tsx scripts/placebo.ts",
     "fichas": "node --env-file=.env --import tsx scripts/cargar-fichas.ts",
-    "fiabilidad": "node --env-file=.env --import tsx scripts/fiabilidad.ts"
+    "fiabilidad": "node --env-file=.env --import tsx scripts/fiabilidad.ts",
+    "raras": "node --env-file=.env --import tsx scripts/verificar-raras.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

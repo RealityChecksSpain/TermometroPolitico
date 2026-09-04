@@ -1,10 +1,19 @@
 import { db } from '../src/lib/supabase';
 
 const REPS = Number(process.env.PLACEBO_REPS ?? 200);
+
+if (REPS < 1000) {
+  console.log(`\nAVISO: ${REPS} permutaciones dan una p con escalon de ${(1 / REPS).toFixed(4)}.`);
+  console.log('Para comparar corridas entre si hace falta PLACEBO_REPS=5000 o mas.');
+}
 const MIN_LADO = 3;
 const K = 2;
 
-const DIMS: [string, string][] = [
+const EXCLUIR = new Set(
+  (process.env.EXCLUIR ?? '').split(',').map(d => d.trim()).filter(Boolean)
+);
+
+const DIMS_TODAS: [string, string][] = [
   ['gasto_publico', 'economico'],
   ['impuestos', 'economico'],
   ['regulacion_mercado', 'economico'],
@@ -22,6 +31,16 @@ const DIMS: [string, string][] = [
   ['descentralizacion', 'territorial'],
   ['integracion_europea', 'territorial']
 ];
+
+const DIMS: [string, string][] = DIMS_TODAS.filter(([d]) => !EXCLUIR.has(d));
+
+if (EXCLUIR.size) {
+  console.log(`\nDimensiones excluidas: ${Array.from(EXCLUIR).join(', ')}`);
+  const desconocidas = Array.from(EXCLUIR).filter(d => !DIMS_TODAS.some(([x]) => x === d));
+  if (desconocidas.length) {
+    console.log(`AVISO: no forman parte de ningun eje: ${desconocidas.join(', ')}`);
+  }
+}
 
 type Apoyo = { partido_id: string; iniciativa_id: string; apoyo: number | null };
 
@@ -69,6 +88,9 @@ function bimodalidad(v: number[]): number {
   return den === 0 ? 0 : (g1 * g1 + 1) / den;
 }
 
+const ultimasComunes = new Map<string, string[]>();
+const ultimasFuera = new Map<string, string[]>();
+
 function posiciones(
   eje: string,
   dirPorDim: Map<string, Map<string, string>>,
@@ -103,6 +125,8 @@ function posiciones(
     for (const m of sub.values()) if (m.has(dim)) n++;
     return n >= Math.ceil(totalPartidos * 0.8);
   });
+  ultimasComunes.set(eje, comunes);
+  ultimasFuera.set(eje, dims.filter(d => !comunes.includes(d)));
   if (!comunes.length) return [];
 
   const salida: number[] = [];
@@ -163,6 +187,12 @@ for (const eje of ['economico', 'social', 'territorial'] as const) {
   const bimObservada = bimodalidad(obs);
 
   console.log(`\n${eje}: ${obs.length} partidos con posicion sobre base comun`);
+  const comunes = ultimasComunes.get(eje) ?? [];
+  const fuera = ultimasFuera.get(eje) ?? [];
+  console.log(`  dimensiones en la base comun: ${comunes.length ? comunes.join(', ') : 'ninguna'}`);
+  if (fuera.length) {
+    console.log(`  fuera por falta de base:      ${fuera.join(', ')}`);
+  }
   console.log(`  rango observado ${rangoObservado.toFixed(4)} · bimodalidad ${bimObservada.toFixed(4)}`);
 
   if (obs.length < 4) {
@@ -182,7 +212,7 @@ for (const eje of ['economico', 'social', 'territorial'] as const) {
     const p = posiciones(eje, revuelto, apoyoPorPartido);
     rangos.push(rango(p));
     bims.push(bimodalidad(p));
-    if ((r + 1) % 50 === 0) console.log(`  ${r + 1}/${REPS}`);
+    if ((r + 1) % Math.max(50, Math.round(REPS / 20)) === 0) console.log(`  ${r + 1}/${REPS}`);
   }
 
   const pValor = (rangos.filter(x => x >= rangoObservado).length + 1) / (REPS + 1);
@@ -192,6 +222,8 @@ for (const eje of ['economico', 'social', 'territorial'] as const) {
   salida.push({
     eje,
     reps: REPS,
+    dimensiones: comunes,
+    dimensiones_fuera: fuera,
     rango_observado: Number(rangoObservado.toFixed(4)),
     placebo_medio: Number(media(rangos).toFixed(4)),
     placebo_p95: Number(percentil(rangos, 0.95).toFixed(4)),

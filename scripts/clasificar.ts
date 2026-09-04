@@ -112,14 +112,14 @@ const progreso = await procesarLote(
     }
 
     const filasMateria: any[] = [
-      { iniciativa_id: i.id, materia_id: principal, principal: true, modelo: modeloActivo(), version_prompt: VERSION }
+      { iniciativa_id: i.id, materia_id: principal, principal: true, modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION }
     ];
 
     (r.datos.materias_secundarias ?? []).slice(0, 3).forEach((s: string) => {
       const id = idMateria.get(s);
       if (!id) { inventados.add(`materia:${s}`); return; }
       if (id === principal) return;
-      filasMateria.push({ iniciativa_id: i.id, materia_id: id, principal: false, modelo: modeloActivo(), version_prompt: VERSION });
+      filasMateria.push({ iniciativa_id: i.id, materia_id: id, principal: false, modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION });
     });
 
     await db().from('iniciativa_materia').upsert(filasMateria, { onConflict: 'iniciativa_id,materia_id' });
@@ -134,7 +134,7 @@ const progreso = await procesarLote(
           iniciativa_id: i.id,
           colectivo_id: id,
           efecto: String(a.efecto).slice(0, 300),
-          modelo: modeloActivo(),
+          modelo: r.modelo ?? modeloActivo(),
           version_prompt: VERSION
         };
       })

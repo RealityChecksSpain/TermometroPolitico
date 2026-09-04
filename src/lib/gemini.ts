@@ -113,6 +113,7 @@ export interface RespuestaGemini<T> {
   ok: boolean;
   datos: T | null;
   bruto: string;
+  modelo?: string;
   error?: string;
   tokensEntrada?: number;
   tokensSalida?: number;
@@ -211,6 +212,10 @@ export async function preguntar<T>(
 
       if (res.status === 503) {
         ultimoError = `${modelo}: saturado (503)`;
+        if (intento < reintentos) {
+          await new Promise(r => setTimeout(r, 5000 * (intento + 1)));
+          continue;
+        }
         break;
       }
 
@@ -239,6 +244,7 @@ export async function preguntar<T>(
           ok: true,
           datos,
           bruto,
+          modelo,
           tokensEntrada: cuerpo.usageMetadata?.promptTokenCount,
           tokensSalida: cuerpo.usageMetadata?.candidatesTokenCount
         };

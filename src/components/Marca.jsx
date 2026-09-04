@@ -11,9 +11,9 @@ const ARCO = 5;
 
 const BANDA_ALTA = 19;
 const BANDA_BAJA = 24;
-const ALA = 4;
-const MELLA = 26;
-const COLA = 30;
+const ALA = 14;
+const MELLA = 40;
+const COLA = 48;
 const CABEZA_R = 8;
 
 export default function Marca({ tinta = '#15171A', acento = '#E0492E', quieta = false }) {
@@ -46,9 +46,9 @@ export default function Marca({ tinta = '#15171A', acento = '#E0492E', quieta = 
   }, [reducido, quieta, avance]);
 
   const util = Math.max(ancho, 1);
-  const cola = Math.min(COLA, util * 0.05);
+  const cola = Math.min(COLA, util * 0.055);
   const mella = Math.min(MELLA, util * 0.045);
-  const ala = Math.min(ALA, util * 0.009);
+  const ala = Math.min(ALA, util * 0.016);
   const radio = Math.min(CABEZA_R, util * 0.022);
 
   const cx = Math.min(60, util / 2);

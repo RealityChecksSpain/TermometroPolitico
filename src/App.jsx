@@ -10,6 +10,7 @@ import Metodologia from './components/Metodologia.jsx';
 import Descargas from './components/Descargas.jsx';
 import Partidos from './components/Partidos.jsx';
 import Inicio from './components/Inicio.jsx';
+import FeedPersonal from './components/FeedPersonal.jsx';
 import AvatarPartido from './components/AvatarPartido.jsx';
 import { fraseCortaDeNorma } from './lib/fraseCorta.js';
 import {
@@ -223,8 +224,19 @@ function IconoEjes({ acento }) {
   </>);
 }
 
+function IconoSiguiendo({ acento }) {
+  return (
+    <>
+      <rect x="3" y="4" width="18" height="4" fill={acento} />
+      <rect x="3" y="10" width="12" height="4" fill="currentColor" />
+      <rect x="3" y="16" width="7" height="4" fill="currentColor" />
+    </>
+  );
+}
+
 const ICONOS = {
   inicio: IconoInicio,
+  siguiendo: IconoSiguiendo,
   leyes: IconoLeyes,
   diputados: IconoDiputados,
   partidos: IconoPartidos,
@@ -420,7 +432,7 @@ export default function App() {
     <pre className="em" style={{ fontSize: 12, background: '#FBE9EC', padding: 12, borderRadius: 3, whiteSpace: 'pre-wrap', marginTop: 12 }}>{error}</pre>
   </div></>;
 
-  const secciones = [['inicio', 'Inicio'], ['leyes', 'Leyes'], ['diputados', 'Diputados'], ['partidos', 'Partidos'], ['ejes', 'Mapa']];
+  const secciones = [['inicio', 'Inicio'], ['siguiendo', 'Siguiendo'], ['leyes', 'Leyes'], ['diputados', 'Diputados'], ['partidos', 'Partidos'], ['ejes', 'Mapa']];
   const mostrarHemiciclo = seccion === 'leyes' || seccion === 'diputados';
 
   return (
@@ -875,6 +887,7 @@ export default function App() {
             </div>
           )}
 
+          {seccion === 'siguiendo' && <div className="solo1"><FeedPersonal /></div>}
           {seccion === 'partidos' && <div className="solo1"><Partidos /></div>}
           {seccion === 'ejes' && <div className="solo1"><Mapa /></div>}
           {seccion === 'metodo' && <div className="solo1"><Metodologia cobertura={cobertura} /></div>}

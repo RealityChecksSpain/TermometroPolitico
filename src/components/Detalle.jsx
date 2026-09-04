@@ -1,7 +1,9 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Cifra, Entrada, SALIDA } from './Movimiento.jsx';
-import { traerVotacionesDeNorma, traerRelacionadas } from '../lib/cliente.js';
+import { traerVotacionesDeNorma, traerRelacionadas, traerIniciativaDeVotacion } from '../lib/cliente.js';
+import { estaSeguido } from '../lib/seguimientos.js';
+import BotonSeguir from './BotonSeguir.jsx';
 import HistorialNorma from './HistorialNorma.jsx';
 import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
 import { implicacionDe } from '../lib/implicaciones.js';
@@ -87,6 +89,23 @@ function Bloque({ titulo, children, aviso }) {
 }
 
 export function DetalleLey({ votacion, onVolver }) {
+  const [iniciativaId, setIniciativaId] = useState(null);
+  const [seguida, setSeguida] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    setIniciativaId(null);
+    setSeguida(false);
+    traerIniciativaDeVotacion(votacion.votacion_principal ?? votacion.id)
+      .then(id => {
+        if (!vivo) return;
+        setIniciativaId(id);
+        setSeguida(id ? estaSeguido('iniciativa', id) : false);
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [votacion.id, votacion.votacion_principal]);
+
   const aprobada = votacion.resultado === 'aprobada';
   const enlaces = String(votacion.enlaces_bocg ?? '').split(/[\s·]+/).filter(u => u.startsWith('http')).slice(0, 3);
   const frase = fraseCortaDeNorma(votacion, 72);
@@ -117,6 +136,16 @@ export function DetalleLey({ votacion, onVolver }) {
 
   return (
     <div className="e">
+      {iniciativaId && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingBottom: 10 }}>
+          <BotonSeguir
+            tipo="iniciativa"
+            id={iniciativaId}
+            seguido={seguida}
+            alCambiar={(_t, _i, ahora) => setSeguida(ahora)}
+          />
+        </div>
+      )}
       <button onClick={onVolver} className="em" style={{
         background: 'none', border: 'none', cursor: 'pointer', color: C.media, fontSize: 12, padding: '0 0 12px'
       }}>← Volver a la lista</button>

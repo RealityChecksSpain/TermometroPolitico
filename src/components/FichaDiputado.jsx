@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Cifra, SALIDA } from './Movimiento.jsx';
 import { desgloseBienes } from '../lib/inmuebles.js';
-import { traerVotosDeDiputado, traerResumenDiputado, traerActividades } from '../lib/cliente.js';
+import { traerVotosDeDiputado, traerResumenDiputado, traerActividades, traerPoliticoDeMandato } from '../lib/cliente.js';
+import { estaSeguido } from '../lib/seguimientos.js';
+import BotonSeguir from './BotonSeguir.jsx';
 import AvatarPartido from './AvatarPartido.jsx';
 import { VOTO } from '../lib/paleta.js';
 
@@ -34,6 +36,27 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
   const [fallo, setFallo] = useState(null);
   const [actividades, setActividades] = useState([]);
   const [pestana, setPestana] = useState('votos');
+  const [politicoId, setPoliticoId] = useState(null);
+  const [seguido, setSeguido] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    if (!d) { setPoliticoId(null); setSeguido(false); return () => { vivo = false; }; }
+    const directo = d.politico_id ?? null;
+    if (directo) {
+      setPoliticoId(directo);
+      setSeguido(estaSeguido('politico', directo));
+      return () => { vivo = false; };
+    }
+    traerPoliticoDeMandato(d.mandato_id)
+      .then(id => {
+        if (!vivo) return;
+        setPoliticoId(id);
+        setSeguido(id ? estaSeguido('politico', id) : false);
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [d?.mandato_id, d?.politico_id, d]);
   const [pagina, setPagina] = useState(0);
   const [soloDisidencias, setSoloDisidencias] = useState(false);
 
@@ -109,7 +132,18 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                 </div>
               </div>
             </div>
-            <button onClick={onCerrar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.tenue, fontSize: 24, lineHeight: 1 }}>×</button>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              {politicoId && (
+                <BotonSeguir
+                  tipo="politico"
+                  id={politicoId}
+                  seguido={seguido}
+                  alCambiar={(_t, _i, ahora) => setSeguido(ahora)}
+                  compacto
+                />
+              )}
+              <button onClick={onCerrar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.tenue, fontSize: 24, lineHeight: 1 }}>×</button>
+            </div>
           </div>
 
           {resumen && (

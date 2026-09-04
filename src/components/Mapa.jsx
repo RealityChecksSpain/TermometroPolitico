@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { DestelloSuave } from './Destello.jsx';
+import Contraste from './Contraste.jsx';
 import { VOTO } from '../lib/paleta.js';
 import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos, traerSubejes, traerBaseComun, traerVotosPorClase, traerIniciativasPartido } from '../lib/cliente.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
@@ -30,7 +31,8 @@ function listarDims(dims) {
   return partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
 }
 
-const ESCALA_VOTOS = 1.24;
+const CAMPO = 1.12;
+const ESCALA_MIN = 1.24;
 
 const NOMBRE_CLASE = {
   ley_final: 'Votaciones finales de norma',
@@ -149,8 +151,6 @@ export default function Mapa({ onDiputados }) {
     traerIniciativasPartido().then(setIniciativas).catch(() => setIniciativas(null));
   }, []);
 
-  const ejeEcoValido = !auditoria || auditoria.etiqueta_permitida === 'izquierda-derecha';
-  const sustituido = fuente === 'votos' && !ejeEcoValido;
 
   const puntos = useMemo(() => {
     if (!datos) return [];
@@ -167,26 +167,45 @@ export default function Mapa({ onDiputados }) {
           : fuente === 'territorio' ? d.voto_err_territorial : d.voto_err_economico,
         ey: fuente === 'programa' ? null : d.voto_err_social,
         nulo: fuente === 'programa' ? false
-          : fuente === 'territorio' ? false : Boolean(d.voto_eco_nulo && d.voto_soc_nulo)
+          : fuente === 'territorio' ? false : Boolean(d.voto_eco_nulo)
       }))
-      .map(d => (fuente === 'votos' && !ejeEcoValido)
-        ? { ...d, x: d.voto_alineamiento, ex: 0, n: d.voto_n_social }
-        : d)
       .filter(d => d.x !== null && d.x !== undefined && d.y !== null && d.y !== undefined)
       .map(d => ({ ...d, x: Number(d.x), y: Number(d.y) }));
 
     if (fuente !== 'programa') {
+      const tope = Math.max(
+        0.05,
+        ...list.map(p => Math.abs(Number(p.x)) + Math.abs(Number(p.ex ?? 0)) * 1.96),
+        ...list.map(p => Math.abs(Number(p.y)) + Math.abs(Number(p.ey ?? 0)) * 1.96)
+      );
+      const k = Math.max(ESCALA_MIN, CAMPO / tope);
       list = list.map(p => ({
         ...p,
-        x: Number(p.x) * ESCALA_VOTOS,
-        y: Number(p.y) * ESCALA_VOTOS,
-        ex: Number(p.ex ?? 0) * 1.96 * ESCALA_VOTOS,
-        ey: Number(p.ey ?? 0) * 1.96 * ESCALA_VOTOS
+        escala: k,
+        x: Number(p.x) * k,
+        y: Number(p.y) * k,
+        ex: Number(p.ex ?? 0) * 1.96 * k,
+        ey: Number(p.ey ?? 0) * 1.96 * k
       }));
     }
 
     return list.map(d => ({ ...d, cx: d.x, cy: -d.y }));
-  }, [datos, fuente, ejeEcoValido]);
+  }, [datos, fuente]);
+
+  const escala = puntos[0]?.escala ?? 1;
+
+  const separables = useMemo(() => {
+    const m = new Map();
+    for (const p of puntos) {
+      const otros = puntos.filter(q => q.partido !== p.partido);
+      const n = otros.filter(q => {
+        const margen = Math.sqrt(Number(p.ex ?? 0) ** 2 + Number(q.ex ?? 0) ** 2);
+        return Math.abs(Number(p.x) - Number(q.x)) > margen;
+      }).length;
+      m.set(p.partido, n);
+    }
+    return m;
+  }, [puntos]);
 
   const r = escanos => 0.035 + Math.sqrt(Number(escanos ?? 1)) * 0.011;
 
@@ -205,7 +224,7 @@ export default function Mapa({ onDiputados }) {
       puestas.push({ x: p.cx, y: ly });
       return { ...p, labelY: ly, radio };
     });
-  }, [puntos]);
+  }, [puntos, separables]);
 
   const resolver = useCallback((clientX, clientY) => {
     const p = puntoSvg(svgRef.current, clientX, clientY);
@@ -258,7 +277,7 @@ export default function Mapa({ onDiputados }) {
     if (a?.movido) return;
     const hit = resolver(e.clientX, e.clientY);
     if (!hit) return;
-    setEncima(prev => (prev === hit.partido ? null : hit.partido));
+    setEncima(prev => (esTactil && prev === hit.partido ? null : hit.partido));
   }, [resolver]);
 
   useEffect(() => {
@@ -331,20 +350,15 @@ export default function Mapa({ onDiputados }) {
               </div>
             )}
             <GuiaEje
-              titulo={fuente === 'territorio' ? 'Eje territorial' : sustituido ? 'Eje de bloque' : 'Eje económico'}
+              titulo={fuente === 'territorio' ? 'Eje territorial' : 'Eje económico'}
               intro={fuente === 'territorio'
                 ? 'Mide dónde debe residir el poder: en el Estado central o en las comunidades autónomas. Es independiente de los otros dos ejes y en España es el que más separa a los partidos.'
-                : sustituido
-                  ? 'No hay suficientes normas económicas contestadas en ambos sentidos para situar a los partidos en izquierda-derecha por sus votos. Mientras tanto, este eje mide lo que sí se puede medir: cuánto apoya cada partido las normas que trae el Gobierno.'
-                  : 'Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades.'}
+                : 'Mide una sola cosa: qué papel debe tener el Estado en la economía. No mide simpatías ni identidades.'}
               colorA="#C45C52"
               colorB="#3D7AB8"
               a={fuente === 'territorio' ? {
                 titulo: 'Descentralizador',
                 texto: 'Las competencias y los recursos deben acercarse a quien conoce el territorio. Incluye transferencias, financiación autonómica y reconocimiento de lenguas y culturas propias.'
-              } : sustituido ? {
-                titulo: 'Oposición',
-                texto: 'El partido vota en contra de la mayor parte de lo que el Gobierno lleva al pleno. No dice nada sobre su ideología: un partido puede oponerse desde la izquierda o desde la derecha.'
               } : {
                 titulo: 'Izquierda económica',
                 texto: 'El mercado por sí solo genera desigualdad, así que el Estado debe corregirla: más gasto público, impuestos progresivos y reglas que limiten el poder de las empresas. Es la línea que va de Marx a la socialdemocracia de posguerra.'
@@ -352,18 +366,17 @@ export default function Mapa({ onDiputados }) {
               b={fuente === 'territorio' ? {
                 titulo: 'Centralista',
                 texto: 'La igualdad entre ciudadanos exige reglas comunes y un Estado que las garantice. Incluye recentralizar competencias, unidad de mercado y una lengua común en la Administración.'
-              } : sustituido ? {
-                titulo: 'Gobierno',
-                texto: 'El partido apoya la mayor parte de lo que el Gobierno lleva al pleno. Tampoco dice nada sobre ideología: puede ser socio de investidura, puede negociar apoyos puntuales, o puede coincidir en el fondo.'
               } : {
                 titulo: 'Derecha económica',
                 texto: 'El mercado asigna mejor que cualquier planificador porque nadie reúne toda la información necesaria para decidir por los demás: menos gasto, impuestos bajos y menos regulación. Es el argumento de Hayek y Friedman.'
               }}
               miramos={fuente === 'territorio'
-                ? <>Descentralización y competencias europeas, sobre {auditoria?.n_territorial ?? '—'} normas.</>
-                : sustituido
-                  ? <>Propensión de cada partido a votar que sí, sobre {auditoria?.n_economico ?? '—'} normas.</>
-                  : <>Gasto público, impuestos, regulación, propiedad pública, protección laboral y proteccionismo, sobre {auditoria?.n_economico ?? '—'} normas.</>}
+                ? <>Solo descentralización, sobre {auditoria?.n_territorial ?? '—'} normas. Las
+                    competencias europeas quedan fuera: no hay suficientes normas votadas en los
+                    dos sentidos por casi todos los partidos.</>
+                : <>De las seis dimensiones económicas solo entran las que tienen normas contestadas
+                    en los dos sentidos por casi todos los partidos, sobre {auditoria?.n_economico ?? '—'} normas.
+                    El gasto público queda fuera: el Congreso casi nunca vota recortes.</>}
             />
           </div>
 
@@ -412,9 +425,9 @@ export default function Mapa({ onDiputados }) {
                 fill="#EDE7D4" fillOpacity="0.62" />
 
                             <text x="-1.32" y="-1.28" fill="#EE7B3A" fontSize="0.092" fontWeight="700"
-                fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'DESCENTRALIZADOR' : sustituido ? 'OPOSICIÓN' : 'IZQUIERDA'}</text>
+                fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'DESCENTRALIZADOR' : 'IZQUIERDA'}</text>
               <text x="1.32" y="-1.28" fill="#4E9BBE" fontSize="0.092" fontWeight="700"
-                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'CENTRALISTA' : sustituido ? 'GOBIERNO' : 'DERECHA'}</text>
+                textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'CENTRALISTA' : 'DERECHA'}</text>
               <text x="0" y="-1.40" fill="#F2A93E" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">CONSERVADOR</text>
               <text x="0" y="1.48" fill="#2FA98F" fontSize="0.092" fontWeight="700"
@@ -435,16 +448,31 @@ export default function Mapa({ onDiputados }) {
                         transition={VIAJE}
                         stroke="#5A6067" strokeWidth="0.005" />
                     )}
-                    {fuente === 'votos' && encima === p.partido && (p.ex > 0 || p.ey > 0) && (
-                      <motion.ellipse
-                        initial={false}
-                        animate={{
-                          cx: p.cx, cy: p.cy,
-                          rx: Math.max(p.ex, p.radio * 1.3), ry: Math.max(p.ey, p.radio * 1.3)
-                        }}
-                        transition={VIAJE}
-                        fill={p.color || '#8E9299'} opacity="0.16"
-                        stroke={p.color || '#8E9299'} strokeOpacity="0.35" strokeWidth="0.006" />
+                    {fuente !== 'programa' && encima === p.partido && (p.ex > 0 || p.ey > 0) && (
+                      <>
+                        <motion.ellipse
+                          initial={false}
+                          animate={{
+                            cx: p.cx, cy: p.cy,
+                            rx: Math.max(p.ex, p.radio * 1.3), ry: Math.max(p.ey, p.radio * 1.3)
+                          }}
+                          transition={VIAJE}
+                          fill={p.color || '#8E9299'} opacity="0.16"
+                          stroke={p.color || '#8E9299'} strokeOpacity="0.45"
+                          strokeWidth="0.007" strokeDasharray="0.03 0.022" />
+                        <motion.text
+                          initial={false}
+                          animate={{
+                            x: p.cx,
+                            y: p.cy - Math.max(p.ey, p.radio * 1.3) - 0.045
+                          }}
+                          transition={VIAJE}
+                          fill="#C9CDD2" stroke={C.pizarra} strokeWidth="0.012"
+                          paintOrder="stroke" strokeLinejoin="round"
+                          fontSize="0.05" textAnchor="middle" fontFamily="DM Mono, monospace">
+                          margen de error
+                        </motion.text>
+                      </>
                     )}
                     <motion.circle
                       initial={false}
@@ -453,10 +481,9 @@ export default function Mapa({ onDiputados }) {
                         r: encima === p.partido ? p.radio * 1.22 : p.radio
                       }}
                       transition={VIAJE}
-                      fill={p.nulo ? 'none' : (p.color || '#8E9299')}
-                      stroke={p.nulo ? (p.color || '#8E9299') : C.pizarra}
-                      strokeWidth={p.nulo ? 0.018 : 0.014}
-                      strokeDasharray={p.nulo ? '0.035 0.028' : undefined} />
+                      fill={p.color || '#8E9299'}
+                      stroke={C.pizarra}
+                      strokeWidth="0.014" />
                     <motion.text
                       initial={false}
                       animate={{ x: p.cx, y: p.labelY }}
@@ -473,44 +500,6 @@ export default function Mapa({ onDiputados }) {
               })}
             </svg>
 
-            {fuente === 'votos' && auditoria && (
-              (auditoria.etiqueta_permitida !== 'izquierda-derecha' ||
-               auditoria.etiqueta_permitida_social !== 'conservador-progresista') && (
-              <div style={{
-                marginTop: 10, padding: 11, background: '#3A3226', border: '1px solid #6B5518',
-                borderRadius: 3, fontSize: 12, color: '#E8C56A', lineHeight: 1.55
-              }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>Auditoría automática</div>
-                {auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
-                  <div>
-                    El eje horizontal no puede ser izquierda-derecha: {auditoria.etiqueta_permitida === 'datos insuficientes'
-                      ? `solo hay ${auditoria.n_economico ?? '—'} normas económicas votadas con división real, y hacen falta 8.`
-                      : auditoria.etiqueta_permitida === 'sin poder discriminante'
-                        ? `solo ${auditoria.economico_significativos ?? 0} partidos tienen posición distinguible del centro.`
-                        : auditoria.etiqueta_permitida === 'placebo caducado'
-                          ? 'han entrado datos nuevos desde la última comprobación contra el azar, así que la anterior ya no vale para estas posiciones.'
-                          : auditoria.etiqueta_permitida === 'placebo sin calcular'
-                            ? 'todavía no se ha comprobado que estas posiciones no salgan por azar.'
-                            : `barajando al azar las etiquetas de las normas se obtiene un rango parecido (p = ${Number(auditoria.p_economico ?? 1).toFixed(3)}), así que el orden no viene del contenido.`}
-                    {' '}En su lugar se muestra el alineamiento con el Gobierno, que sí está medido.
-                  </div>
-                )}
-                {auditoria.etiqueta_permitida_social !== 'conservador-progresista' && (
-                  <div style={{ marginTop: 4 }}>
-                    Eje vertical: {auditoria.etiqueta_permitida_social === 'datos insuficientes'
-                      ? `solo ${auditoria.n_social ?? '—'} normas con división real, hacen falta 8.`
-                      : auditoria.etiqueta_permitida_social === 'sin poder discriminante'
-                        ? `solo ${auditoria.social_significativos ?? 0} partidos tienen posición distinguible del centro.`
-                        : auditoria.etiqueta_permitida_social === 'placebo caducado'
-                          ? 'han entrado datos nuevos desde la última comprobación contra el azar.'
-                          : auditoria.etiqueta_permitida_social === 'placebo sin calcular'
-                            ? 'todavía no se ha comprobado contra el azar.'
-                            : `el test de permutación no lo distingue del azar (p = ${Number(auditoria.p_social ?? 1).toFixed(3)}).`}
-                  </div>
-                )}
-              </div>
-            ))}
-
             {faltan > 0 && (
               <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
                 {datos.length} de 13 partidos con datos suficientes. El resto aparecerá cuando termine la codificación.
@@ -526,12 +515,26 @@ export default function Mapa({ onDiputados }) {
                     <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.escanos} escaños</span>
                   </div>
                   <div className="em" style={{ color: '#A8AEB4', fontSize: 11.5, marginTop: 6, lineHeight: 1.6 }}>
-                    económico {Number(activo.x / (fuente === 'votos' ? ESCALA_VOTOS : 1)).toFixed(2)}
-                    {fuente === 'votos' && activo.ex > 0 && ` ±${(activo.ex / ESCALA_VOTOS).toFixed(2)}`}
-                    {' · '}social {Number(activo.y / (fuente === 'votos' ? ESCALA_VOTOS : 1)).toFixed(2)}
-                    {fuente === 'votos' && activo.ey > 0 && ` ±${(activo.ey / ESCALA_VOTOS).toFixed(2)}`}
+                    {fuente === 'territorio' ? 'territorial' : 'económico'} {Number(activo.x / (fuente === 'programa' ? 1 : escala)).toFixed(2)}
+                    {fuente !== 'programa' && activo.ex > 0 && ` ±${(activo.ex / escala).toFixed(2)}`}
+                    {' · '}social {Number(activo.y / (fuente === 'programa' ? 1 : escala)).toFixed(2)}
+                    {fuente !== 'programa' && activo.ey > 0 && ` ±${(activo.ey / escala).toFixed(2)}`}
                     {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'votos codificados'}
                   </div>
+                  {fuente !== 'programa' && Number(activo.n ?? 0) < 25 && (
+                    <div className="em" style={{ color: '#E8C56A', fontSize: 10.5, marginTop: 6, lineHeight: 1.6 }}>
+                      Base muy corta: {activo.n} normas. Con tan pocas, la posición de este partido
+                      es orientativa y no debería compararse con la de partidos que tienen cientos.
+                    </div>
+                  )}
+                  {fuente !== 'programa' && (activo.ex > 0 || activo.ey > 0) && (
+                    <div className="em" style={{ color: '#8E959C', fontSize: 10.5, marginTop: 6, lineHeight: 1.6 }}>
+                      El óvalo es el margen de error: la posición real está casi con seguridad
+                      dentro de él. Es ancho cuando el partido ha votado pocas normas de las que
+                      dividen al pleno en esa dimensión, no cuando su postura sea ambigua.
+                      {' '}Se distingue de {separables.get(activo.partido) ?? 0} de {puntos.length - 1} partidos.
+                    </div>
+                  )}
                   {(() => {
                     const f = iniciativas?.[String(activo.siglas ?? '').trim().toUpperCase()];
                     if (!f || !f.presentadas) return null;
@@ -644,9 +647,13 @@ export default function Mapa({ onDiputados }) {
             {fuente === 'votos' && (
               <span> La posición por votos no mide cuánto apoya un partido, sino cuánto más
                 apoya lo que <em>baja</em> gasto, impuestos o regulación que lo que los sube.
-                El centro exacto significa que vota igual en ambos casos. Las cruces son el
-                margen de error; un círculo hueco es un partido cuya posición no se distingue
-                del centro.</span>
+                El centro exacto significa que vota igual en ambos casos.
+                {esTactil ? ' Toca' : ' Pasa por encima de'} un partido para ver su margen de error.</span>
+            )}
+            {fuente !== 'programa' && escala / ESCALA_MIN >= 1.15 && (
+              <span> El eje está ampliado {(escala / ESCALA_MIN).toFixed(1)} veces para que las
+                diferencias se vean: las posiciones reales caben en una franja estrecha alrededor
+                del centro, y los números del panel son los de verdad, sin ampliar.</span>
             )}
           </div>
               )}
@@ -694,6 +701,8 @@ export default function Mapa({ onDiputados }) {
         </div>
       )}
 
+      {fuente !== 'territorio' && <Contraste datos={datos} />}
+
       <div style={{ marginTop: 14, padding: 15, background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3 }}>
         <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>Cómo se calcula esta posición</div>
         <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 8 }}>
@@ -729,6 +738,26 @@ export default function Mapa({ onDiputados }) {
           tasa de votos a favor. Por eso la oposición sistemática no empuja a nadie hacia un extremo.
           Ningún eje se invierte ni se reescala a mano.
         </div>
+        {fuente === 'votos' && auditoria && (
+          (auditoria.etiqueta_permitida !== 'izquierda-derecha' ||
+           auditoria.etiqueta_permitida_social !== 'conservador-progresista') && (
+          <div style={{
+            marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.linea}`,
+            fontSize: 13, color: C.media, lineHeight: 1.6
+          }}>
+            <strong>Hasta dónde llega la precisión.</strong>{' '}
+            {auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
+              <>El eje económico ordena a los partidos, pero con poco margen: solo{' '}
+                {auditoria.economico_significativos ?? 0} de {auditoria.partidos_economico ?? 13} tienen
+                posición distinguible del centro, porque el Congreso apenas vota normas que recorten
+                gasto o desregulen. El orden es informativo; las distancias exactas, no.{' '}</>
+            )}
+            {auditoria.etiqueta_permitida_social !== 'conservador-progresista' && (
+              <>En el eje social la base es de {auditoria.n_social ?? '—'} normas con división real.</>
+            )}
+          </div>
+        ))}
+
         {fuente === 'votos' && auditoria?.p_economico != null && (
           <div style={{
             marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.linea}`,

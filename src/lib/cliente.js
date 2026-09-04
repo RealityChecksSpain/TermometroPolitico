@@ -512,3 +512,235 @@ export async function traerUltimas(limite = 6) {
   }
   return data ?? [];
 }
+export async function traerPerfilActual() {
+  const { data } = await supabase.auth.getUser();
+  return data?.user?.id ?? null;
+}
+
+const TABLA_SEGUIMIENTO = {
+  iniciativa: ['seguimientos_iniciativa', 'iniciativa_id'],
+  materia: ['seguimientos_materia', 'materia_id'],
+  politico: ['seguimientos_politico', 'politico_id']
+};
+
+export async function seguir(tipo, id) {
+  const par = TABLA_SEGUIMIENTO[tipo];
+  if (!par) throw new Error(`tipo de seguimiento desconocido: ${tipo}`);
+  const perfilId = await traerPerfilActual();
+  if (!perfilId) return { ok: false, motivo: 'sin sesion' };
+  const [tabla, columna] = par;
+  const { error } = await supabase
+    .from(tabla)
+    .upsert({ perfil_id: perfilId, [columna]: id }, { onConflict: `perfil_id,${columna}` });
+  return error ? { ok: false, motivo: error.message } : { ok: true };
+}
+
+export async function dejarDeSeguir(tipo, id) {
+  const par = TABLA_SEGUIMIENTO[tipo];
+  if (!par) throw new Error(`tipo de seguimiento desconocido: ${tipo}`);
+  const perfilId = await traerPerfilActual();
+  if (!perfilId) return { ok: false, motivo: 'sin sesion' };
+  const [tabla, columna] = par;
+  const { error } = await supabase
+    .from(tabla)
+    .delete()
+    .eq('perfil_id', perfilId)
+    .eq(columna, id);
+  return error ? { ok: false, motivo: error.message } : { ok: true };
+}
+
+export async function traerSeguimientos() {
+  const perfilId = await traerPerfilActual();
+  if (!perfilId) return { iniciativa: [], materia: [], politico: [] };
+  const [ini, mat, pol] = await Promise.all([
+    supabase.from('seguimientos_iniciativa').select('iniciativa_id'),
+    supabase.from('seguimientos_materia').select('materia_id'),
+    supabase.from('seguimientos_politico').select('politico_id')
+  ]);
+  return {
+    iniciativa: (ini.data ?? []).map(r => r.iniciativa_id),
+    materia: (mat.data ?? []).map(r => r.materia_id),
+    politico: (pol.data ?? []).map(r => r.politico_id)
+  };
+}
+
+export async function traerFeedPersonal(limite = 30, desplazamiento = 0) {
+  const perfilId = await traerPerfilActual();
+  if (!perfilId) return [];
+  const { data, error } = await supabase
+    .from('v_feed_personal')
+    .select('*')
+    .order('fecha', { ascending: false })
+    .range(desplazamiento, desplazamiento + limite - 1);
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function enviarEnlaceAcceso(correo) {
+  const limpio = String(correo ?? '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(limpio)) {
+    return { ok: false, motivo: 'correo no valido' };
+  }
+  const { error } = await supabase.auth.signInWithOtp({
+    email: limpio,
+    options: { emailRedirectTo: window.location.origin }
+  });
+  return error ? { ok: false, motivo: error.message } : { ok: true };
+}
+
+export async function cerrarSesion() {
+  const { error } = await supabase.auth.signOut();
+  return error ? { ok: false, motivo: error.message } : { ok: true };
+}
+
+export function alCambiarSesion(callback) {
+  const { data } = supabase.auth.onAuthStateChange((_evento, sesion) => {
+    callback(sesion?.user?.id ?? null);
+  });
+  return () => data?.subscription?.unsubscribe();
+}
+
+const VISTA_ACTIVIDAD = {
+  iniciativa: 'v_actividad_iniciativa',
+  materia: 'v_actividad_materia',
+  politico: 'v_actividad_politico'
+};
+
+async function votacionesRecientes(vista, claves, limite) {
+  const { data, error } = await supabase
+    .from(vista)
+    .select('votacion_id, momento, orden')
+    .in('clave', claves)
+    .order('momento', { ascending: false })
+    .order('orden', { ascending: false })
+    .limit(limite * Math.max(1, claves.length));
+  if (error) return [];
+  const vistos = [];
+  const puestos = new Set();
+  for (const f of data ?? []) {
+    if (puestos.has(f.votacion_id)) continue;
+    puestos.add(f.votacion_id);
+    vistos.push(f);
+    if (vistos.length >= limite) break;
+  }
+  return vistos;
+}
+
+export async function traerActividadSeguida(seguimientos, limite = 40) {
+  const activos = Object.entries(VISTA_ACTIVIDAD)
+    .filter(([tipo]) => (seguimientos?.[tipo] ?? []).length > 0);
+  if (activos.length === 0) return [];
+
+  const cabeceras = await Promise.all(
+    activos.map(async ([tipo, vista]) => ({
+      tipo,
+      vista,
+      claves: seguimientos[tipo],
+      recientes: await votacionesRecientes(vista, seguimientos[tipo], limite)
+    }))
+  );
+
+  const orden = new Map();
+  for (const c of cabeceras) {
+    for (const r of c.recientes) {
+      const previo = orden.get(r.votacion_id);
+      if (!previo || String(r.momento) > String(previo.momento)) orden.set(r.votacion_id, r);
+    }
+  }
+
+  const ids = Array.from(orden.values())
+    .sort((a, b) => String(b.momento).localeCompare(String(a.momento)) || (b.orden ?? 0) - (a.orden ?? 0))
+    .slice(0, limite)
+    .map(r => r.votacion_id);
+
+  if (ids.length === 0) return [];
+
+  const lotes = await Promise.all(cabeceras.map(async c => {
+    const { data, error } = await supabase
+      .from(c.vista)
+      .select('*')
+      .in('clave', c.claves)
+      .in('votacion_id', ids);
+    if (error) return [];
+    return (data ?? []).map(f => ({ ...f, tipo: c.tipo, motivo_id: f.clave }));
+  }));
+
+  const porVotacion = new Map();
+  for (const f of lotes.flat()) {
+    const clave = f.votacion_id;
+    if (!porVotacion.has(clave)) {
+      porVotacion.set(clave, {
+        votacion_id: f.votacion_id,
+        iniciativa_id: f.iniciativa_id ?? null,
+        titulo: f.titulo,
+        subtitulo: f.subtitulo,
+        fecha: f.fecha,
+        momento: f.momento,
+        resultado: f.resultado,
+        total_si: f.total_si,
+        total_no: f.total_no,
+        total_abstencion: f.total_abstencion,
+        similitud: f.similitud,
+        materia_nombre: f.materia_nombre ?? null,
+        materia_color: f.materia_color ?? null,
+        motivos: [],
+        seguidos: []
+      });
+    }
+    const g = porVotacion.get(clave);
+    if (g.similitud == null && f.similitud != null) g.similitud = f.similitud;
+    if (!g.materia_nombre && f.materia_nombre) {
+      g.materia_nombre = f.materia_nombre;
+      g.materia_color = f.materia_color ?? null;
+    }
+    if (!g.motivos.some(m => m.tipo === f.tipo && m.id === f.clave)) {
+      g.motivos.push({ tipo: f.tipo, id: f.clave, nombre: f.motivo_nombre });
+    }
+    if (f.tipo === 'politico' && !g.seguidos.some(x => x.id === f.clave)) {
+      g.seguidos.push({
+        id: f.clave,
+        nombre: f.motivo_nombre,
+        voto: f.voto_seguido,
+        foto: f.foto_url ?? null
+      });
+    }
+  }
+
+  const seguidosPolitico = (seguimientos.politico ?? []).length;
+
+  return Array.from(porVotacion.values())
+    .map(g => ({
+      ...g,
+      faltan: Math.max(0, seguidosPolitico - g.seguidos.length),
+      seguidos: g.seguidos.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es'))
+    }))
+    .sort((a, b) => String(b.momento).localeCompare(String(a.momento)));
+}
+
+export async function traerIniciativaDeVotacion(votacionId) {
+  if (!votacionId) return null;
+  const { data, error } = await supabase
+    .from('v_enlace_fiable')
+    .select('iniciativa_id')
+    .eq('votacion_id', votacionId)
+    .limit(1);
+  if (error) return null;
+  return data?.[0]?.iniciativa_id ?? null;
+}
+
+export async function traerPoliticoDeMandato(mandatoId) {
+  if (!mandatoId) return null;
+  const { data, error } = await supabase
+    .from('mandatos')
+    .select('politico_id')
+    .eq('id', mandatoId)
+    .limit(1);
+  if (error) return null;
+  return data?.[0]?.politico_id ?? null;
+}
+
+export async function traerMaterias() {
+  const { data, error } = await supabase.from('materias').select('id, slug, nombre');
+  if (error) return [];
+  return data ?? [];
+}
