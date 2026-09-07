@@ -1,129 +1,76 @@
-export type EjeId = 'izq_der' | 'territorial' | 'gal_tan';
+import { EjeId, FUENTES, NOMBRE_EJE } from './escalas';
 
-export interface FuenteExterna {
-  id: string;
+export type { EjeId };
+export { FUENTES, NOMBRE_EJE };
+
+export interface FilaConsenso {
+  clave: string;
+  tipo: string;
   nombre: string;
-  tipo: 'encuesta_expertos' | 'encuesta_ciudadana' | 'analisis_programas';
-  institucion: string;
-  url: string;
-  escalaMin: number;
-  escalaMax: number;
-  ejes: EjeId[];
-  ultimaOla: string;
-}
-
-export const FUENTES: Record<string, FuenteExterna> = {
-  ches: {
-    id: 'ches',
-    nombre: 'Chapel Hill Expert Survey',
-    tipo: 'encuesta_expertos',
-    institucion: 'University of North Carolina at Chapel Hill',
-    url: 'https://www.chesdata.eu',
-    escalaMin: 0,
-    escalaMax: 10,
-    ejes: ['izq_der', 'territorial', 'gal_tan'],
-    ultimaOla: 'pendiente_de_cargar'
-  },
-  cis: {
-    id: 'cis',
-    nombre: 'Barómetro CIS · autoubicación de partidos',
-    tipo: 'encuesta_ciudadana',
-    institucion: 'Centro de Investigaciones Sociológicas',
-    url: 'https://www.cis.es',
-    escalaMin: 1,
-    escalaMax: 10,
-    ejes: ['izq_der'],
-    ultimaOla: 'pendiente_de_cargar'
-  },
-  marpor: {
-    id: 'marpor',
-    nombre: 'Manifesto Project · índice RILE',
-    tipo: 'analisis_programas',
-    institucion: 'WZB Berlin Social Science Center',
-    url: 'https://manifesto-project.wzb.eu',
-    escalaMin: -100,
-    escalaMax: 100,
-    ejes: ['izq_der'],
-    ultimaOla: 'pendiente_de_cargar'
-  }
-};
-
-export interface PosicionBruta {
-  partido: string;
-  fuente: string;
+  nombre_corto: string | null;
+  pais_nombre: string | null;
+  partido_slug: string | null;
   eje: EjeId;
   valor: number;
-  provisional: boolean;
-}
-
-export const POSICIONES_BRUTAS: PosicionBruta[] = [
-  { partido: 'sumar', fuente: 'ches', eje: 'izq_der', valor: 1.8, provisional: true },
-  { partido: 'psoe', fuente: 'ches', eje: 'izq_der', valor: 3.4, provisional: true },
-  { partido: 'erc', fuente: 'ches', eje: 'izq_der', valor: 2.6, provisional: true },
-  { partido: 'bildu', fuente: 'ches', eje: 'izq_der', valor: 1.5, provisional: true },
-  { partido: 'bng', fuente: 'ches', eje: 'izq_der', valor: 2.1, provisional: true },
-  { partido: 'pnv', fuente: 'ches', eje: 'izq_der', valor: 5.4, provisional: true },
-  { partido: 'junts', fuente: 'ches', eje: 'izq_der', valor: 6.1, provisional: true },
-  { partido: 'cc', fuente: 'ches', eje: 'izq_der', valor: 6.3, provisional: true },
-  { partido: 'pp', fuente: 'ches', eje: 'izq_der', valor: 7.2, provisional: true },
-  { partido: 'upn', fuente: 'ches', eje: 'izq_der', valor: 7.6, provisional: true },
-  { partido: 'vox', fuente: 'ches', eje: 'izq_der', valor: 9.1, provisional: true },
-
-  { partido: 'sumar', fuente: 'cis', eje: 'izq_der', valor: 2.2, provisional: true },
-  { partido: 'psoe', fuente: 'cis', eje: 'izq_der', valor: 3.9, provisional: true },
-  { partido: 'erc', fuente: 'cis', eje: 'izq_der', valor: 3.1, provisional: true },
-  { partido: 'bildu', fuente: 'cis', eje: 'izq_der', valor: 2.0, provisional: true },
-  { partido: 'bng', fuente: 'cis', eje: 'izq_der', valor: 2.7, provisional: true },
-  { partido: 'pnv', fuente: 'cis', eje: 'izq_der', valor: 5.8, provisional: true },
-  { partido: 'junts', fuente: 'cis', eje: 'izq_der', valor: 6.4, provisional: true },
-  { partido: 'cc', fuente: 'cis', eje: 'izq_der', valor: 6.0, provisional: true },
-  { partido: 'pp', fuente: 'cis', eje: 'izq_der', valor: 7.5, provisional: true },
-  { partido: 'upn', fuente: 'cis', eje: 'izq_der', valor: 7.8, provisional: true },
-  { partido: 'vox', fuente: 'cis', eje: 'izq_der', valor: 9.4, provisional: true },
-
-  { partido: 'bildu', fuente: 'ches', eje: 'territorial', valor: 9.5, provisional: true },
-  { partido: 'junts', fuente: 'ches', eje: 'territorial', valor: 9.7, provisional: true },
-  { partido: 'erc', fuente: 'ches', eje: 'territorial', valor: 9.6, provisional: true },
-  { partido: 'bng', fuente: 'ches', eje: 'territorial', valor: 9.2, provisional: true },
-  { partido: 'pnv', fuente: 'ches', eje: 'territorial', valor: 8.9, provisional: true },
-  { partido: 'cc', fuente: 'ches', eje: 'territorial', valor: 7.4, provisional: true },
-  { partido: 'sumar', fuente: 'ches', eje: 'territorial', valor: 6.8, provisional: true },
-  { partido: 'psoe', fuente: 'ches', eje: 'territorial', valor: 4.6, provisional: true },
-  { partido: 'pp', fuente: 'ches', eje: 'territorial', valor: 1.9, provisional: true },
-  { partido: 'upn', fuente: 'ches', eje: 'territorial', valor: 1.2, provisional: true },
-  { partido: 'vox', fuente: 'ches', eje: 'territorial', valor: 0.4, provisional: true }
-];
-
-function normalizar(valor: number, fuente: FuenteExterna): number {
-  const { escalaMin, escalaMax } = fuente;
-  return ((valor - escalaMin) / (escalaMax - escalaMin)) * 10;
+  desviacion: number;
+  n_fuentes: number;
+  fuentes: string[];
+  anio: number;
 }
 
 export interface PosicionConsenso {
-  partido: string;
+  clave: string;
+  partido: string | null;
+  nombre: string;
   eje: EjeId;
   valor: number;
   desviacion: number;
   fuentesUsadas: string[];
-  provisional: boolean;
+  anio: number;
+}
+
+const porSlug = new Map<string, PosicionConsenso>();
+const porClave = new Map<string, PosicionConsenso>();
+
+export function cargarPosiciones(filas: FilaConsenso[]): number {
+  porSlug.clear();
+  porClave.clear();
+  let cargadas = 0;
+  for (const f of filas ?? []) {
+    if (f.valor === null || f.valor === undefined) continue;
+    const p: PosicionConsenso = {
+      clave: f.clave,
+      partido: f.partido_slug ?? null,
+      nombre: f.nombre_corto || f.nombre,
+      eje: f.eje,
+      valor: Number(f.valor),
+      desviacion: Number(f.desviacion ?? 0),
+      fuentesUsadas: Array.isArray(f.fuentes) ? f.fuentes : [],
+      anio: Number(f.anio ?? 0)
+    };
+    porClave.set(`${f.clave}|${f.eje}`, p);
+    if (f.partido_slug) porSlug.set(`${f.partido_slug}|${f.eje}`, p);
+    cargadas++;
+  }
+  return cargadas;
+}
+
+export function hayPosiciones(eje?: EjeId): boolean {
+  if (!eje) return porSlug.size > 0;
+  for (const k of porSlug.keys()) if (k.endsWith(`|${eje}`)) return true;
+  return false;
+}
+
+export function cuantasPosiciones(): number {
+  return porClave.size;
 }
 
 export function posicionConsenso(partido: string, eje: EjeId): PosicionConsenso | null {
-  const brutas = POSICIONES_BRUTAS.filter(p => p.partido === partido && p.eje === eje);
-  if (brutas.length === 0) return null;
+  return porSlug.get(`${partido}|${eje}`) ?? null;
+}
 
-  const normalizadas = brutas.map(b => normalizar(b.valor, FUENTES[b.fuente]));
-  const media = normalizadas.reduce((a, b) => a + b, 0) / normalizadas.length;
-  const varianza = normalizadas.reduce((a, b) => a + (b - media) ** 2, 0) / normalizadas.length;
-
-  return {
-    partido,
-    eje,
-    valor: Number(media.toFixed(2)),
-    desviacion: Number(Math.sqrt(varianza).toFixed(2)),
-    fuentesUsadas: brutas.map(b => b.fuente),
-    provisional: brutas.some(b => b.provisional)
-  };
+export function posicionPorClave(clave: string, eje: EjeId): PosicionConsenso | null {
+  return porClave.get(`${clave}|${eje}`) ?? null;
 }
 
 export interface VotoGrupo {
@@ -136,15 +83,17 @@ export interface CentroGravedad {
   eje: EjeId;
   centroAFavor: number | null;
   centroEnContra: number | null;
-  centroCamara: number;
+  centroCamara: number | null;
   escanosAFavor: number;
   escanosEnContra: number;
+  escanosSinPosicion: number;
   distanciaAlCentro: number | null;
   fuentes: string[];
 }
 
 export function centroGravedad(votos: VotoGrupo[], eje: EjeId): CentroGravedad {
   const fuentes = new Set<string>();
+  let sinPosicion = 0;
 
   const ponderar = (subset: VotoGrupo[]) => {
     let suma = 0;
@@ -159,11 +108,15 @@ export function centroGravedad(votos: VotoGrupo[], eje: EjeId): CentroGravedad {
     return peso === 0 ? null : Number((suma / peso).toFixed(2));
   };
 
+  votos.forEach(v => {
+    if (!posicionConsenso(v.partido, eje)) sinPosicion += v.escanos;
+  });
+
   const aFavor = votos.filter(v => v.voto === 'si');
   const enContra = votos.filter(v => v.voto === 'no');
 
   const centroAFavor = ponderar(aFavor);
-  const centroCamara = ponderar(votos) ?? 5;
+  const centroCamara = ponderar(votos);
 
   return {
     eje,
@@ -172,7 +125,11 @@ export function centroGravedad(votos: VotoGrupo[], eje: EjeId): CentroGravedad {
     centroCamara,
     escanosAFavor: aFavor.reduce((a, v) => a + v.escanos, 0),
     escanosEnContra: enContra.reduce((a, v) => a + v.escanos, 0),
-    distanciaAlCentro: centroAFavor === null ? null : Number((centroAFavor - centroCamara).toFixed(2)),
+    escanosSinPosicion: sinPosicion,
+    distanciaAlCentro:
+      centroAFavor === null || centroCamara === null
+        ? null
+        : Number((centroAFavor - centroCamara).toFixed(2)),
     fuentes: Array.from(fuentes)
   };
 }
@@ -186,7 +143,6 @@ export interface TramoBarra {
 
 export function tramosDeApoyo(votos: VotoGrupo[], eje: EjeId = 'izq_der'): TramoBarra[] {
   const aFavor = votos.filter(v => v.voto === 'si');
-  const total = aFavor.reduce((a, v) => a + v.escanos, 0);
 
   const buckets: Record<TramoBarra['tramo'], { escanos: number; partidos: string[] }> = {
     izquierda: { escanos: 0, partidos: [] },
@@ -194,25 +150,35 @@ export function tramosDeApoyo(votos: VotoGrupo[], eje: EjeId = 'izq_der'): Tramo
     derecha: { escanos: 0, partidos: [] }
   };
 
+  let clasificados = 0;
+
   aFavor.forEach(v => {
     const pos = posicionConsenso(v.partido, eje);
     if (!pos) return;
     const tramo: TramoBarra['tramo'] = pos.valor < 4 ? 'izquierda' : pos.valor > 6 ? 'derecha' : 'centro';
     buckets[tramo].escanos += v.escanos;
     buckets[tramo].partidos.push(v.partido);
+    clasificados += v.escanos;
   });
 
   return (['izquierda', 'centro', 'derecha'] as const).map(tramo => ({
     tramo,
     escanos: buckets[tramo].escanos,
-    porcentaje: total === 0 ? 0 : Number(((buckets[tramo].escanos / total) * 100).toFixed(1)),
+    porcentaje: clasificados === 0 ? 0 : Number(((buckets[tramo].escanos / clasificados) * 100).toFixed(1)),
     partidos: buckets[tramo].partidos
   }));
 }
 
-export function textoProcedencia(cg: CentroGravedad): string {
-  const nombres = cg.fuentes.map(f => FUENTES[f].nombre).join(' · ');
-  return `Posiciones de partido según ${nombres}. Votos según el Congreso de los Diputados. Esta aplicación no asigna ideología a ninguna ley.`;
+export function textoProcedencia(cg: CentroGravedad): string | null {
+  if (!cg.fuentes.length) return null;
+  const nombres = cg.fuentes
+    .map(f => FUENTES[f]?.nombre ?? f)
+    .join(' · ');
+  const aviso = cg.escanosSinPosicion > 0
+    ? ` No entran en el calculo ${cg.escanosSinPosicion} escanos de partidos sin posicion externa publicada.`
+    : '';
+  return `Posiciones de partido segun ${nombres}. Votos segun el Congreso de los Diputados. ` +
+    `Esta aplicacion no asigna ideologia a ninguna ley.${aviso}`;
 }
 
 export function votacionesFueraDeBloque(

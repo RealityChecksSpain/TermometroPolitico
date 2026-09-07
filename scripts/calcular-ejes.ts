@@ -1,6 +1,7 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { pca, escalarA, correlacion, MatrizVotos } from '../src/lib/pca';
-import { posicionConsenso } from '../src/lib/posiciones';
+import { cargarPosiciones, posicionConsenso, cuantasPosiciones } from '../src/lib/posiciones';
+import { traerTodo } from '../src/lib/paginar';
 
 const legislaturaId = exigirEnv('LEGISLATURA_ACTIVA_ID');
 const MIN_VOTOS = Number(process.env.MIN_VOTOS ?? 100);
@@ -20,6 +21,22 @@ async function paginar<T>(consulta: (desde: number, hasta: number) => any): Prom
     desde += tam;
   }
   return salida;
+}
+
+console.log('\nCargando posiciones externas...');
+
+const externasCrudas = await traerTodo<any>((a, b) =>
+  db().from('v_posiciones_consenso')
+    .select('*')
+    .eq('eje', 'izq_der')
+    .not('partido_slug', 'is', null)
+    .range(a, b)
+);
+cargarPosiciones(externasCrudas);
+console.log(`  ${cuantasPosiciones()} partidos espanoles con posicion externa publicada`);
+if (cuantasPosiciones() === 0) {
+  console.log('  AVISO: sin posiciones externas no hay contraste. El eje se calculara igual,');
+  console.log('         pero se etiquetara como "sin verificar" en vez de izquierda-derecha.');
 }
 
 console.log('\nCargando votos...');
@@ -158,28 +175,30 @@ for (const eje of ejes) {
       calculadas.push(valor);
     }
   });
-  const r = correlacion(calculadas, externas);
+  const r = externas.length >= 6 ? correlacion(calculadas, externas) : NaN;
 
   const forma = diagnosticoForma(ordenado);
   eje.huecoMaximo = forma.huecoMaximo;
   eje.esContinuo = forma.esContinuo;
 
-  const correlacionAlta = Math.abs(r) > 0.8;
-  eje.etiqueta = forma.esContinuo && correlacionAlta
-    ? 'Izquierda - Derecha'
-    : forma.esContinuo
-      ? 'Eje sin interpretar'
-      : 'Bloque parlamentario';
+  const correlacionAlta = Number.isFinite(r) && Math.abs(r) > 0.8;
+  eje.etiqueta = !Number.isFinite(r)
+    ? 'Sin verificar externamente'
+    : forma.esContinuo && correlacionAlta
+      ? 'Izquierda - Derecha'
+      : forma.esContinuo
+        ? 'Eje sin interpretar'
+        : 'Bloque parlamentario';
 
   console.log(`\nEJE ${eje.numero}  varianza explicada ${(eje.varianza * 100).toFixed(1)}%`);
-  console.log(`  correlacion con CHES izq-der: ${r.toFixed(3)}`);
+  console.log(`  correlacion con fuentes externas izq-der: ${Number.isFinite(r) ? r.toFixed(3) : 'sin base (' + externas.length + ' partidos)'}`);
   console.log(`  hueco maximo entre partidos: ${(forma.huecoMaximo * 100).toFixed(1)}% del rango`);
   console.log(`  forma: ${forma.esContinuo ? 'CONTINUO' : 'BIMODAL (dos bloques separados)'}`);
   console.log(`  ETIQUETA: ${eje.etiqueta}`);
   if (!forma.esContinuo) {
     console.log('  AVISO: un eje bimodal mide pertenencia a bloque, no ideologia.');
-    console.log('         La correlacion con CHES es espuria: en Espana el bloque de');
-    console.log('         investidura es de izquierdas, asi que cualquier eje');
+    console.log('         La correlacion con las fuentes externas es espuria: en Espana el');
+    console.log('         bloque de investidura es de izquierdas, asi que cualquier eje');
     console.log('         gobierno-oposicion correlaciona con izquierda-derecha.');
   }
   console.log('  centroides por partido:');
@@ -212,7 +231,7 @@ for (const eje of ejes) {
         polo_negativo: eje.polos[0],
         polo_positivo: eje.polos[1],
         varianza_explicada: eje.varianza,
-        correlacion_ches: eje.correlacion,
+        correlacion_ches: Number.isFinite(eje.correlacion) ? eje.correlacion : null,
         metodo: eje.esContinuo ? 'pca_votaciones' : 'pca_votaciones_bimodal',
         votaciones_usadas: columnas.length,
         mandatos_usados: filas.length,

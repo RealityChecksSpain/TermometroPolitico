@@ -15,3 +15,6 @@ scripts/_*.ts
 **/*secret*
 **/*credentials*
 !.cursor/rules/secretos.mdc
+
+datos/externas/
+datos/regimenes/diagnostico/

@@ -1,0 +1,152 @@
+[
+  {
+    "clave": "regimen:de-1933",
+    "nombre": "Partido Nacionalsocialista (NSDAP) · Adolf Hitler",
+    "nombre_corto": "Alemania 1933-45",
+    "pais_nombre": "Alemania",
+    "pais_vdem": "Germany",
+    "desde": 1933,
+    "hasta": 1945,
+    "alcance": "Politica interna del Estado aleman entre la Ley de Plenos Poderes y la capitulacion. No incluye la politica de ocupacion en terceros paises."
+  },
+  {
+    "clave": "regimen:su-1928",
+    "nombre": "Partido Bolchevique · Iosif Stalin",
+    "nombre_corto": "URSS 1928-53",
+    "pais_nombre": "Union Sovietica",
+    "pais_vdem": "Russia",
+    "desde": 1928,
+    "hasta": 1953,
+    "alcance": "Politica interna desde el primer plan quinquenal hasta la muerte de Stalin. No incluye la NEP anterior ni el periodo posterior."
+  },
+  {
+    "clave": "regimen:cl-1973",
+    "nombre": "Junta militar · Augusto Pinochet",
+    "nombre_corto": "Chile 1973-90",
+    "pais_nombre": "Chile",
+    "pais_vdem": "Chile",
+    "desde": 1973,
+    "hasta": 1990,
+    "alcance": "Politica interna desde el golpe hasta el traspaso de mando de 1990."
+  },
+  {
+    "clave": "regimen:es-1939",
+    "nombre": "FET y de las JONS · Francisco Franco",
+    "nombre_corto": "Espana 1939-75",
+    "pais_nombre": "Espana",
+    "pais_vdem": "Spain",
+    "desde": 1939,
+    "hasta": 1975,
+    "alcance": "Politica interna desde el final de la guerra civil hasta la muerte de Franco. Incluye tanto la autarquia como el desarrollismo posterior a 1959."
+  },
+  {
+    "clave": "regimen:kp-1990",
+    "nombre": "Partido del Trabajo de Corea · Kim Jong-il y Kim Jong-un",
+    "nombre_corto": "Corea Norte 1990-",
+    "pais_nombre": "Corea del Norte",
+    "pais_vdem": "North Korea",
+    "desde": 1990,
+    "hasta": 2024,
+    "alcance": "Politica interna desde el fin del apoyo sovietico hasta la actualidad."
+  },
+  {
+    "clave": "regimen:kr-1961",
+    "nombre": "Republica de Corea · Park Chung-hee",
+    "nombre_corto": "Corea Sur 1961-79",
+    "pais_nombre": "Corea del Sur",
+    "pais_vdem": "South Korea",
+    "desde": 1961,
+    "hasta": 1979,
+    "alcance": "Politica interna desde el golpe de 1961 hasta 1979."
+  },
+  {
+    "clave": "regimen:it-1922",
+    "nombre": "Partido Nacional Fascista · Benito Mussolini",
+    "nombre_corto": "Italia 1922-43",
+    "pais_nombre": "Italia",
+    "pais_vdem": "Italy",
+    "desde": 1922,
+    "hasta": 1943,
+    "alcance": "Politica interna desde la marcha sobre Roma hasta la caida de Mussolini en julio de 1943. No incluye la Republica Social Italiana."
+  },
+  {
+    "clave": "regimen:cn-1949",
+    "nombre": "Partido Comunista de China · Mao Zedong",
+    "nombre_corto": "China 1949-76",
+    "pais_nombre": "China",
+    "pais_vdem": "China",
+    "desde": 1949,
+    "hasta": 1976,
+    "alcance": "Politica interna desde la proclamacion de la Republica Popular hasta la muerte de Mao. No incluye la reforma economica posterior."
+  },
+  {
+    "clave": "regimen:za-1948",
+    "nombre": "Partido Nacional (apartheid) · de Malan a De Klerk",
+    "nombre_corto": "Sudafrica 1948-94",
+    "pais_nombre": "Sudafrica",
+    "pais_vdem": "South Africa",
+    "desde": 1948,
+    "hasta": 1994,
+    "alcance": "Politica interna desde la victoria del Partido Nacional hasta las primeras elecciones multirraciales."
+  },
+  {
+    "clave": "regimen:kh-1975",
+    "nombre": "Jemeres Rojos (Kampuchea Democratica) · Pol Pot",
+    "nombre_corto": "Camboya 1975-79",
+    "pais_nombre": "Camboya",
+    "pais_vdem": "Cambodia",
+    "desde": 1975,
+    "hasta": 1979,
+    "alcance": "Politica interna durante la Kampuchea Democratica."
+  },
+  {
+    "clave": "regimen:cu-1959",
+    "nombre": "Partido Comunista de Cuba · Fidel y Raul Castro",
+    "nombre_corto": "Cuba 1959-",
+    "pais_nombre": "Cuba",
+    "pais_vdem": "Cuba",
+    "desde": 1959,
+    "hasta": 2024,
+    "alcance": "Politica interna desde la revolucion hasta la actualidad. Es un periodo largo con cambios economicos importantes: donde la politica cambio de signo, la respuesta correcta es neutro."
+  },
+  {
+    "clave": "regimen:iq-1968",
+    "nombre": "Partido Baaz en Irak · al-Bakr y Saddam Hussein",
+    "nombre_corto": "Irak 1968-2003",
+    "pais_nombre": "Irak",
+    "pais_vdem": "Iraq",
+    "desde": 1968,
+    "hasta": 2003,
+    "alcance": "Politica interna desde la toma del poder por el Baaz hasta la invasion de 2003."
+  },
+  {
+    "clave": "regimen:jp-1931",
+    "nombre": "Japon imperial · gobiernos militares, Hideki Tojo",
+    "nombre_corto": "Japon 1931-45",
+    "pais_nombre": "Japon",
+    "pais_vdem": "Japan",
+    "desde": 1931,
+    "hasta": 1945,
+    "alcance": "Politica interna desde el incidente de Manchuria hasta la rendicion. No incluye la politica en los territorios ocupados."
+  },
+  {
+    "clave": "regimen:gr-1967",
+    "nombre": "Junta de los Coroneles · Yorgos Papadopoulos",
+    "nombre_corto": "Grecia 1967-74",
+    "pais_nombre": "Grecia",
+    "pais_vdem": "Greece",
+    "desde": 1967,
+    "hasta": 1974,
+    "alcance": "Politica interna durante la dictadura militar."
+  },
+  {
+    "clave": "regimen:ir-1979",
+    "nombre": "Republica Islamica de Iran · Jomeini y Jamenei",
+    "nombre_corto": "Iran 1979-",
+    "pais_nombre": "Iran",
+    "pais_vdem": "Iran",
+    "desde": 1979,
+    "hasta": 2024,
+    "alcance": "Politica interna desde la revolucion hasta la actualidad."
+  }
+]
