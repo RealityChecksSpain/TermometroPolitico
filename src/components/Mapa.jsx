@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion';
 import { DestelloSuave } from './Destello.jsx';
 import Contraste from './Contraste.jsx';
+import MapaDemocracia from './MapaDemocracia.jsx';
 import { VOTO } from '../lib/paleta.js';
 import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos, traerSubejes, traerBaseComun, traerVotosPorClase, traerIniciativasPartido } from '../lib/cliente.js';
 import {
@@ -38,6 +39,8 @@ function listarDims(dims) {
 const CAMPO = 1.12;
 const ESCALA_MIN = 1.24;
 const ESCALA_CHES = 1.24 / 5;
+const BORDE = 1.24;
+const VB = { x: -1.45, y: -1.5, w: 2.9, h: 3.05 };
 const FORMAS = ['circulo', 'triangulo', 'cuadrado', 'pentagono', 'hexagono'];
 const LADOS = { triangulo: 3, cuadrado: 4, pentagono: 5, hexagono: 6 };
 const MAX_RANURAS = 5;
@@ -79,7 +82,18 @@ const NOMBRE_SUBEJE = {
   moral_tradicional: 'Moral y familia',
   religion_estado: 'Religión y Estado',
   orden_publico: 'Orden público',
-  diversidad_cultural: 'Diversidad cultural'
+  diversidad_cultural: 'Diversidad cultural',
+  propiedad_publica: 'Propiedad pública',
+  proteccion_laboral: 'Protección laboral',
+  proteccionismo: 'Proteccionismo',
+  nacionalismo: 'Identidad nacional',
+  autoridad_estatal: 'Poder del Ejecutivo',
+  descentralizacion: 'Descentralización',
+  integracion_europea: 'Integración europea',
+  ortodoxia_fiscal: 'Disciplina fiscal',
+  igualdad_trato: 'Igualdad de trato',
+  medio_ambiente: 'Medio ambiente',
+  calidad_democratica: 'Calidad democrática'
 };
 
 const ETIQUETA_DIM = {
@@ -91,7 +105,18 @@ const ETIQUETA_DIM = {
   moral_tradicional: ['la moral tradicional', 'la autonomía personal'],
   religion_estado: ['privilegios confesionales', 'la laicidad'],
   orden_publico: ['más poder policial', 'más garantías'],
-  diversidad_cultural: ['la asimilación', 'la pluralidad']
+  diversidad_cultural: ['la asimilación', 'la pluralidad'],
+  propiedad_publica: ['privatizar', 'nacionalizar'],
+  proteccion_laboral: ['facilitar el despido', 'reforzar derechos laborales'],
+  proteccionismo: ['abrir mercados', 'poner aranceles y barreras'],
+  nacionalismo: ['relativizar los símbolos comunes', 'reforzar los símbolos comunes'],
+  autoridad_estatal: ['reforzar los contrapesos', 'concentrar poder en el Ejecutivo'],
+  descentralizacion: ['recentralizar competencias', 'pasar competencias a las comunidades'],
+  integracion_europea: ['recuperar soberanía', 'ceder competencias a la UE'],
+  ortodoxia_fiscal: ['relajar las reglas de déficit', 'reforzar la estabilidad presupuestaria'],
+  igualdad_trato: ['recortar la protección antidiscriminación', 'ampliar la protección antidiscriminación'],
+  medio_ambiente: ['relajar exigencias ambientales', 'reforzar la protección ambiental'],
+  calidad_democratica: ['debilitar los controles del poder', 'reforzar los controles del poder']
 };
 
 function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
@@ -150,7 +175,6 @@ export default function Mapa({ onDiputados }) {
   const arrastre = useRef(null);
   const svgRef = useRef(null);
 
-  const VB = { x: -1.45, y: -1.5, w: 2.9, h: 3.05 };
   const viewBox = useMemo(() => {
     const w = VB.w / vista.z;
     const h = VB.h / vista.z;
@@ -222,7 +246,8 @@ export default function Mapa({ onDiputados }) {
           escala: 1,
           x, y, cx: x, cy: -y,
           ex: rf.ex * ESCALA_CHES,
-          ey: rf.ey * ESCALA_CHES
+          ey: rf.ey * ESCALA_CHES,
+          unaFuente: Array.isArray(rf.fuentes) && rf.fuentes.length === 1
         };
       });
     }
@@ -350,6 +375,28 @@ export default function Mapa({ onDiputados }) {
     return m;
   }, [puntos, fuente]);
 
+  const regla = useMemo(() => {
+    if (fuente === 'referencias') {
+      const marcas = [0, 2.5, 5, 7.5, 10];
+      return {
+        unidad: 'escala 0 a 10 de la encuesta de expertos',
+        x: marcas.map(v => ({ v, pos: (v - 5) * ESCALA_CHES, texto: String(v) })),
+        y: marcas.map(v => ({ v, pos: (v - 5) * ESCALA_CHES, texto: String(v) }))
+      };
+    }
+    const k = puntos[0]?.escala ?? 1;
+    const tope = BORDE / k;
+    const marcas = [-tope, -tope / 2, 0, tope / 2, tope];
+    const fmt = n => (Math.abs(n) < 0.005 ? '0' : n.toFixed(2));
+    return {
+      unidad: fuente === 'programa'
+        ? 'diferencial de programa, de -1 a +1'
+        : 'diferencial de voto, cero es el centro de la Cámara',
+      x: marcas.map(v => ({ v, pos: v * k, texto: fmt(v) })),
+      y: marcas.map(v => ({ v, pos: -v * k, texto: fmt(v) }))
+    };
+  }, [fuente, puntos]);
+
   const r = escanos => 0.035 + Math.sqrt(Number(escanos ?? 1)) * 0.011;
 
   const conEtiqueta = useMemo(() => {
@@ -411,7 +458,7 @@ export default function Mapa({ onDiputados }) {
       movido: false
     };
     try { svgRef.current?.setPointerCapture?.(e.pointerId); } catch { /* sin captura */ }
-  }, [resolver, vista]);
+  }, [vista]);
 
   const onPointerUp = useCallback(e => {
     const a = arrastre.current;
@@ -444,6 +491,30 @@ export default function Mapa({ onDiputados }) {
 
   const activo = encima ? conEtiqueta.find(p => p.partido === encima) : null;
   const anclado = fijado ? conEtiqueta.find(p => p.partido === fijado) : null;
+
+  const comparacion = (() => {
+    if (fuente !== 'referencias' || !anclado || !activo || anclado.partido === activo.partido) return null;
+    const frase = (etiqueta, va, vb, mas, menos, ea, eb) => {
+      const a = Number(va);
+      const b = Number(vb);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+      const d = a - b;
+      const margen = Math.max(Number(ea ?? 0), Number(eb ?? 0), 0.35);
+      if (Math.abs(d) < margen) {
+        return `en ${etiqueta} no se distinguen (${a.toFixed(2)} frente a ${b.toFixed(2)}, menos que el desacuerdo entre fuentes)`;
+      }
+      const cuanto = Math.abs(d) >= 2.5 ? 'mucho más' : Math.abs(d) >= 1.2 ? 'más' : 'algo más';
+      return `${cuanto} ${d > 0 ? mas : menos} (${a.toFixed(2)} frente a ${b.toFixed(2)})`;
+    };
+    const partes = [
+      frase('lo económico', activo.bruto_x, anclado.bruto_x,
+        'a la derecha', 'a la izquierda', activo.ex, anclado.ex),
+      frase('lo social', activo.bruto_y, anclado.bruto_y,
+        'conservador', 'progresista', activo.ey, anclado.ey)
+    ].filter(Boolean);
+    if (!partes.length) return null;
+    return { a: activo.siglas, b: anclado.siglas, partes };
+  })();
   const comparando = Boolean(anclado && activo && anclado.partido !== activo.partido);
   const faltan = 13 - (datos?.length ?? 0);
 
@@ -470,6 +541,7 @@ export default function Mapa({ onDiputados }) {
             escala 0 a 10 · {activo.fuentes.map(f => fuentesExternas?.find(x => x.id === f)?.nombre ?? f).join(' · ')}
             {activo.nombre && activo.nombre !== activo.siglas && <> · {activo.nombre}</>}
           </span>
+          {activo.unaFuente && <span style={{ color: '#E8C56A' }}> · una fuente</span>}
           {activo.esRegimen && (() => {
             const filas = dimRegimen?.[activo.partido] ?? [];
             if (!filas.length) return null;
@@ -506,6 +578,13 @@ export default function Mapa({ onDiputados }) {
             );
           })()}
 
+          {activo.esEspanol && (
+            <span style={{ display: 'block', color: '#E8C56A', fontSize: 10.5, marginTop: 6, lineHeight: 1.6 }}>
+              Esta no es la posición que tiene en «Lo que han votado». Sale de una encuesta de
+              expertos europeos sobre el partido, no de sus votos en el Congreso, y va en otra
+              escala. Las dos son ciertas y miden cosas distintas: no las compares entre pestañas.
+            </span>
+          )}
           {activo.esRegimen && activo.democracia != null && (
             <span style={{ display: 'block', color: '#A8AEB4', fontSize: 11, marginTop: 6 }}>
               Democracia liberal {Number(activo.democracia).toFixed(3)} de 1
@@ -526,18 +605,10 @@ export default function Mapa({ onDiputados }) {
         {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'votos codificados'}
       </div>
       )}
-      {fuente !== 'programa' && fuente !== 'referencias' && Number(activo.n ?? 0) < 25 && (
-        <div className="em" style={{ color: '#E8C56A', fontSize: 10.5, marginTop: 6, lineHeight: 1.6 }}>
-          Base muy corta: {activo.n} normas. Con tan pocas, la posición de este partido
-          es orientativa y no debería compararse con la de partidos que tienen cientos.
-        </div>
-      )}
       {fuente !== 'programa' && fuente !== 'referencias' && (activo.ex > 0 || activo.ey > 0) && (
-        <div className="em" style={{ color: '#8E959C', fontSize: 10.5, marginTop: 6, lineHeight: 1.6 }}>
-          El óvalo es el margen de error: la posición real está casi con seguridad
-          dentro de él. Es ancho cuando el partido ha votado pocas normas de las que
-          dividen al pleno en esa dimensión, no cuando su postura sea ambigua.
-          {' '}Se distingue de {separables.get(activo.partido) ?? 0} de {puntos.length - 1} partidos.
+        <div className="em" style={{ color: '#8E959C', fontSize: 10.5, marginTop: 4 }}>
+          se distingue de {separables.get(activo.partido) ?? 0} de {puntos.length - 1} partidos
+          {Number(activo.n ?? 0) < 25 && <span style={{ color: '#E8C56A' }}> · base corta</span>}
         </div>
       )}
       {(() => {
@@ -653,7 +724,7 @@ export default function Mapa({ onDiputados }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {[['programa', 'Lo que prometieron'], ['votos', 'Lo que han votado'], ['territorio', 'Territorialidad'], ['referencias', 'Comparativa internacional']].map(([k, t]) => (
+        {[['programa', 'Lo que prometieron'], ['votos', 'Lo que han votado'], ['territorio', 'Territorialidad'], ['referencias', 'Comparativa externa'], ['democracia', 'Democracia en el mundo']].map(([k, t]) => (
           <button key={k} onClick={() => setFuente(k)} style={{
             padding: '9px 16px', fontSize: 13.5, cursor: 'pointer', borderRadius: 2,
             fontWeight: fuente === k ? 600 : 400,
@@ -664,7 +735,7 @@ export default function Mapa({ onDiputados }) {
         ))}
       </div>
 
-      {puntos.length === 0 ? (
+      {fuente === 'democracia' ? <MapaDemocracia /> : puntos.length === 0 ? (
         <div style={{ padding: 24, background: '#FFF8E6', border: '1px solid #E8D9A8', borderRadius: 3, fontSize: 13, color: '#6B5518', lineHeight: 1.6 }}>
           {fuente === 'referencias'
             ? (referencias === null
@@ -790,10 +861,33 @@ export default function Mapa({ onDiputados }) {
                 fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'DESCENTRALIZADOR' : 'IZQUIERDA'}</text>
               <text x="1.32" y="-1.28" fill="#4E9BBE" fontSize="0.092" fontWeight="700"
                 textAnchor="end" fontFamily="DM Mono, monospace" letterSpacing="0.02">{fuente === 'territorio' ? 'CENTRALISTA' : 'DERECHA'}</text>
-              <text x="0" y="-1.40" fill="#F2A93E" fontSize="0.092" fontWeight="700"
+              {fuente === 'referencias' && (
+                <text x="0" y="-1.44" fill="#8E9299" fontSize="0.062" fontWeight="700"
+                  textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.05">
+                  FUENTE EXTERNA
+                </text>
+              )}
+              <text x="0" y={fuente === 'referencias' ? '-1.34' : '-1.40'} fill="#F2A93E" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">CONSERVADOR</text>
               <text x="0" y="1.48" fill="#2FA98F" fontSize="0.092" fontWeight="700"
                 textAnchor="middle" fontFamily="DM Mono, monospace" letterSpacing="0.02">PROGRESISTA</text>
+
+              {regla.x.map(m => (
+                <g key={`rx-${m.texto}-${m.pos}`}>
+                  <line x1={m.pos} y1="-0.028" x2={m.pos} y2="0.028"
+                    stroke="#EDE7D4" strokeOpacity="0.45" strokeWidth="0.011" />
+                  <text x={m.pos} y="0.115" fill="#8E959C" fontSize="0.058" textAnchor="middle"
+                    fontFamily="DM Mono, monospace">{m.texto}</text>
+                </g>
+              ))}
+              {regla.y.map(m => (
+                <g key={`ry-${m.texto}-${m.pos}`}>
+                  <line x1="-0.028" y1={m.pos} x2="0.028" y2={m.pos}
+                    stroke="#EDE7D4" strokeOpacity="0.45" strokeWidth="0.011" />
+                  <text x="0.055" y={m.pos + 0.021} fill="#8E959C" fontSize="0.058"
+                    fontFamily="DM Mono, monospace">{m.texto}</text>
+                </g>
+              ))}
 
               {conEtiqueta.map(p => {
                 const on = !encima || encima === p.partido || fijado === p.partido;
@@ -811,6 +905,14 @@ export default function Mapa({ onDiputados }) {
                         animate={{ x1: p.cx, y1: p.cy + p.radio, x2: p.cx, y2: p.labelY - 0.045 }}
                         transition={VIAJE}
                         stroke="#5A6067" strokeWidth="0.005" />
+                    )}
+                    {fuente === 'referencias' && p.unaFuente && !(p.ex > 0 || p.ey > 0) && (
+                      <motion.circle
+                        initial={false}
+                        animate={{ cx: p.cx, cy: p.cy, r: p.radio * 2.4 }}
+                        transition={VIAJE}
+                        fill="none" stroke="#8E9299" strokeOpacity="0.5"
+                        strokeWidth="0.006" strokeDasharray="0.014 0.018" />
                     )}
                     {fuente !== 'programa' && encima === p.partido && (p.ex > 0 || p.ey > 0) && (
                       <>
@@ -895,6 +997,24 @@ export default function Mapa({ onDiputados }) {
               })}
             </svg>
 
+            <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginTop: 6, lineHeight: 1.6 }}>
+              {regla.unidad}
+              {fuente === 'referencias' && fuentesExternas?.length > 0 && (
+                <>
+                  {' · Fuentes: '}
+                  {fuentesExternas.map((f, i) => (
+                    <React.Fragment key={f.id}>
+                      {i > 0 && ' · '}
+                      {f.url
+                        ? <a href={f.url} target="_blank" rel="noopener noreferrer"
+                            style={{ color: '#9FB3C8', textDecoration: 'underline' }}>{f.nombre}</a>
+                        : f.nombre}
+                    </React.Fragment>
+                  ))}
+                </>
+              )}
+            </div>
+
             {faltan > 0 && fuente !== 'referencias' && (
               <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
                 {datos.length} de 13 partidos con datos suficientes. El resto aparecerá cuando termine la codificación.
@@ -903,6 +1023,7 @@ export default function Mapa({ onDiputados }) {
 
             <div style={{ minHeight: 56, marginTop: 12, paddingTop: 12, borderTop: '1px solid #3A4048' }}>
               {activo || anclado ? (
+                <>
                 <div style={{
                   display: comparando ? 'grid' : 'block',
                   gridTemplateColumns: comparando ? '1fr 1fr' : undefined,
@@ -933,6 +1054,16 @@ export default function Mapa({ onDiputados }) {
                     </div>
                   )}
                 </div>
+                {comparacion && (
+                  <div style={{
+                    marginTop: 10, paddingTop: 9, borderTop: '1px solid #3A4048',
+                    color: '#C9CFD5', fontSize: 12.5, lineHeight: 1.65
+                  }}>
+                    <strong style={{ color: '#F2F3F0' }}>{comparacion.a} frente a {comparacion.b}:</strong>{' '}
+                    {comparacion.partes.join('; ')}.
+                  </div>
+                )}
+                </>
               ) : (
           <div style={{ color: '#8E959C', fontSize: 12, lineHeight: 1.5 }}>
             {fuente === 'referencias'
@@ -951,6 +1082,16 @@ export default function Mapa({ onDiputados }) {
                 apoya lo que <em>baja</em> gasto, impuestos o regulación que lo que los sube.
                 El centro exacto significa que vota igual en ambos casos.
                 {esTactil ? ' Toca' : ' Pasa por encima de'} un partido para ver su margen de error.</span>
+            )}
+            {fuente !== 'programa' && fuente !== 'referencias' && (
+              <span style={{ display: 'block', marginTop: 6 }}>
+                El óvalo es el margen de error: la posición real está casi con seguridad dentro de
+                él. Es ancho cuando el partido ha votado pocas normas de las que dividen al pleno
+                en esa dimensión, no cuando su postura sea ambigua. Los partidos marcados con
+                <span style={{ color: '#E8C56A' }}> base corta</span> tienen menos de 25 normas
+                codificadas: su posición es orientativa y no se puede comparar con la de partidos
+                que tienen cientos.
+              </span>
             )}
             {fuente !== 'programa' && escala / ESCALA_MIN >= 1.15 && (
               <span> El eje está ampliado {(escala / ESCALA_MIN).toFixed(1)} veces para que las
@@ -1089,6 +1230,11 @@ export default function Mapa({ onDiputados }) {
                             {codigo}
                           </span>
                           {rf.nombre_corto || rf.nombre}
+                          {rf.anio && (
+                            <span style={{ color: C.tenue, fontSize: 9.5, marginLeft: 2 }}>
+                              {String(rf.anio).slice(-2)}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -1150,6 +1296,8 @@ export default function Mapa({ onDiputados }) {
             nunca a un panel de expertos por la posición de un régimen sin elecciones. Están
             codificados aquí, dimensión a dimensión, sobre política documentada, por varios modelos
             de lenguaje que responden por separado; su desacuerdo es la elipse que rodea al punto.
+            Los puntos con anillo discontinuo tienen una sola fuente: no llevan elipse porque no
+            hay con qué contrastarlos, no porque estén mejor medidos.
             Es la información más débil de toda la aplicación y así hay que leerla.
           </div>
           <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 10 }}>

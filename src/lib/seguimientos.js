@@ -1,20 +1,40 @@
-const CLAVE = 'lentenegra.seguimientos.v1';
+const CLAVE = 'lentedemocratica.seguimientos.v1';
+const CLAVES_ANTIGUAS = ['lentenegra.seguimientos.v1'];
 const TIPOS = ['iniciativa', 'materia', 'politico'];
 
 function vacio() {
   return { iniciativa: [], materia: [], politico: [] };
 }
 
+function normalizar(datos) {
+  const salida = vacio();
+  TIPOS.forEach(t => {
+    salida[t] = Array.isArray(datos?.[t]) ? datos[t].filter(x => typeof x === 'string') : [];
+  });
+  return salida;
+}
+
+function migrar() {
+  for (const vieja of CLAVES_ANTIGUAS) {
+    try {
+      const raw = localStorage.getItem(vieja);
+      if (!raw) continue;
+      const datos = normalizar(JSON.parse(raw));
+      localStorage.setItem(CLAVE, JSON.stringify(datos));
+      localStorage.removeItem(vieja);
+      return datos;
+    } catch {
+      try { localStorage.removeItem(vieja); } catch { continue; }
+    }
+  }
+  return null;
+}
+
 export function leerSeguimientos() {
   try {
     const raw = localStorage.getItem(CLAVE);
-    if (!raw) return vacio();
-    const datos = JSON.parse(raw);
-    const salida = vacio();
-    TIPOS.forEach(t => {
-      salida[t] = Array.isArray(datos?.[t]) ? datos[t].filter(x => typeof x === 'string') : [];
-    });
-    return salida;
+    if (!raw) return migrar() ?? vacio();
+    return normalizar(JSON.parse(raw));
   } catch {
     return vacio();
   }

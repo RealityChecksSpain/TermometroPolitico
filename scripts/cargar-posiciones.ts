@@ -308,6 +308,7 @@ async function cargar() {
   const ola = opcion('ola') || '';
   const seco = bandera('seco');
   const todosLosAnios = bandera('todos-los-anios');
+  const desde = Number(opcion('desde') ?? '') || null;
   const paisFijo = opcion('pais-nombre') || '';
   const paises = (opcion('paises') || '')
     .split(',')
@@ -410,6 +411,7 @@ async function cargar() {
   let sinAnio = 0;
   let sinMedida = 0;
   let fueraDePais = 0;
+  let fueraDeHorizonte = 0;
 
   for (const fila of filas) {
     if (filtros.length && !filtros.every(f => (fila[f.columna] ?? '').trim() === f.valor)) {
@@ -426,6 +428,10 @@ async function cargar() {
     const anio = anioDe(fila[colAnio!] ?? '');
     if (anio === null) {
       sinAnio++;
+      continue;
+    }
+    if (desde !== null && anio < desde) {
+      fueraDeHorizonte++;
       continue;
     }
     const nombre = (fila[colNombre!] ?? '').trim();
@@ -486,7 +492,11 @@ async function cargar() {
 
   const lista = Array.from(registros.values());
   console.log(`Entidades utilizables: ${lista.length}`);
-  console.log(`Descartadas: ${fueraDePais} por filtro o pais, ${sinAnio} sin anio, ${sinMedida} sin ninguna medida\n`);
+  const paisesPresentes = new Set(Array.from(registros.values()).map(r => r.pais));
+  console.log(`Paises con al menos una entidad: ${paisesPresentes.size}`);
+  console.log(`Descartadas: ${fueraDePais} por filtro o pais, ${sinAnio} sin anio, ${sinMedida} sin ninguna medida`);
+  if (desde !== null) console.log(`Descartadas por anterior a ${desde}: ${fueraDeHorizonte}`);
+  console.log('');
 
   if (!lista.length) {
     console.error('Nada que cargar. Revisa el filtro --paises o el mapeo de columnas.\n');
@@ -508,7 +518,9 @@ async function cargar() {
     return;
   }
 
-  const version = `${fuenteId}-${ola || 'sin-ola'}-${new Date().toISOString().slice(0, 10)}`;
+  const marca = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
+  const horizonte = desde !== null ? `desde${desde}` : 'sinhorizonte';
+  const version = `${fuenteId}-${ola || 'sin-ola'}-${horizonte}-${marca}`;
 
   const { error: eFuente } = await db().from('fuentes_externas').upsert({
     id: meta.id,
@@ -576,11 +588,37 @@ async function cargar() {
     }
   }
 
+  const { count: previas } = await db()
+    .from('posiciones_externas')
+    .select('*', { count: 'exact', head: true })
+    .eq('fuente_id', fuenteId);
+
+  if (previas && previas > 0) {
+    const { error: eBorrado } = await db()
+      .from('posiciones_externas')
+      .delete()
+      .eq('fuente_id', fuenteId);
+    if (eBorrado) throw eBorrado;
+    console.log(`Borradas ${previas} posiciones de cargas anteriores de ${fuenteId}.`);
+  }
+
   for (let i = 0; i < posiciones.length; i += 500) {
     const { error } = await db()
       .from('posiciones_externas')
-      .upsert(posiciones.slice(i, i + 500), { onConflict: 'fuente_id,entidad_id,eje,anio' });
+      .insert(posiciones.slice(i, i + 500));
     if (error) throw error;
+  }
+
+  const { count: totalEntidades } = await db()
+    .from('entidades_externas')
+    .select('*', { count: 'exact', head: true });
+  const conPosicion = await traerTodo<any>((a, b) =>
+    db().from('posiciones_externas').select('entidad_id').range(a, b));
+  const distintas = new Set(conPosicion.map((x: any) => x.entidad_id)).size;
+  const huerfanas = (totalEntidades ?? 0) - distintas;
+  if (huerfanas > 0) {
+    console.log(`AVISO: ${huerfanas} entidades sin ninguna posicion. Son restos de cargas`);
+    console.log('anteriores y no salen en el mapa, pero conviene limpiarlas.');
   }
 
   console.log(`Posiciones escritas: ${posiciones.length}`);

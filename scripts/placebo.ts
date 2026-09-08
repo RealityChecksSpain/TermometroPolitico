@@ -148,12 +148,32 @@ const rango = (v: number[]) => (v.length < 2 ? 0 : Math.max(...v) - Math.min(...
 
 console.log('\n=== Placebo de los ejes (subejes por dimension) ===\n');
 
+const VERSION = process.env.VERSION_CODIGO_LEY ?? 'codigo-ley-v6-2026-09';
+
 const columnas = ['iniciativa_id', ...DIMS.map(([d]) => d)].join(', ');
 const codigos = await paginar<any>((a, b) =>
-  db().from('iniciativa_codigo').select(columnas).range(a, b));
+  db().from('iniciativa_codigo').select(columnas).eq('version_prompt', VERSION).range(a, b));
+
+const todas = await paginar<any>((a, b) =>
+  db().from('iniciativa_codigo').select('version_prompt').range(a, b));
+const fuera = todas.length - codigos.length;
 
 const utilSet = new Set<string>(codigos.map(c => c.iniciativa_id as string));
+console.log(`Version de prompt:      ${VERSION}`);
 console.log(`Iniciativas codificadas: ${utilSet.size}`);
+if (fuera > 0) {
+  const otras = new Map<string, number>();
+  todas.forEach((t: any) => {
+    if (t.version_prompt !== VERSION) otras.set(t.version_prompt, (otras.get(t.version_prompt) ?? 0) + 1);
+  });
+  console.log(`Fuera del calculo:       ${fuera} normas de otra version de prompt`);
+  otras.forEach((n, v) => console.log(`  ${v}: ${n}`));
+  console.log('Recodificalas con la version actual o quedaran sin contar.');
+}
+if (utilSet.size === 0) {
+  console.log('\nNo hay ninguna norma con esa version. Revisa VERSION_CODIGO_LEY.\n');
+  process.exit(1);
+}
 
 const apoyos = await paginar<Apoyo>((a, b) =>
   db().from('v_apoyo_iniciativa').select('partido_id, iniciativa_id, apoyo').range(a, b));

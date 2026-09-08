@@ -123,9 +123,9 @@ export const ESQUEMAS: Record<string, EsquemaFuente> = {
         columnas: [
           { nombre: 'v2paimmig_osp', orientacion: 1 },
           { nombre: 'v2pagender_osp', orientacion: 1 },
-          { nombre: 'v2parelig_osp', orientacion: -1 },
+          { nombre: 'v2parelig_osp', orientacion: 1 },
           { nombre: 'v2paminor_osp', orientacion: 1 },
-          { nombre: 'v2paculsup_osp', orientacion: -1 }
+          { nombre: 'v2paculsup_osp', orientacion: 1 }
         ],
         escalaMin: 0,
         escalaMax: 4,

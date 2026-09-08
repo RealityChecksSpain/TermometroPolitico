@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  traerAuditoriaPlacebo, nombrarDimensiones, NOMBRE_EJE_LEY, FUERA_DE_EJE, NOMBRE_DIMENSION_LEY
+} from '../lib/auditoria.js';
 
 const C = {
   superficie: '#FFFFFF', pizarra: '#1F2328', tinta: '#14161A',
@@ -31,7 +34,70 @@ function Fuente({ nombre, que, url }) {
   );
 }
 
+function ComposicionEjes({ auditoria }) {
+  if (auditoria === null) {
+    return (
+      <p style={{ margin: '10px 0 0' }}>
+        La composición exacta de cada eje se guarda en la auditoría y ahora mismo no se puede leer.
+        Mientras no se pueda, esta página no afirma cuántas dimensiones entran: preferimos el hueco
+        a un número que no podamos enseñar.
+      </p>
+    );
+  }
+  const orden = { economico: 0, social: 1, territorial: 2 };
+  const lista = [...auditoria].sort((a, b) => (orden[a.eje] ?? 9) - (orden[b.eje] ?? 9));
+  const reps = Math.max(...lista.map(e => e.reps || 0));
+  const dentroTotal = new Set(lista.flatMap(e => e.dimensiones));
+  const fueraTotal = [...new Set(lista.flatMap(e => e.fuera))].filter(d => !dentroTotal.has(d));
+  return (
+    <>
+      <p style={{ margin: '10px 0 0' }}>
+        Cada norma se etiqueta según veinte preguntas de hecho, una por dimensión. No todas llegan a
+        componer un eje: una dimensión solo entra si hay al menos tres normas en cada sentido para
+        cada partido y si al menos el 80 % de los partidos la tienen. Esto es lo que entra hoy,
+        leído de la auditoría y no escrito a mano:
+      </p>
+      <ul style={{ margin: '10px 0 0', paddingLeft: 20 }}>
+        {lista.map(e => (
+          <li key={e.eje} style={{ marginBottom: 6 }}>
+            Eje <strong>{NOMBRE_EJE_LEY[e.eje] ?? e.eje}</strong>:{' '}
+            {e.dimensiones.length === 0
+              ? 'ninguna dimensión reúne base suficiente, así que este eje no se rotula.'
+              : <>{e.dimensiones.length} de {e.dimensiones.length + e.fuera.length}{' '}
+                  {e.dimensiones.length === 1 ? 'dimensión' : 'dimensiones'} —{' '}
+                  {nombrarDimensiones(e.dimensiones)}.</>}
+            {e.fuera.length > 0 && (
+              <> Queda fuera por falta de base: {nombrarDimensiones(e.fuera)}.</>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p style={{ margin: '10px 0 0' }}>
+        {fueraTotal.length > 0 && <>Que una dimensión quede fuera no significa que no se codifique:
+          se codifica y se puede consultar, pero no mueve la posición de nadie en el mapa. </>}
+        Además hay cuatro dimensiones que se calculan y no componen ningún eje, porque la literatura
+        comparada no las sitúa en ninguno: {nombrarDimensiones(FUERA_DE_EJE)}.
+      </p>
+      {reps > 0 && (
+        <p style={{ margin: '10px 0 0' }}>
+          Antes de publicar cada eje se comprueba contra el azar: se barajan {reps.toLocaleString('es')}{' '}
+          veces las etiquetas de las normas y se mide qué separación entre partidos sale por
+          casualidad. Si la observada no destaca, el eje no se rotula.
+          {lista.map(e => e.p === null ? null : (
+            <span key={e.eje} style={{ display: 'block', marginTop: 4 }}>
+              Eje {NOMBRE_EJE_LEY[e.eje] ?? e.eje}: p = {e.p.toFixed(4)}
+              {e.p > 0.05 ? ' — no supera la comprobación, así que no se rotula.' : '.'}
+            </span>
+          ))}
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function Metodologia({ cobertura }) {
+  const [auditoria, setAuditoria] = useState(null);
+  useEffect(() => { traerAuditoriaPlacebo().then(setAuditoria).catch(() => setAuditoria(null)); }, []);
   return (
     <div style={{ maxWidth: 720 }}>
       <h1 className="ed" style={{ fontSize: 'clamp(26px, 4.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.03em', margin: 0, lineHeight: 1.1 }}>
@@ -100,16 +166,7 @@ export default function Metodologia({ cobertura }) {
           investidura o en la oposición, no ideología: la disciplina de voto supera el 98% y las
           votaciones nominales reflejan mayorías, no convicciones.
         </p>
-        <p style={{ margin: '10px 0 0' }}>
-          En su lugar, cada norma se etiqueta según veinte preguntas de hecho, una por dimensión.
-          Seis componen el eje económico: gasto público, impuestos, regulación de empresas,
-          propiedad pública, protección laboral y proteccionismo. Ocho el social: derechos
-          individuales, migración, moral y familia, religión y Estado, orden público, diversidad
-          cultural, nacionalismo y autoridad del Ejecutivo. Dos el territorial: descentralización
-          e integración europea. Y cuatro se calculan pero no componen ningún eje, porque la
-          literatura comparada no las sitúa en ninguno: ortodoxia fiscal, igualdad de trato,
-          medio ambiente y calidad democrática.
-        </p>
+        <ComposicionEjes auditoria={auditoria} />
         <p style={{ margin: '10px 0 0' }}>
           Cada pregunta se responde por separado, así que un decreto que sube el gasto y endurece
           penas puntúa en las dos sin anularse. Las dimensiones y sus definiciones siguen el
@@ -126,9 +183,9 @@ export default function Metodologia({ cobertura }) {
           Tres reglas evitan los extremos falsos. Una dimensión solo cuenta si hay al menos tres
           normas en cada sentido. El resultado se encoge hacia el centro cuando hay pocas normas,
           de modo que nadie aparece en un extremo por haber votado poco. Y un eje se compone solo
-          con las dimensiones que tienen los trece partidos, para que las posiciones sean
-          comparables entre sí: si a un grupo le falta una dimensión, esa dimensión sale del
-          cálculo para todos.
+          con las dimensiones que reúnen esa base en al menos el 80 % de los partidos, para que las
+          posiciones sean comparables entre sí: si a demasiados grupos les falta una dimensión, esa
+          dimensión sale del cálculo para todos.
         </p>
         <p style={{ margin: '10px 0 0' }}>
           El borde del mapa no es el partido más alejado: es el máximo posible, apoyar todas las
@@ -137,19 +194,18 @@ export default function Metodologia({ cobertura }) {
           recorrido posible de 2,0, y el social 0,61.
         </p>
         <p style={{ margin: '10px 0 0' }}>
-          Antes de publicar cada eje se comprueba contra el azar: se barajan 200 veces las
-          etiquetas de las normas y se mide qué separación entre partidos sale por casualidad. Si
-          la observada no destaca, el eje no se rotula. Y la comprobación caduca sola en cuanto
-          entran datos nuevos, así que un eje etiquetado siempre lo está sobre los datos actuales.
+          La comprobación caduca sola en cuanto entran datos nuevos, así que un eje etiquetado
+          siempre lo está sobre los datos actuales.
         </p>
       </Seccion>
 
       <Seccion titulo="Por qué el eje económico mide poco">
         <p style={{ margin: 0 }}>
-          De las 456 normas codificadas, <strong>182 amplían gasto público y 7 lo recortan</strong>.
-          En protección laboral son 38 frente a 1; en privatizaciones, 6 frente a 1; en
-          proteccionismo, 7 frente a 1. Solo impuestos tiene los dos sentidos poblados, con 58
-          bajadas y 23 subidas.
+          De las normas codificadas hasta hoy, <strong>la inmensa mayoría de las que tocan gasto
+          público lo amplían y apenas un puñado lo recorta</strong>.
+          Lo mismo pasa en protección laboral, privatizaciones y proteccionismo. Solo impuestos y
+          regulación de empresas tienen los dos sentidos poblados, y por eso son las únicas que
+          sostienen hoy el eje horizontal.
         </p>
         <p style={{ margin: '10px 0 0' }}>
           Una posición se calcula restando el apoyo a las normas que recortan menos el apoyo a las
@@ -173,9 +229,9 @@ export default function Metodologia({ cobertura }) {
           declaraciones de intenciones.
         </p>
         <p style={{ margin: '10px 0 0' }}>
-          Tampoco mide todo por igual en los dos ejes. En lo económico, nueve de los trece partidos
+          Tampoco mide todo por igual en los dos ejes. En lo económico la mayoría de los partidos
           tienen una posición que no se distingue del centro una vez descontado el margen de error;
-          en lo social son dos de trece. El eje que de verdad separa a esta cámara es el social.
+          en lo social se separan casi todos. El eje que de verdad separa a esta cámara es el social.
         </p>
         <p style={{ margin: '10px 0 0' }}>
           Y no mide monarquía ni forma de Estado: son cuestiones constitucionales que apenas se
@@ -217,6 +273,84 @@ export default function Metodologia({ cobertura }) {
         </ul>
       </Seccion>
 
+      <Seccion titulo="Cuando dos fuentes no dicen lo mismo">
+        <p style={{ margin: 0 }}>
+          En la pestaña de comparativa externa hay partidos con dos encuestas de expertos detrás
+          y otros con una sola. Cuando hay dos, la posición que ves es la media, y el óvalo que la
+          rodea deja de ser la incertidumbre declarada por una encuesta: pasa a ser el desacuerdo
+          real entre las dos. Un óvalo ancho ahí no significa que el partido sea ambiguo, significa
+          que dos grupos de expertos independientes no lo colocan en el mismo sitio.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Al cruzar las dos fuentes aparece un patrón que merece contarse. <strong>En el eje
+          izquierda-derecha coinciden casi punto por punto</strong>: los partidos que una sitúa a
+          la izquierda, la otra también, y con valores casi idénticos. Dos encuestas hechas por
+          equipos distintos, con preguntas distintas y paneles de expertos distintos, llegando al
+          mismo sitio. Es la mejor prueba disponible de que ese eje mide algo real y no una
+          convención.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          <strong>En el eje social no coinciden</strong>, y el desacuerdo tiene dirección: crece
+          cuanto más conservador sitúa una fuente al partido. Los partidos que las dos colocan en
+          el lado progresista casi no se mueven; los que una coloca en el lado conservador aparecen
+          bastante menos conservadores en la otra. Por eso los óvalos son anchos justo en la mitad
+          conservadora del mapa y estrechos en la otra.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          La explicación más probable no es que una se equivoque, sino que miden constructos
+          distintos. Una pregunta a los expertos por una única posición global en el eje
+          libertario-autoritario. La otra promedia cinco cosas concretas y separadas: inmigración,
+          igualdad de género, religión, minorías y superioridad cultural. Un partido conservador
+          europeo convencional puntúa muy conservador en la primera, pero en la segunda no llega a
+          los extremos en todas las dimensiones a la vez, y esa media lo acerca al centro.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          No promediamos para tapar la discrepancia ni elegimos la fuente que nos guste más. La
+          media se publica con el desacuerdo dibujado encima, porque el desacuerdo también es
+          información: dice en qué eje la ciencia política está de acuerdo sobre dónde está cada
+          partido, y en cuál no.
+        </p>
+      </Seccion>
+
+      <Seccion titulo="Democracia y autocracia en el mundo">
+        <p style={{ margin: 0 }}>
+          Esta pestaña no mide ideología. No hay izquierda ni derecha en ella y sus posiciones
+          no se pueden comparar con las de las otras pestañas: son otras preguntas, otra escala
+          y otra unidad. Aquí la unidad es el país, no el partido.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Mide dos cosas distintas. El eje horizontal, si el gobierno se puede perder en unas
+          elecciones: que existan, que se pueda votar, que la oposición pueda competir y que el
+          resultado se acate. El vertical, si quien gana encuentra límites: tribunales que
+          funcionen, un parlamento que controle y una ley que se aplique igual a todos. Son
+          independientes, y por eso el plano dice algo que un número solo esconde. Un país puede
+          celebrar elecciones reales y tener pocos frenos al que las gana.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Los dos índices son del Instituto V-Dem de la Universidad de Gotemburgo, que los
+          construye preguntando a expertos de cada país y publica su libro de códigos. No son una
+          nota ni un ranking de países buenos y malos: son dos descripciones concretas, cada una
+          de 0 a 1, y todos los países salen medidos el mismo año para que se puedan comparar
+          entre sí. Las entidades históricas que dejaron de existir no aparecen en el mapa del
+          presente; su serie completa sigue disponible al fijar un país.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Conviene saber qué <em>no</em> significa una puntuación media en el eje vertical.
+          España bajo el franquismo, en 1955, sale en 0,069 de elecciones y 0,220 de límites al
+          poder. Ese 0,220 no describe libertad: describe que había un aparato jurídico, unas
+          Cortes y unos tribunales que existían y funcionaban con sus reglas, aunque nada de
+          aquello fuera disputable. El índice mide procedimiento, no libertad. Leerlo como si
+          midiera lo segundo es el error más fácil de cometer en esta pantalla.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Por la misma razón, ningún número de esta capa se enseña suelto. Para ver la
+          puntuación de un país hay que fijarlo, y al fijarlo aparece su serie completa debajo.
+          Una cifra de un año concreto, sacada de su historia, admite cualquier lectura; con la
+          línea al lado, muchas menos. Los datos son los que son y no se ocultan, pero tampoco
+          se sirven en un formato que invite a usarlos como munición.
+        </p>
+      </Seccion>
+
       <Seccion titulo="Fuentes">
         <Fuente nombre="Congreso de los Diputados · datos abiertos"
           que="Votaciones, diputados, intervenciones e iniciativas legislativas"
@@ -225,6 +359,12 @@ export default function Metodologia({ cobertura }) {
           que="Texto íntegro de las normas" />
         <Fuente nombre="Programas electorales de 2023"
           que="Publicados por cada partido en su web. No se alojan aquí." />
+        <Fuente nombre="Chapel Hill Expert Survey"
+          que="Posiciones de partidos europeos según encuestas a expertos"
+          url="https://www.chesdata.eu" />
+        <Fuente nombre="V-Dem · Varieties of Democracy"
+          que="Índices de democracia electoral y de límites al poder, por país y año, desde 1789"
+          url="https://www.v-dem.net" />
       </Seccion>
 
       <Seccion titulo="Uso y licencia">

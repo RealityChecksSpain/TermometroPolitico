@@ -70,9 +70,9 @@ export default function Descargas() {
       const filas = await traerTodo(c.vista, c.orden);
       const fecha = new Date().toISOString().slice(0, 10);
       if (formato === 'csv') {
-        descargar(`escano-${c.id}-${fecha}.csv`, aCsv(filas));
+        descargar(`lente-${c.id}-${fecha}.csv`, aCsv(filas));
       } else {
-        descargar(`escano-${c.id}-${fecha}.json`, JSON.stringify(filas, null, 2), 'application/json');
+        descargar(`lente-${c.id}-${fecha}.json`, JSON.stringify(filas, null, 2), 'application/json');
       }
     } catch (e) {
       setError(String(e.message ?? e));

@@ -450,7 +450,7 @@ export default function App() {
             <img src="/logo.svg" alt="" width="64" height="64"
               style={{ display: 'block', flexShrink: 0 }}
               onError={e => { e.currentTarget.style.display = 'none'; }} />
-            Lente Negra
+            Lente Democrática
           </button>
           <div className="em" style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: C.tenue }}>
             XV legislatura

@@ -24,7 +24,6 @@ export default function Marca({ tinta = '#15171A', acento = '#E0492E', quieta = 
   const avance = useMotionValue(reducido || quieta ? 1 : 0);
   const px = useSpring(avance, { stiffness: 118, damping: 12.5, mass: 1 });
   const py = useSpring(avance, { stiffness: 220, damping: 30, mass: 1 });
-  const ph = useSpring(avance, { stiffness: 100, damping: 14, mass: 1 });
 
   useLayoutEffect(() => {
     const el = caja.current;
@@ -46,9 +45,9 @@ export default function Marca({ tinta = '#15171A', acento = '#E0492E', quieta = 
   }, [reducido, quieta, avance]);
 
   const util = Math.max(ancho, 1);
-  const cola = Math.min(COLA, util * 0.055);
-  const mella = Math.min(MELLA, util * 0.045);
-  const ala = Math.min(ALA, util * 0.016);
+  const cola = Math.min(COLA, util * 0.040);
+  const mella = Math.min(MELLA, util * 0.030);
+  const ala = Math.min(ALA, util * 0.004);
   const radio = Math.min(CABEZA_R, util * 0.022);
 
   const cx = Math.min(60, util / 2);
@@ -59,9 +58,10 @@ export default function Marca({ tinta = '#15171A', acento = '#E0492E', quieta = 
   const cabezaFin = { x: util - mella - radio, y: (BANDA_ALTA + BANDA_BAJA) / 2, r: radio };
 
   const d = useTransform([px, py], ([a, b]) => trazo(silueta, linea, a, b));
-  const bolaX = useTransform(ph, v => mezcla(cabezaIni.x, cabezaFin.x, v));
-  const bolaY = useTransform(ph, v => mezcla(cabezaIni.y, cabezaFin.y, v) - ARCO * Math.sin(Math.PI * limitar(v)));
-  const bolaR = useTransform(ph, v => mezcla(cabezaIni.r, cabezaFin.r, limitar(v)));
+  const bolaX = useTransform(px, v => mezcla(cabezaIni.x, cabezaFin.x, v));
+  const bolaY = useTransform([px, py], ([a, b]) =>
+    mezcla(cabezaIni.y, cabezaFin.y, b) - ARCO * Math.sin(Math.PI * limitar(a)));
+  const bolaR = useTransform(px, v => mezcla(cabezaIni.r, cabezaFin.r, limitar(v)));
 
   return (
     <div ref={caja} aria-hidden="true" style={{
