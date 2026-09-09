@@ -8,6 +8,7 @@ import { traerMapaPartidos, traerSesgo, traerAuditoriaEjeVotos, traerSubejes, tr
 import {
   traerReferencias, traerFuentesExternas, traerDimensionesRegimen, NOMBRE_DIMENSION
 } from '../lib/referencias.js';
+import { traerAuditoriaFiabilidad, indiceKappa, UMBRAL_KAPPA } from '../lib/auditoria.js';
 import { marcaDe } from '../lib/regimenes-marca.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 
@@ -158,6 +159,7 @@ function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
 export default function Mapa({ onDiputados }) {
   const [datos, setDatos] = useState(null);
   const [subejes, setSubejes] = useState(null);
+  const [kappas, setKappas] = useState({});
   const [baseComun, setBaseComun] = useState(null);
   const [votosClase, setVotosClase] = useState(null);
   const [iniciativas, setIniciativas] = useState(null);
@@ -204,6 +206,7 @@ export default function Mapa({ onDiputados }) {
     traerSesgo().then(setSesgo).catch(() => setSesgo(null));
     traerAuditoriaEjeVotos().then(setAuditoria).catch(() => setAuditoria(null));
     traerSubejes().then(setSubejes).catch(() => setSubejes(null));
+    traerAuditoriaFiabilidad().then(f => setKappas(indiceKappa(f))).catch(() => setKappas({}));
     traerBaseComun().then(setBaseComun).catch(() => setBaseComun(null));
     traerVotosPorClase().then(setVotosClase).catch(() => setVotosClase(null));
     traerIniciativasPartido().then(setIniciativas).catch(() => setIniciativas(null));
@@ -683,10 +686,19 @@ export default function Mapa({ onDiputados }) {
             {lista.map(f => {
               const pct = Math.round(Math.abs(Number(f.bruto)) * 100);
               const hacia = Number(f.bruto) >= 0 ? ETIQUETA_DIM[f.dim]?.[0] : ETIQUETA_DIM[f.dim]?.[1];
+              const k = kappas[f.dim];
+              const floja = typeof k === 'number' && k < UMBRAL_KAPPA;
               return (
                 <div key={`${f.eje}-${f.dim}`} style={{ marginBottom: 5 }}>
                   <div className="em" style={{ fontSize: 10.5, color: '#C9CDD2' }}>
                     {NOMBRE_SUBEJE[f.dim] ?? f.dim}
+                    {floja && (
+                      <span
+                        title={`Dos modelos distintos solo coinciden en esta pregunta con una kappa de ${k.toFixed(2).replace('.', ',')}. Por debajo de ${UMBRAL_KAPPA.toFixed(2).replace('.', ',')} no la consideramos reproducible.`}
+                        style={{ marginLeft: 5, fontSize: 9.5, color: '#E0A0AC', border: '1px solid #7A3B46', borderRadius: 2, padding: '0 3px' }}>
+                        poco fiable · κ {k.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
                   </div>
                   <div className="em" style={{ fontSize: 10, color: '#8E959C', lineHeight: 1.5 }}>
                     {pct === 0

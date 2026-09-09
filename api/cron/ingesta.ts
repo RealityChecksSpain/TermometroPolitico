@@ -1,44 +1,31 @@
 import { ejecutarIngesta } from '../../src/lib/congreso-adapter';
 import { vaciarCola } from '../../src/lib/resolver';
+import { autorizadoPorCron, sinCache } from '../../src/lib/autorizar';
 
 export const config = { maxDuration: 60 };
 
-function autorizado(req: Request): boolean {
-  const esperado = process.env.CRON_SECRET;
-  if (!esperado || esperado.trim().length < 16) return false;
-  const recibido = req.headers.get('authorization') ?? '';
-  const esperadoCompleto = `Bearer ${esperado}`;
-  if (recibido.length !== esperadoCompleto.length) return false;
-  let diferencia = 0;
-  for (let i = 0; i < esperadoCompleto.length; i++) {
-    diferencia |= recibido.charCodeAt(i) ^ esperadoCompleto.charCodeAt(i);
-  }
-  return diferencia === 0;
-}
-
 export default async function handler(req: Request): Promise<Response> {
-  if (!autorizado(req)) return new Response('No autorizado', { status: 401 });
+  if (!autorizadoPorCron(req)) return new Response('No autorizado', { status: 401 });
 
   const legislaturaId = process.env.LEGISLATURA_ACTIVA_ID;
   if (!legislaturaId) {
-    return Response.json({ error: 'Falta LEGISLATURA_ACTIVA_ID' }, { status: 500 });
+    console.error('cron/ingesta: falta LEGISLATURA_ACTIVA_ID');
+    return sinCache({ ok: false, error: 'configuracion incompleta' }, 500);
   }
 
   try {
     const ingesta = await ejecutarIngesta(legislaturaId, 'XV', 10);
     const cola = await vaciarCola(legislaturaId);
 
-    const { db } = await import('../../src/lib/supabase');
-    await db().rpc('refrescar_metricas');
-
-    return Response.json({
+    return sinCache({
       ok: true,
       ingesta,
       cola,
+      metricas: 'las refresca pg_cron a las 6:30, no este endpoint',
       ejecutado: new Date().toISOString()
     });
   } catch (e) {
     console.error('cron/ingesta', e);
-    return Response.json({ ok: false, error: 'fallo en la ingesta' }, { status: 500 });
+    return sinCache({ ok: false, error: 'fallo en la ingesta' }, 500);
   }
 }

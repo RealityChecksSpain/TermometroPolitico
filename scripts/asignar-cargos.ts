@@ -1,5 +1,6 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { readFile } from 'fs/promises';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('SUPABASE_URL');
 const FICHERO = process.argv[2] ?? './cargos.txt';
@@ -53,7 +54,7 @@ for (const [nombre, cargo] of lineas) {
 }
 
 console.log(`\n  asignados: ${ok}   sin encontrar: ${fallos}`);
-await db().rpc('refrescar_metricas');
+await refrescarMetricas();
 console.log('  metricas refrescadas\n');
 
 export {};

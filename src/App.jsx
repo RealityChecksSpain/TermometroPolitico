@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Hemiciclo, { LeyendaVoto } from './components/Hemiciclo.jsx';
 import Marca from './components/Marca.jsx';
 import { desgloseBienes } from './lib/inmuebles.js';
 import Detalle, { DetalleLey } from './components/Detalle.jsx';
 import FichaDiputado from './components/FichaDiputado.jsx';
-import Mapa from './components/Mapa.jsx';
-import Metodologia from './components/Metodologia.jsx';
-import Descargas from './components/Descargas.jsx';
-import Partidos from './components/Partidos.jsx';
+const Mapa = lazy(() => import('./components/Mapa.jsx'));
+const Metodologia = lazy(() => import('./components/Metodologia.jsx'));
+const Descargas = lazy(() => import('./components/Descargas.jsx'));
+const Partidos = lazy(() => import('./components/Partidos.jsx'));
 import Inicio from './components/Inicio.jsx';
-import FeedPersonal from './components/FeedPersonal.jsx';
+const FeedPersonal = lazy(() => import('./components/FeedPersonal.jsx'));
 import AvatarPartido from './components/AvatarPartido.jsx';
 import { fraseCortaDeNorma } from './lib/fraseCorta.js';
 import {
@@ -26,11 +26,10 @@ const C = {
 };
 
 const estilos = `
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Archivo:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box}
 html,body{margin:0;background:${C.papel};-webkit-font-smoothing:antialiased}
-.e{font-family:'Archivo',system-ui,sans-serif}
-.ed{font-family:'Newsreader',Georgia,serif;letter-spacing:-0.012em;font-optical-sizing:auto}
+.e{font-family:'Archivo Variable','Archivo',system-ui,sans-serif}
+.ed{font-family:'Newsreader Variable','Newsreader',Georgia,serif;letter-spacing:-0.012em;font-optical-sizing:auto}
 .em{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
 button,input{font-family:inherit}
 .app{max-width:1120px;margin:0 auto;padding:0 16px 96px}
@@ -98,7 +97,7 @@ color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,co
 --sombraAlta:0 2px 4px rgba(20,22,26,.06),0 8px 24px rgba(20,22,26,.05);
 }
 body{font-size:15px;line-height:1.55}
-h1,h2,h3{margin:0;font-family:'Newsreader',Georgia,serif;letter-spacing:-0.018em;line-height:1.15}
+h1,h2,h3{margin:0;font-family:'Newsreader Variable','Newsreader',Georgia,serif;letter-spacing:-0.018em;line-height:1.15}
 .display{font-size:clamp(28px,4.6vw,44px);font-weight:600;letter-spacing:-0.028em;line-height:1.08}
 .t1{font-size:clamp(21px,2.6vw,27px);font-weight:600;line-height:1.2}
 .t2{font-size:clamp(17px,1.9vw,20px);font-weight:600;line-height:1.28}
@@ -173,7 +172,7 @@ margin-bottom:8px}
 .chipsCcaaLista{display:flex;flex-wrap:wrap;gap:5px}
 .chipsCcaaLista button{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;
 border-radius:2px;border:1px solid #3A4048;background:transparent;color:#C7CDD2;
-font-family:'Archivo',system-ui,sans-serif;font-size:11px;cursor:pointer;
+font-family:'Archivo Variable','Archivo',system-ui,sans-serif;font-size:11px;cursor:pointer;
 transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
 .chipsCcaaLista button:hover{border-color:#6C737B;color:#F2F3F0}
 .chipsCcaaLista button span{font-family:'DM Mono',ui-monospace,monospace;font-size:10px;color:#8E959C}
@@ -184,6 +183,14 @@ transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
 flex-wrap:wrap;padding:var(--s4) 0 var(--s3)}
 
 `;
+
+const DIFERIDAS = ['siguiendo', 'partidos', 'ejes', 'metodo', 'datos'];
+
+function Cargando() {
+  return (
+    <div style={{ padding: 40, textAlign: 'center', color: C.tenue, fontSize: 13 }}>Cargando…</div>
+  );
+}
 
 function IconoInicio({ acento }) {
   return (<>
@@ -887,11 +894,17 @@ export default function App() {
             </div>
           )}
 
-          {seccion === 'siguiendo' && <div className="solo1"><FeedPersonal /></div>}
-          {seccion === 'partidos' && <div className="solo1"><Partidos /></div>}
-          {seccion === 'ejes' && <div className="solo1"><Mapa /></div>}
-          {seccion === 'metodo' && <div className="solo1"><Metodologia cobertura={cobertura} /></div>}
-          {seccion === 'datos' && <div className="solo1"><Descargas /></div>}
+          {DIFERIDAS.includes(seccion) && (
+            <div className="solo1">
+              <Suspense fallback={<Cargando />}>
+                {seccion === 'siguiendo' && <FeedPersonal />}
+                {seccion === 'partidos' && <Partidos />}
+                {seccion === 'ejes' && <Mapa />}
+                {seccion === 'metodo' && <Metodologia cobertura={cobertura} />}
+                {seccion === 'datos' && <Descargas />}
+              </Suspense>
+            </div>
+          )}
           </div>
         </motion.div>
         </AnimatePresence>

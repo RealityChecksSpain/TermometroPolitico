@@ -1,6 +1,7 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('GEMINI_API_KEY');
 const VERSION = process.env.VERSION_PROMPT ?? 'v3-frase-corta-2026-08';
@@ -141,7 +142,7 @@ if (errores.size > 0) {
     .forEach(([e, n]) => console.log(`  ${String(n).padStart(4)}  ${String(e).slice(0, 140)}`));
 }
 
-await db().rpc('refrescar_metricas');
+await refrescarMetricas();
 console.log('\nMetricas refrescadas.\n');
 
 export {};

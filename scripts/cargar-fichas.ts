@@ -1,5 +1,6 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { UA, BASE_CONGRESO } from '../src/lib/descubrir';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('LEGISLATURA_ACTIVA_ID');
 const legislaturaId = process.env.LEGISLATURA_ACTIVA_ID!;
@@ -250,7 +251,7 @@ const { count: conBienes } = await db().from('mandatos')
 console.log(`\n  con foto en BD:   ${conFoto ?? 0}`);
 console.log(`  con bienes en BD: ${conBienes ?? 0}`);
 
-await db().rpc('refrescar_metricas');
+await refrescarMetricas();
 console.log('\n  Metricas refrescadas.\n');
 console.log('Si asignadas=0: revisa la muestra de HTML. Si sigue siendo JSON, el Congreso');
 console.log('cambió de nuevo la URL — pega un cURL de la ficha (lifecycle=0), no de agenda.\n');

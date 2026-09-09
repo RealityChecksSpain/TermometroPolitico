@@ -1,13 +1,15 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { db, exigirEnv } from '../src/lib/supabase';
 import { traerTodo } from '../src/lib/paginar';
 import { preguntar, modeloActivo, Cadencia, CuotaDiariaAgotada } from '../src/lib/gemini';
 import { ESQUEMA, prompt } from '../src/lib/prompt-leyes';
+import { versionCodigoLey } from '../src/lib/version-codigo';
 
 exigirEnv('GEMINI_API_KEY');
 
 const MUESTRA = Number(process.env.FIABILIDAD_N ?? 50);
 const MIN_MARCADAS = Number(process.env.FIABILIDAD_MIN_MARCADAS ?? 5);
-const VERSION = process.env.VERSION_CODIGO_LEY ?? 'codigo-ley-v6-2026-09';
+const VERSION = versionCodigoLey();
 
 const DIMS = [
   'gasto_publico', 'impuestos', 'regulacion_mercado', 'propiedad_publica',
@@ -54,15 +56,8 @@ if (!codificadas.length) {
   process.exit(0);
 }
 
-const barajadas = [...codificadas].sort(() => Math.random() - 0.5).slice(0, MUESTRA);
-const ids = barajadas.map(c => c.iniciativa_id);
-
-const iniciativas = await traerTodo<any>((a, b) =>
-  db().from('iniciativas').select('id, titulo, texto_extraido').in('id', ids).range(a, b));
-const porId = new Map(iniciativas.map(i => [i.id, i]));
-
 const modelo = modeloActivo();
-const primeros = Array.from(new Set(barajadas.map(c => c.modelo ?? 'desconocido')));
+const primeros = Array.from(new Set(codificadas.map(c => c.modelo ?? 'desconocido')));
 
 if (primeros.includes(modelo)) {
   console.log(`El modelo activo (${modelo}) es tambien el que codifico la muestra.`);
@@ -70,10 +65,46 @@ if (primeros.includes(modelo)) {
   process.exit(0);
 }
 
+const DIR_PARCIAL = 'datos/fiabilidad';
+const RUTA_PARCIAL = `${DIR_PARCIAL}/${VERSION}__${modelo}.json`;
+
+let guardadas: Record<string, Record<string, string>> = {};
+if (existsSync(RUTA_PARCIAL)) {
+  try {
+    guardadas = JSON.parse(readFileSync(RUTA_PARCIAL, 'utf8'));
+  } catch {
+    console.log(`No se pudo leer ${RUTA_PARCIAL}. Se empieza de cero.\n`);
+  }
+}
+
+function volcar(): void {
+  mkdirSync(DIR_PARCIAL, { recursive: true });
+  writeFileSync(RUTA_PARCIAL, JSON.stringify(guardadas, null, 2));
+}
+
+const yaComparadas = new Set(Object.keys(guardadas));
+const faltan = MUESTRA - yaComparadas.size;
+
+if (yaComparadas.size > 0) {
+  console.log(`Recuperadas ${yaComparadas.size} comparaciones de corridas anteriores.`);
+  console.log(`  ${RUTA_PARCIAL}\n`);
+}
+
+const barajadas = faltan <= 0
+  ? []
+  : [...codificadas].filter(c => !yaComparadas.has(String(c.iniciativa_id)))
+      .sort(() => Math.random() - 0.5).slice(0, faltan);
+const ids = barajadas.map(c => c.iniciativa_id);
+
+const iniciativas = await traerTodo<any>((a, b) =>
+  db().from('iniciativas').select('id, titulo, texto_extraido').in('id', ids).range(a, b));
+const porId = new Map(iniciativas.map(i => [i.id, i]));
+
 console.log(`Version prompt:      ${VERSION}`);
 console.log(`Primer codificador:  ${primeros.join(', ')}`);
 console.log(`Segundo codificador: ${modelo}`);
-console.log(`Muestra:             ${barajadas.length} de ${codificadas.length} normas\n`);
+console.log(`Objetivo:            ${MUESTRA} normas de ${codificadas.length}`);
+console.log(`Por comparar hoy:    ${barajadas.length}\n`);
 
 const cadencia = new Cadencia(modelo);
 const original: Record<string, string[]> = {};
@@ -84,6 +115,7 @@ const errores = new Map<string, number>();
 let hechas = 0;
 let fallidas = 0;
 let cortada = false;
+let relevoAlPrimero = 0;
 
 for (const c of barajadas) {
   const ini = porId.get(c.iniciativa_id);
@@ -107,20 +139,44 @@ for (const c of barajadas) {
     fallidas++;
     continue;
   }
-  for (const d of DIMS) {
-    const v1 = String(c[d] ?? 'neutro');
-    const v2 = VALORES.includes(r.datos[d]) ? r.datos[d] : 'neutro';
-    original[d].push(v1);
-    replica[d].push(v2);
+  const respondio = r.modelo ?? modelo;
+  if (primeros.includes(respondio)) {
+    relevoAlPrimero++;
+    continue;
   }
+
+  const fila: Record<string, string> = {};
+  for (const d of DIMS) {
+    fila[d] = VALORES.includes(r.datos[d]) ? r.datos[d] : 'neutro';
+  }
+  guardadas[String(c.iniciativa_id)] = fila;
   hechas++;
-  if (hechas % 10 === 0) console.log(`  ${hechas}/${barajadas.length}`);
+  if (hechas % 10 === 0) { volcar(); console.log(`  ${hechas}/${barajadas.length}`); }
 }
 
-console.log(`\nComparadas ${hechas}, fallidas ${fallidas}\n`);
+volcar();
 
-if (hechas > 0 && hechas < 20) {
-  console.log(`Muestra de ${hechas}: la kappa no es interpretable por dimension.`);
+const porId2 = new Map(codificadas.map(c => [String(c.iniciativa_id), c]));
+let comparadas = 0;
+for (const [id, fila] of Object.entries(guardadas)) {
+  const c = porId2.get(id);
+  if (!c) continue;
+  for (const d of DIMS) {
+    original[d].push(String(c[d] ?? 'neutro'));
+    replica[d].push(fila[d] ?? 'neutro');
+  }
+  comparadas++;
+}
+
+console.log(`\nNuevas hoy ${hechas}, fallidas ${fallidas}. Acumuladas ${comparadas} de ${MUESTRA}.\n`);
+
+if (relevoAlPrimero > 0) {
+  console.log(`  ${relevoAlPrimero} respuestas descartadas: el relevo cayo en ${primeros.join(', ')},`);
+  console.log('  que es quien codifico el corpus. Comparar un modelo consigo mismo infla la kappa.\n');
+}
+
+if (comparadas > 0 && comparadas < 20) {
+  console.log(`Muestra de ${comparadas}: la kappa no es interpretable por dimension.`);
   console.log('Con casi todo "neutro", coincidir en pocos casos devuelve 1,000 sin significar nada.');
   console.log('Sirve para comprobar que la tuberia funciona, no para decidir si se publica.\n');
 }
@@ -132,7 +188,7 @@ if (errores.size > 0) {
   console.log('');
 }
 
-if (!hechas) {
+if (!comparadas) {
   console.log('Sin datos suficientes.');
   console.log('Si el error es HTTP 400 por JSON mode, relanza con SIN_ESQUEMA=true.\n');
   process.exit(0);
@@ -163,7 +219,7 @@ for (const d of DIMS) {
 
   filas.push({
     dimension: d,
-    muestra: hechas,
+    muestra: comparadas,
     marcadas,
     modelo_a: primeros.join(', '),
     modelo_b: modelo,
@@ -197,16 +253,19 @@ console.log('\nEl acuerdo bruto engana cuando casi todo es "neutro": kappa lo co
 console.log('Por debajo de 0,40 la codificacion no es reproducible y el mapa no deberia publicarse.\n');
 
 if (cortada) {
-  console.log(`Corrida incompleta: ${hechas} de ${barajadas.length} previstas.\n`);
+  console.log(`Cuota agotada tras ${hechas} de ${barajadas.length} previstas hoy.`);
+  console.log(`Lo comparado queda en ${RUTA_PARCIAL}. Relanza manana y sigue donde lo dejo:`);
+  console.log(`  MODELO_IA=${modelo} npm run fiabilidad\n`);
 }
 
-if (hechas < 20) {
-  console.log('No se guarda: muestra insuficiente para el historico.\n');
+if (comparadas < 20) {
+  console.log(`No se guarda: ${comparadas} comparaciones acumuladas, hacen falta 20.`);
+  console.log('Relanza el mismo comando hasta llegar. Nada se pierde entre corridas.\n');
   process.exit(0);
 }
 
 const { error } = await db().from('auditoria_fiabilidad').upsert(filas, {
-  onConflict: 'dimension,version_prompt'
+  onConflict: 'dimension,version_prompt,modelo_b'
 });
 if (error) {
   console.log(`No se pudo guardar: ${error.message}`);

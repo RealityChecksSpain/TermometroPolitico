@@ -1,6 +1,7 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { normalizarNombre } from '../src/lib/texto';
 import { descargarHtml, extraerUrls, masReciente, BASE_CONGRESO, UA } from '../src/lib/descubrir';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('LEGISLATURA_ACTIVA_ID');
 const legislaturaId = process.env.LEGISLATURA_ACTIVA_ID!;
@@ -118,7 +119,7 @@ for (let i = 0; i < lote.length; i += 500) {
 }
 console.log(`  ${ok} guardadas`);
 
-await db().rpc('refrescar_metricas');
+await refrescarMetricas();
 console.log('\nComprueba:');
 console.log("  select empleador, count(*) from actividades_declaradas where sector ilike '%privad%' group by empleador order by 2 desc limit 20;\n");
 

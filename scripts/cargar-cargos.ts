@@ -1,6 +1,7 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { normalizarNombre } from '../src/lib/texto';
 import { UA } from '../src/lib/descubrir';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('LEGISLATURA_ACTIVA_ID');
 const legislaturaId = process.env.LEGISLATURA_ACTIVA_ID!;
@@ -96,7 +97,7 @@ console.log(`\n  asignados: ${asignados}`);
 console.log(`  no son diputados o no cruzan: ${sinCruce}`);
 console.log('  (muchos ministros no tienen escaño, es normal)');
 
-await db().rpc('refrescar_metricas');
+await refrescarMetricas();
 console.log('\n  Revisa el resultado:');
 console.log('    select nombre_completo, partido_siglas, cargo, ausencias');
 console.log('    from mv_diputados where cargo is not null order by ausencias desc;\n');

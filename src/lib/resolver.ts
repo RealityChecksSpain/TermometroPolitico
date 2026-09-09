@@ -1,4 +1,5 @@
 import { db, exigirEnv } from './supabase';
+import { modeloActivo } from './gemini';
 import { normalizarNombre } from './texto';
 
 export type OrigenResolucion = 'alias' | 'trigrama' | 'llm' | 'sin_resolver';
@@ -91,12 +92,15 @@ async function porAnthropic(nombre: string, candidatos: Candidato[]) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: process.env.MODELO_IA ?? 'claude-haiku-4-5-20251001',
+      model: modeloActivo(),
       max_tokens: 200,
       messages: [{ role: 'user', content: construirPrompt(nombre, candidatos) }]
     })
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`resolver/anthropic ${res.status}`);
+    return null;
+  }
   const data = await res.json();
   const texto = data.content
     .filter((b: any) => b.type === 'text')
@@ -106,7 +110,7 @@ async function porAnthropic(nombre: string, candidatos: Candidato[]) {
 }
 
 async function porGemini(nombre: string, candidatos: Candidato[]) {
-  const modelo = process.env.MODELO_IA ?? 'gemini-2.0-flash';
+  const modelo = encodeURIComponent(modeloActivo());
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
     {
@@ -121,7 +125,10 @@ async function porGemini(nombre: string, candidatos: Candidato[]) {
       })
     }
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`resolver/gemini ${res.status} con modelo ${modelo}`);
+    return null;
+  }
   const data = await res.json();
   const texto = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
   return extraerVeredicto(texto, candidatos.length);
@@ -134,7 +141,8 @@ async function porLlm(nombre: string, candidatos: Candidato[]) {
     return proveedor === 'gemini'
       ? await porGemini(nombre, candidatos)
       : await porAnthropic(nombre, candidatos);
-  } catch {
+  } catch (e) {
+    console.error('resolver/llm', e);
     return null;
   }
 }

@@ -1,9 +1,13 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { traerTodo } from '../src/lib/paginar';
 import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
+import { comprobarModelo, exigirVersionCodigoPromesas } from '../src/lib/version-codigo';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('GEMINI_API_KEY');
-const VERSION = process.env.VERSION_CODIGO ?? 'codigo-v5-2026-08';
+const VERSION = exigirVersionCodigoPromesas();
+const { modelos: MODELOS } = comprobarModelo();
+console.log(`\nCorpus ${VERSION} · codificador ${MODELOS[0]}\n`);
 
 const DIR = { type: 'string', enum: ['aumenta', 'reduce', 'neutro'] };
 
@@ -225,7 +229,7 @@ const progreso = SOLO_INFORME
 
     if (campos.every(c => fila[c] === 'neutro')) todoNeutro++;
 
-    const { error: e } = await db().from('promesa_codigo').upsert(fila, { onConflict: 'promesa_id' });
+    const { error: e } = await db().from('promesa_codigo').upsert(fila, { onConflict: 'promesa_id,version_prompt' });
     return e ? null : true;
   },
   {
@@ -253,7 +257,7 @@ if (!SOLO_INFORME && errores.size > 0) {
     .forEach(([e, n]) => console.log(`  ${String(n).padStart(4)}  ${String(e).slice(0, 120)}`));
 }
 
-if (!SOLO_INFORME) await db().rpc('refrescar_metricas');
+if (!SOLO_INFORME) await refrescarMetricas();
 
 const { data: ejes } = await db().from('mv_eje_programa').select('*').order('eje_economico');
 if (ejes?.length) {
@@ -278,16 +282,28 @@ if (ejes?.length) {
   pintar('EJE ECONOMICO  (-1 izquierda ... +1 derecha)', 'eje_economico');
   pintar('EJE SOCIAL  (-1 progresista ... +1 conservador)', 'eje_social');
 
-  console.log('\nDESGLOSE POR DIMENSION');
-  console.log('  ratio: -1 expande ... +1 restringe · (n) = señales que lo sustentan · minimo 10');
-  console.log('  PARTIDO           GASTO       IMPUESTOS      REGULACION');
-  ejes.forEach((e: any) => {
-    const f = (v: any, n: any) => {
-      const num = v === null || v === undefined ? '   —' : Number(v).toFixed(2).padStart(5);
-      return `${num} (${String(n ?? 0).padStart(3)})`;
-    };
-    console.log(`  ${String(e.siglas).padEnd(11)} ${f(e.ratio_gasto, e.n_gasto)}  ${f(e.ratio_impuestos, e.n_impuestos)}  ${f(e.ratio_regulacion, e.n_regulacion)}`);
-  });
+  console.log('\nCUANTO MATERIAL SUSTENTA CADA EJE');
+  console.log('  base = promesas sobre la base comun · dims = dimensiones que aportan');
+  console.log('  PARTIDO       PROMESAS   ECONOMICO        SOCIAL       TERRITORIAL');
+  const celda = (base: any, dims: any) => {
+    const b = base === null || base === undefined ? '—' : String(base);
+    if (dims === null || dims === undefined) return b.padStart(9);
+    return `${b} / ${dims}d`.padStart(9);
+  };
+  [...ejes]
+    .sort((a: any, b: any) => Number(b.promesas ?? 0) - Number(a.promesas ?? 0))
+    .forEach((e: any) => {
+      const flojo = Number(e.promesas ?? 0) < 150 ? '  <- pocas promesas' : '';
+      console.log(
+        `  ${String(e.siglas).padEnd(11)} ${String(e.promesas ?? 0).padStart(7)}   ` +
+        `${celda(e.base_economico, e.dimensiones_economicas)}  ` +
+        `${celda(e.base_social, e.dimensiones_sociales)}  ` +
+        `${celda(e.base_territorial, undefined)}${flojo}`
+      );
+    });
+  console.log('\n  Un eje sin base es un eje sin posicion: sale como "sin base suficiente".');
+  console.log('  Dos partidos con base muy distinta NO son igual de firmes aunque el mapa');
+  console.log('  los dibuje con el mismo punto.');
 }
 console.log('');
 

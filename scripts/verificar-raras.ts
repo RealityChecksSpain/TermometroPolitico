@@ -2,10 +2,11 @@ import { db, exigirEnv } from '../src/lib/supabase';
 import { traerTodo } from '../src/lib/paginar';
 import { preguntar, modeloActivo, Cadencia, CuotaDiariaAgotada } from '../src/lib/gemini';
 import { ESQUEMA, prompt } from '../src/lib/prompt-leyes';
+import { versionCodigoLey } from '../src/lib/version-codigo';
 
 exigirEnv('GEMINI_API_KEY');
 
-const VERSION = process.env.VERSION_CODIGO_LEY ?? 'codigo-ley-v6-2026-09';
+const VERSION = versionCodigoLey();
 const DIMS = (process.env.RARAS ?? 'religion_estado,ortodoxia_fiscal,propiedad_publica,proteccionismo,apertura_migratoria')
   .split(',').map(d => d.trim()).filter(Boolean);
 const CONTROLES = Number(process.env.RARAS_CONTROLES ?? 1);

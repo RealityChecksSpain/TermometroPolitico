@@ -8,10 +8,14 @@ const OPCIONALES = [
   'ANTHROPIC_API_KEY',
   'GEMINI_API_KEY',
   'PROVEEDOR_IA',
+  'MODELO_IA',
   'CRON_SECRET',
+  'ORIGEN_PERMITIDO',
   'RESEND_API_KEY',
   'ALERTA_EMAIL'
 ];
+
+import { VERSION_CODIGO_LEY } from '../src/lib/version-codigo';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -54,8 +58,53 @@ if (leg && !UUID.test(leg)) {
 }
 
 const secret = process.env.CRON_SECRET?.trim();
-if (secret && secret.length !== 64) {
+if (secret && secret.length < 16) {
+  console.log(`  AVISO    CRON_SECRET tiene ${secret.length} caracteres. Por debajo de 16 los crons rechazan todo.`);
+  fallos++;
+} else if (secret && secret.length !== 64) {
   console.log(`  AVISO    CRON_SECRET tiene ${secret.length} caracteres, se esperan 64`);
+}
+
+console.log('\nCORPUS Y AUDITORIA');
+const version = process.env.VERSION_CODIGO_LEY?.trim();
+if (!version) {
+  console.log(`  FALTA    VERSION_CODIGO_LEY. codificar:leyes se negara a arrancar.`);
+  console.log(`           Version activa: ${VERSION_CODIGO_LEY}`);
+  fallos++;
+} else if (version !== VERSION_CODIGO_LEY) {
+  console.log(`  AVISO    VERSION_CODIGO_LEY=${version} no es la activa (${VERSION_CODIGO_LEY})`);
+} else {
+  console.log(`  OK       VERSION_CODIGO_LEY=${version}`);
+}
+
+const reps = Number(process.env.PLACEBO_REPS ?? 200);
+if (reps < 1000) {
+  console.log(`  AVISO    PLACEBO_REPS=${reps}. El placebo no guardara nada por debajo de 1000.`);
+} else {
+  console.log(`  OK       PLACEBO_REPS=${reps}`);
+}
+
+const cadena = (process.env.MODELO_IA ?? '').split(',').map(s => s.trim()).filter(Boolean);
+if (cadena.length === 0) {
+  console.log('  AVISO    MODELO_IA vacia: se usara gemini-flash-lite-latest, que es un alias movil.');
+} else if (cadena.length > 1) {
+  console.log(`  OK       MODELO_IA: cadena de ${cadena.length} modelos con relevo por cuota`);
+  console.log('           Cubre el corpus sin pararse, pero lo deja repartido entre codificadores.');
+  console.log(`           Al terminar de cubrirlo, homogeneiza con:`);
+  console.log(`             MODELO_IA=${cadena[0]} npm run codificar:leyes -- --rehacer-mezcla`);
+} else if (/-latest$/.test(cadena[0])) {
+  console.log(`  AVISO    MODELO_IA=${cadena[0]} es un alias movil.`);
+  console.log('           El corpus quedaria atribuido a una etiqueta, no a un modelo.');
+} else {
+  console.log(`  OK       MODELO_IA=${cadena[0]}`);
+}
+
+const versionPromesas = process.env.VERSION_CODIGO?.trim();
+if (!versionPromesas) {
+  console.log('  ausente  VERSION_CODIGO (promesas). codificar:promesas se negara a arrancar.');
+  console.log('           No es la misma variable que VERSION_CODIGO_LEY.');
+} else {
+  console.log(`  OK       VERSION_CODIGO=${versionPromesas}`);
 }
 
 console.log('\nRESOLUCION DE NOMBRES');

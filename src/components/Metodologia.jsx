@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  traerAuditoriaPlacebo, nombrarDimensiones, NOMBRE_EJE_LEY, FUERA_DE_EJE, NOMBRE_DIMENSION_LEY
+  traerAuditoriaPlacebo, traerAuditoriaFiabilidad, nombrarDimensiones, veredictoKappa,
+  NOMBRE_EJE_LEY, FUERA_DE_EJE, NOMBRE_DIMENSION_LEY, EJE_DE_DIMENSION, UMBRAL_KAPPA
 } from '../lib/auditoria.js';
 
 const C = {
@@ -16,6 +17,154 @@ function Seccion({ titulo, children }) {
       </h2>
       <div style={{ fontSize: 14, color: C.media, lineHeight: 1.65 }}>{children}</div>
     </section>
+  );
+}
+
+function Fiabilidad({ fiabilidad }) {
+  if (fiabilidad === null) {
+    return (
+      <p style={{ margin: 0 }}>
+        La prueba de acuerdo entre modelos no se puede leer ahora mismo. Mientras no se pueda,
+        esta página no afirma que la codificación sea reproducible: preferimos el hueco a un
+        número que no podamos enseñar.
+      </p>
+    );
+  }
+
+  const orden = { economico: 0, social: 1, territorial: 2 };
+
+  const porModelo = new Map();
+  for (const f of fiabilidad) {
+    const clave = f.modeloB ?? 'sin identificar';
+    if (!porModelo.has(clave)) porModelo.set(clave, []);
+    porModelo.get(clave).push(f);
+  }
+
+  const mediaDe = filas => {
+    const c = filas.filter(f => f.kappa !== null);
+    return c.length ? c.reduce((a, f) => a + f.kappa, 0) / c.length : null;
+  };
+
+  const corridas = [...porModelo.entries()]
+    .map(([modeloB, filas]) => ({
+      modeloB,
+      filas,
+      fecha: filas.map(f => f.calculado).filter(Boolean).sort().pop() ?? '',
+      media: mediaDe(filas)
+    }))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  const principal = corridas[0];
+  const otras = corridas.slice(1);
+
+  const conBase = principal.filas.filter(f => f.kappa !== null);
+  const sinBase = principal.filas.filter(f => f.kappa === null).map(f => f.dimension);
+  const media = principal.media;
+  const cabecera = principal.filas[0] ?? {};
+
+  const flojasEnAlguna = [...new Set(
+    fiabilidad.filter(f => f.kappa !== null && f.kappa < UMBRAL_KAPPA).map(f => f.dimension)
+  )];
+
+  const lista = [...principal.filas].sort((a, b) => {
+    const ea = orden[EJE_DE_DIMENSION[a.dimension]] ?? 9;
+    const eb = orden[EJE_DE_DIMENSION[b.dimension]] ?? 9;
+    if (ea !== eb) return ea - eb;
+    return (b.kappa ?? -1) - (a.kappa ?? -1);
+  });
+
+  return (
+    <>
+      <p style={{ margin: 0 }}>
+        Una segunda inteligencia artificial, <strong>{principal.modeloB}</strong>,
+        vuelve a codificar a ciegas una muestra al azar de {cabecera.muestra || '—'} normas de las
+        que ya codificó <strong>{cabecera.modeloA ?? 'la primera'}</strong>. Después se mide cuánto
+        coinciden. Si dos modelos que no se han visto leen la misma ley y sacan lo mismo, la
+        codificación no depende de cuál se usó.
+      </p>
+      <p style={{ margin: '10px 0 0' }}>
+        La medida es la kappa de Cohen, que descuenta el acuerdo que saldría por azar. Hace falta
+        porque casi todas las leyes son «neutro» en casi todas las dimensiones: coincidir en el
+        neutro es fácil y no demuestra nada. Por debajo de {UMBRAL_KAPPA.toFixed(2).replace('.', ',')} consideramos
+        que una dimensión no es reproducible.
+      </p>
+
+      <div style={{ marginTop: 14, borderTop: `1px solid ${C.linea}` }}>
+        {lista.map(f => {
+          const eje = EJE_DE_DIMENSION[f.dimension];
+          const floja = f.kappa !== null && f.kappa < UMBRAL_KAPPA;
+          return (
+            <div key={f.dimension} style={{
+              display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
+              padding: '7px 0', borderBottom: `1px solid ${C.linea}`
+            }}>
+              <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.tinta }}>
+                {NOMBRE_DIMENSION_LEY[f.dimension] ?? f.dimension}
+                <span style={{ fontSize: 11, color: C.tenue, marginLeft: 6 }}>
+                  {eje ? `eje ${NOMBRE_EJE_LEY[eje]}` : 'fuera de los ejes'}
+                </span>
+              </div>
+              <div className="em" style={{ fontSize: 12, color: C.tenue, flex: '0 0 70px' }}>
+                {f.marcadas} marc.
+              </div>
+              <div className="em" style={{
+                fontSize: 12.5, flex: '0 0 56px', textAlign: 'right',
+                color: floja ? '#8E0B20' : C.tinta,
+                fontWeight: floja ? 600 : 400
+              }}>
+                {f.kappa === null ? '—' : f.kappa.toFixed(3).replace('.', ',')}
+              </div>
+              <div style={{ fontSize: 12, flex: '0 0 100px', color: floja ? '#8E0B20' : C.media }}>
+                {veredictoKappa(f.kappa)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {media !== null && (
+        <p style={{ margin: '12px 0 0' }}>
+          Media sobre las {conBase.length} dimensiones con base suficiente:{' '}
+          <strong>{media.toFixed(3).replace('.', ',')}</strong> ({veredictoKappa(media)}).
+        </p>
+      )}
+
+      {sinBase.length > 0 && (
+        <p style={{ margin: '10px 0 0' }}>
+          Sin base en esta muestra: {nombrarDimensiones(sinBase)}. Son asuntos que el Congreso
+          apenas toca, así que una muestra al azar casi no las contiene y la kappa no se calcula.
+          No sabemos si son reproducibles: no es lo mismo que saber que lo son.
+        </p>
+      )}
+
+      {otras.length > 0 && (
+        <p style={{ margin: '10px 0 0' }}>
+          El corpus se ha releído con {corridas.length} segundos codificadores en total.
+          {otras.map(c => (
+            <span key={c.modeloB}>
+              {' '}Con <strong>{c.modeloB}</strong>, kappa media{' '}
+              {c.media === null ? '—' : c.media.toFixed(3).replace('.', ',')} sobre{' '}
+              {c.filas[0]?.muestra ?? '—'} normas.
+            </span>
+          ))}{' '}
+          Cada uno usa su propia muestra al azar, así que las cifras no son directamente comparables
+          entre sí, pero coincidir dos veces con modelos distintos cuenta más que coincidir una.
+        </p>
+      )}
+
+      {flojasEnAlguna.length > 0 && (
+        <p style={{ margin: '10px 0 0', color: '#8E0B20' }}>
+          Por debajo del umbral en alguna de las comprobaciones:{' '}
+          {nombrarDimensiones(flojasEnAlguna)}. Donde aparezcan en la web, van marcadas.
+        </p>
+      )}
+
+      <p style={{ margin: '10px 0 0' }}>
+        Esta prueba responde a «¿da igual qué modelo lo lea?». El placebo de arriba responde a otra
+        cosa: «¿el reparto que sale podría ser casualidad?». Una dimensión puede pasar una y no la
+        otra, y las dos hacen falta.
+      </p>
+    </>
   );
 }
 
@@ -97,7 +246,9 @@ function ComposicionEjes({ auditoria }) {
 
 export default function Metodologia({ cobertura }) {
   const [auditoria, setAuditoria] = useState(null);
+  const [fiabilidad, setFiabilidad] = useState(null);
   useEffect(() => { traerAuditoriaPlacebo().then(setAuditoria).catch(() => setAuditoria(null)); }, []);
+  useEffect(() => { traerAuditoriaFiabilidad().then(setFiabilidad).catch(() => setFiabilidad(null)); }, []);
   return (
     <div style={{ maxWidth: 720 }}>
       <h1 className="ed" style={{ fontSize: 'clamp(26px, 4.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.03em', margin: 0, lineHeight: 1.1 }}>
@@ -190,13 +341,16 @@ export default function Metodologia({ cobertura }) {
         <p style={{ margin: '10px 0 0' }}>
           El borde del mapa no es el partido más alejado: es el máximo posible, apoyar todas las
           normas que recortan y ninguna de las que amplían. Por eso ningún partido se acerca al
-          borde. Sobre las 456 normas codificadas, el eje económico completo mide 0,52 de un
-          recorrido posible de 2,0, y el social 0,61.
+          borde: el recorrido que ocupan los partidos reales es una fracción del recorrido posible.
         </p>
         <p style={{ margin: '10px 0 0' }}>
           La comprobación caduca sola en cuanto entran datos nuevos, así que un eje etiquetado
           siempre lo está sobre los datos actuales.
         </p>
+      </Seccion>
+
+      <Seccion titulo="Si lo codificara otra IA, ¿saldría lo mismo?">
+        <Fiabilidad fiabilidad={fiabilidad} />
       </Seccion>
 
       <Seccion titulo="Por qué el eje económico mide poco">
@@ -217,6 +371,26 @@ export default function Metodologia({ cobertura }) {
         <p style={{ margin: '10px 0 0' }}>
           En los programas electorales sí aparecen las dos direcciones. Que un partido prometa
           recortar y luego no vote ningún recorte es, en sí mismo, algo que este mapa permite ver.
+        </p>
+      </Seccion>
+
+      <Seccion titulo="El eje territorial es el más débil de los tres">
+        <p style={{ margin: 0 }}>
+          Los ejes económico y social se componen de varias preguntas: si una falla, las demás
+          sostienen la posición. El territorial descansa sobre <strong>una sola</strong>,
+          descentralización, porque integración europea no reúne base suficiente en bastantes
+          partidos y queda fuera del cálculo.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Eso lo hace frágil por dos motivos. Una sola pregunta no tiene con qué compensarse. Y es
+          además la pregunta más difícil de responder: distinguir «transferir una competencia» de
+          «financiar algo que ejecutan las comunidades» exige leer con cuidado, y es donde dos
+          modelos distintos coinciden menos que en el resto.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          La posición territorial de un partido dice menos que su posición económica o social.
+          No la damos por falsa: la damos por menos firme, y preferimos escribirlo aquí a que
+          alguien lo descubra por su cuenta.
         </p>
       </Seccion>
 

@@ -177,6 +177,7 @@ export function anioDe(valor: string): number | null {
 }
 
 export function normalizarA10(bruto: number, min: number, max: number, orientacion: 1 | -1): number {
-  const t = (bruto - min) / (max - min);
+  if (!Number.isFinite(bruto) || max === min) return NaN;
+  const t = Math.min(1, Math.max(0, (bruto - min) / (max - min)));
   return orientacion === 1 ? t * 10 : 10 - t * 10;
 }

@@ -10,12 +10,12 @@ const C = {
 const CONJUNTOS = [
   {
     id: 'diputados', nombre: 'Diputados',
-    que: 'Los 410 mandatos con partido, circunscripción, asistencia, disidencias, minutos de tribuna y declaraciones de intereses.',
+    que: 'Un registro por mandato, con partido, circunscripción, asistencia, disidencias, minutos de tribuna y declaraciones de intereses.',
     vista: 'mv_diputados', orden: 'nombre_completo'
   },
   {
     id: 'votaciones', nombre: 'Votaciones',
-    que: 'Las 2.055 votaciones con recuentos, resultado, expediente y enlace al acta oficial.',
+    que: 'Cada votación de la legislatura con recuentos, resultado, expediente y enlace al acta oficial.',
     vista: 'mv_votaciones', orden: 'fecha'
   },
   {
@@ -45,9 +45,12 @@ const CONJUNTOS = [
   }
 ];
 
+const TOPE_FILAS = 200000;
+
 async function traerTodo(vista, orden) {
   const filas = [];
   let desde = 0;
+  let completo = true;
   for (;;) {
     const { data, error } = await supabase.from(vista).select('*').order(orden).range(desde, desde + 999);
     if (error) throw error;
@@ -55,24 +58,32 @@ async function traerTodo(vista, orden) {
     filas.push(...data);
     if (data.length < 1000) break;
     desde += 1000;
-    if (desde > 60000) break;
+    if (desde >= TOPE_FILAS) { completo = false; break; }
   }
-  return filas;
+  return { filas, completo };
 }
 
 export default function Descargas() {
   const [ocupado, setOcupado] = useState(null);
   const [error, setError] = useState(null);
+  const [aviso, setAviso] = useState(null);
 
   async function bajar(c, formato) {
-    setOcupado(c.id + formato); setError(null);
+    setOcupado(c.id + formato); setError(null); setAviso(null);
     try {
-      const filas = await traerTodo(c.vista, c.orden);
+      const { filas, completo } = await traerTodo(c.vista, c.orden);
+      if (!filas.length) {
+        setError(`«${c.nombre}» no ha devuelto ninguna fila. El fichero no se ha descargado.`);
+        return;
+      }
       const fecha = new Date().toISOString().slice(0, 10);
       if (formato === 'csv') {
         descargar(`lente-${c.id}-${fecha}.csv`, aCsv(filas));
       } else {
         descargar(`lente-${c.id}-${fecha}.json`, JSON.stringify(filas, null, 2), 'application/json');
+      }
+      if (!completo) {
+        setAviso(`«${c.nombre}» se ha cortado en ${filas.length.toLocaleString('es-ES')} filas. El fichero está incompleto: pídenos el volcado entero antes de publicar nada con él.`);
       }
     } catch (e) {
       setError(String(e.message ?? e));
@@ -95,6 +106,12 @@ export default function Descargas() {
       {error && (
         <div style={{ margin: '16px 0', padding: 12, background: '#FBE9EC', border: '1px solid #E8C0C6', borderRadius: 3, fontSize: 12.5, color: '#8E0B20' }}>
           {error}
+        </div>
+      )}
+
+      {aviso && (
+        <div style={{ margin: '16px 0', padding: 12, background: '#F7EFD9', border: '1px solid #E0CB93', borderRadius: 3, fontSize: 12.5, color: '#7A5A12' }}>
+          {aviso}
         </div>
       )}
 

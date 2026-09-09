@@ -1,4 +1,5 @@
 import { db, exigirEnv } from '../src/lib/supabase';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('LEGISLATURA_ACTIVA_ID');
 
@@ -35,7 +36,7 @@ console.log(`  votaciones con iniciativa: ${conEnlace ?? 0}`);
 console.log(`  votaciones sin iniciativa: ${sinEnlace ?? 0}`);
 console.log('  (PNL, mociones e interpelaciones no estan en el open data de iniciativas)');
 
-await db().rpc('refrescar_metricas');
+await refrescarMetricas();
 console.log('\nMetricas refrescadas.\n');
 
 export {};

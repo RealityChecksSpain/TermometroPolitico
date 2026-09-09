@@ -75,3 +75,47 @@ export async function traerAuditoriaPlacebo() {
     calculado: f.calculado_at ?? null
   }));
 }
+
+export const UMBRAL_KAPPA = 0.40;
+export const KAPPA_SOLIDA = 0.60;
+
+export function veredictoKappa(k) {
+  if (k === null || k === undefined) return 'sin base';
+  if (k >= 0.80) return 'casi perfecto';
+  if (k >= 0.60) return 'sustancial';
+  if (k >= UMBRAL_KAPPA) return 'moderado';
+  if (k >= 0.20) return 'débil';
+  return 'insuficiente';
+}
+
+export async function traerAuditoriaFiabilidad() {
+  if (!supabase) return null;
+  const { data: activa } = await supabase
+    .from('v_version_codigo_activa')
+    .select('version_prompt')
+    .maybeSingle();
+  const version = activa?.version_prompt ?? null;
+  if (!version) return null;
+  const { data, error } = await supabase
+    .from('auditoria_fiabilidad')
+    .select('dimension, muestra, marcadas, modelo_a, modelo_b, version_prompt, acuerdo, kappa, calculado_at')
+    .eq('version_prompt', version);
+  if (error || !data || data.length === 0) return null;
+  return data.map(f => ({
+    dimension: f.dimension,
+    muestra: Number(f.muestra ?? 0),
+    marcadas: Number(f.marcadas ?? 0),
+    modeloA: f.modelo_a ?? null,
+    modeloB: f.modelo_b ?? null,
+    version: f.version_prompt ?? null,
+    acuerdo: f.acuerdo === null || f.acuerdo === undefined ? null : Number(f.acuerdo),
+    kappa: f.kappa === null || f.kappa === undefined ? null : Number(f.kappa),
+    calculado: f.calculado_at ?? null
+  }));
+}
+
+export function indiceKappa(fiabilidad) {
+  const indice = {};
+  for (const f of fiabilidad ?? []) indice[f.dimension] = f.kappa;
+  return indice;
+}

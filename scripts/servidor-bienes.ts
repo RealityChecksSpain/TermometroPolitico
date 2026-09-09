@@ -4,6 +4,8 @@ import { leerDeclaracion } from '../src/lib/leer-declaracion';
 
 exigirEnv('SUPABASE_URL');
 const PUERTO = Number(process.env.PUERTO_ADMIN ?? 4321);
+const INTERFAZ = '127.0.0.1';
+const ORIGENES_PDF = ['www.congreso.es', 'congreso.es'];
 
 const CAMPOS: [string, string, string, string][] = [
   ['fecha_declaracion', 'Fecha de la declaración', 'date', 'Cabecera, arriba a la derecha'],
@@ -197,8 +199,39 @@ document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') 
 cargar();
 </script></body></html>`;
 
+function pdfPermitido(bruto: unknown): boolean {
+  if (typeof bruto !== 'string') return false;
+  try {
+    const u = new URL(bruto);
+    return u.protocol === 'https:' && ORIGENES_PDF.includes(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function peticionLocal(req: { headers: Record<string, string | string[] | undefined> }): boolean {
+  const host = String(req.headers.host ?? '');
+  const nombre = host.split(':')[0];
+  if (nombre !== 'localhost' && nombre !== '127.0.0.1' && nombre !== '[::1]') return false;
+  const origen = req.headers.origin;
+  if (typeof origen === 'string' && origen) {
+    try {
+      const o = new URL(origen);
+      if (o.hostname !== 'localhost' && o.hostname !== '127.0.0.1') return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
+
+  if (!peticionLocal(req as never)) {
+    res.writeHead(403);
+    return res.end('solo desde localhost');
+  }
 
   if (url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -222,6 +255,10 @@ createServer(async (req, res) => {
     let cuerpo = '';
     for await (const c of req) cuerpo += c;
     const { url: pdf } = JSON.parse(cuerpo);
+    if (!pdfPermitido(pdf)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Solo se aceptan PDF de congreso.es por https' }));
+    }
     const r = await leerDeclaracion(pdf);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(r));
@@ -230,15 +267,24 @@ createServer(async (req, res) => {
   if (url.pathname === '/api/guardar' && req.method === 'POST') {
     let cuerpo = '';
     for await (const c of req) cuerpo += c;
-    const fila = { ...JSON.parse(cuerpo), introducido_por: 'revision_humana', introducido_at: new Date().toISOString(), verificado: true };
+    const enviado = JSON.parse(cuerpo);
+    if (!enviado?.mandato_id) { res.writeHead(400); return res.end('falta mandato_id'); }
+    const fila: Record<string, unknown> = { mandato_id: enviado.mandato_id };
+    for (const [campo] of CAMPOS) {
+      if (Object.prototype.hasOwnProperty.call(enviado, campo)) fila[campo] = enviado[campo];
+    }
+    fila.introducido_por = 'revision_humana';
+    fila.introducido_at = new Date().toISOString();
+    fila.verificado = true;
     const { error } = await db().from('bienes_declarados').upsert(fila, { onConflict: 'mandato_id' });
     if (error) { res.writeHead(400); return res.end(error.message); }
     res.writeHead(200); return res.end('ok');
   }
 
   res.writeHead(404); res.end();
-}).listen(PUERTO, () => {
+}).listen(PUERTO, INTERFAZ, () => {
   console.log(`\nEntrada de bienes en http://localhost:${PUERTO}\n`);
+  console.log(`  Escuchando solo en ${INTERFAZ}: nadie mas en la red puede escribir en la base.`);
   console.log('  1. Pega la URL del PDF y pulsa "Leer PDF automaticamente".');
   console.log('  2. Comprueba los campos amarillos contra el documento.');
   console.log('  3. Ctrl+Enter guarda y pasa al siguiente.');

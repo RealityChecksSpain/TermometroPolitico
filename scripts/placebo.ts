@@ -1,10 +1,17 @@
 import { db } from '../src/lib/supabase';
+import { versionCodigoLey } from '../src/lib/version-codigo';
 
 const REPS = Number(process.env.PLACEBO_REPS ?? 200);
+
+const FORZAR = process.argv.includes('--forzar');
+const PUBLICABLE = REPS >= 1000 || FORZAR;
 
 if (REPS < 1000) {
   console.log(`\nAVISO: ${REPS} permutaciones dan una p con escalon de ${(1 / REPS).toFixed(4)}.`);
   console.log('Para comparar corridas entre si hace falta PLACEBO_REPS=5000 o mas.');
+  console.log(FORZAR
+    ? 'Se guardara igual porque has pasado --forzar.'
+    : 'NO se guardara en auditoria_placebo: esa tabla la publica la web.');
 }
 const MIN_LADO = 3;
 const K = 2;
@@ -148,7 +155,7 @@ const rango = (v: number[]) => (v.length < 2 ? 0 : Math.max(...v) - Math.min(...
 
 console.log('\n=== Placebo de los ejes (subejes por dimension) ===\n');
 
-const VERSION = process.env.VERSION_CODIGO_LEY ?? 'codigo-ley-v6-2026-09';
+const VERSION = versionCodigoLey();
 
 const columnas = ['iniciativa_id', ...DIMS.map(([d]) => d)].join(', ');
 const codigos = await paginar<any>((a, b) =>
@@ -257,10 +264,14 @@ for (const eje of ['economico', 'social', 'territorial'] as const) {
 
 if (!salida.length) {
   console.log('\nNada que guardar.');
+} else if (!PUBLICABLE) {
+  console.log(`\nNo se guarda nada: ${REPS} permutaciones no son una medicion.`);
+  console.log('  PLACEBO_REPS=5000 npm run placebo');
+  console.log('  Anade --forzar solo si sabes que estas escribiendo ruido en la web.\n');
 } else {
   const { error } = await db().from('auditoria_placebo').upsert(salida, { onConflict: 'eje' });
   if (error) throw error;
-  console.log(`\nGuardados ${salida.length} ejes en auditoria_placebo.`);
+  console.log(`\nGuardados ${salida.length} ejes en auditoria_placebo con ${REPS} permutaciones.`);
 }
 
 console.log('\nComprueba:  select * from v_auditoria_eje_votos;\n');

@@ -2,6 +2,7 @@ import { db, exigirEnv } from '../src/lib/supabase';
 import { pca, escalarA, correlacion, MatrizVotos } from '../src/lib/pca';
 import { cargarPosiciones, posicionConsenso, cuantasPosiciones } from '../src/lib/posiciones';
 import { traerTodo } from '../src/lib/paginar';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 const legislaturaId = exigirEnv('LEGISLATURA_ACTIVA_ID');
 const MIN_VOTOS = Number(process.env.MIN_VOTOS ?? 100);
@@ -261,8 +262,7 @@ for (const eje of ejes) {
   console.log(`  eje ${eje.numero} "${etiqueta}": ${lote.length} posiciones`);
 }
 
-await db().rpc('refrescar_metricas');
-console.log('  metricas refrescadas');
+await refrescarMetricas();
 
 console.log('\nLISTO. Comprueba: select * from v_centroides_partido order by eje1;\n');
 export {};
