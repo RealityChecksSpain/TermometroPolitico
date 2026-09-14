@@ -65,7 +65,10 @@
     "placebo": "node --env-file=.env --import tsx scripts/placebo.ts",
     "fichas": "node --env-file=.env --import tsx scripts/cargar-fichas.ts",
     "fiabilidad": "node --env-file=.env --import tsx scripts/fiabilidad.ts",
-    "raras": "node --env-file=.env --import tsx scripts/verificar-raras.ts"
+    "raras": "node --env-file=.env --import tsx scripts/verificar-raras.ts",
+    "transparencia": "node --env-file=.env --import tsx scripts/transparencia.ts",
+    "transparencia:plantilla": "node --env-file=.env --import tsx scripts/transparencia.ts --plantilla",
+    "transparencia:estado": "node --env-file=.env --import tsx scripts/transparencia.ts --estado"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",

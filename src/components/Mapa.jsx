@@ -262,8 +262,12 @@ export default function Mapa({ onDiputados }) {
           : fuente === 'territorio' ? d.voto_territorial : d.voto_economico,
         y: fuente === 'programa' ? d.prog_social
           : fuente === 'territorio' ? d.voto_social : d.voto_social,
-        n: fuente === 'programa' ? d.promesas_codificadas
+        n: fuente === 'programa' ? null
           : fuente === 'territorio' ? d.voto_n_territorial : d.voto_n_economico,
+        nX: fuente === 'programa' ? (d.prog_base_economico ?? null) : null,
+        nY: fuente === 'programa' ? (d.prog_base_social ?? null) : null,
+        dimsX: fuente === 'programa' ? (d.prog_dims_economico ?? null) : null,
+        dimsY: fuente === 'programa' ? (d.prog_dims_social ?? null) : null,
         ex: fuente === 'programa' ? null
           : fuente === 'territorio' ? d.voto_err_territorial : d.voto_err_economico,
         ey: fuente === 'programa' ? null : d.voto_err_social,
@@ -294,6 +298,29 @@ export default function Mapa({ onDiputados }) {
   }, [datos, fuente, referencias, ranuras, activos]);
 
   const escala = puntos[0]?.escala ?? 1;
+
+  const basesPrograma = useMemo(() => {
+    if (fuente !== 'programa') return null;
+    const valores = puntos
+      .flatMap(p => [p.nX, p.nY])
+      .filter(v => v !== null && v !== undefined)
+      .map(Number);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [puntos, fuente]);
+
+  const sinDibujar = useMemo(() => {
+    if (fuente !== 'programa' || !datos) return [];
+    const hay = v => v !== null && v !== undefined;
+    return datos
+      .filter(d => (hay(d.prog_economico) || hay(d.prog_social)) &&
+        !(hay(d.prog_economico) && hay(d.prog_social)))
+      .map(d => ({
+        siglas: d.siglas || d.partido,
+        falta: hay(d.prog_economico) ? 'social' : 'económico'
+      }))
+      .filter(d => d.siglas);
+  }, [datos, fuente]);
 
   const porRanura = useMemo(() => {
     const m = new Map();
@@ -605,7 +632,27 @@ export default function Mapa({ onDiputados }) {
         {fuente !== 'programa' && activo.ex > 0 && ` ±${(activo.ex / escala).toFixed(2)}`}
         {' · '}social {Number(activo.y / (fuente === 'programa' ? 1 : escala)).toFixed(2)}
         {fuente !== 'programa' && activo.ey > 0 && ` ±${(activo.ey / escala).toFixed(2)}`}
-        {' · '}calculado sobre {activo.n} {fuente === 'programa' ? 'compromisos' : 'votos codificados'}
+        {fuente !== 'programa' && <>{' · '}calculado sobre {activo.n} votos codificados</>}
+        {fuente === 'programa' && (
+          activo.nX === null && activo.nY === null
+            ? <span style={{ display: 'block', color: '#7C8288', fontSize: 10.5, marginTop: 3 }}>
+                no se puede leer sobre cuántos compromisos está calculado, así que no lo decimos
+              </span>
+            : <span style={{ display: 'block', marginTop: 3 }}>
+                calculado sobre {activo.nX ?? '—'} compromisos en económico y {activo.nY ?? '—'} en social
+                {activo.promesas_codificadas != null && (
+                  <span style={{ color: '#7C8288' }}>
+                    {' '}· de {Number(activo.promesas_codificadas).toLocaleString('es')} que tiene el programa
+                  </span>
+                )}
+                {basesPrograma && puntos.length > 1 &&
+                  Number(Math.min(activo.nX ?? Infinity, activo.nY ?? Infinity)) === basesPrograma.min && (
+                  <span style={{ display: 'block', color: '#E8C56A', fontSize: 10.5, marginTop: 3 }}>
+                    es la base más corta de este mapa
+                  </span>
+                )}
+              </span>
+        )}
       </div>
       )}
       {fuente !== 'programa' && fuente !== 'referencias' && (activo.ex > 0 || activo.ey > 0) && (
@@ -782,8 +829,10 @@ export default function Mapa({ onDiputados }) {
               }}>
                 <strong style={{ color: '#E8C56A' }}>Margen escaso.</strong> Este eje supera la
                 comprobación contra el azar por poco (p = {Number(auditoria.p_economico).toFixed(3)},
-                el límite es 0,05) y solo {auditoria.economico_significativos ?? 0} de{' '}
-                {auditoria.partidos_economico ?? 13} partidos tienen posición distinguible del centro.
+                el límite es 0,05) y{' '}
+                {auditoria.partidos_economico != null
+                  ? <>solo {auditoria.economico_significativos ?? 0} de {auditoria.partidos_economico} partidos tienen posición distinguible del centro.</>
+                  : <>solo {auditoria.economico_significativos ?? 0} partidos tienen posición distinguible del centro.</>}
                 En esta legislatura el Congreso apenas ha votado normas que recorten gasto o
                 desregulen, así que hay poco contraste que medir.
               </div>
@@ -1095,6 +1144,26 @@ export default function Mapa({ onDiputados }) {
                 El centro exacto significa que vota igual en ambos casos.
                 {esTactil ? ' Toca' : ' Pasa por encima de'} un partido para ver su margen de error.</span>
             )}
+            {fuente === 'programa' && (
+              <span style={{ display: 'block', marginTop: 6 }}>
+                La posición no sale del programa entero, sino de la parte que toca las preguntas de
+                cada eje.
+                {basesPrograma && basesPrograma.min !== basesPrograma.max
+                  ? <> Hoy esa parte va de {basesPrograma.min} a {basesPrograma.max} compromisos según
+                      el partido, y aun así todos los puntos se dibujan igual de firmes: el tamaño
+                      del círculo son escaños, no certeza.{' '}</>
+                  : <> El tamaño del círculo son escaños, no certeza.{' '}</>}
+                {esTactil ? 'Toca' : 'Pasa por encima de'} un partido para ver sobre cuántos
+                compromisos está calculado el suyo.
+                {sinDibujar.length > 0 && (
+                  <span style={{ display: 'block', marginTop: 6, color: '#E8C56A' }}>
+                    No aparecen aquí: {sinDibujar.map(p => `${p.siglas} (sin eje ${p.falta})`).join(', ')}.
+                    Tienen posición en un eje pero no en el otro, y un punto necesita las dos
+                    coordenadas. Preferimos que falten a colocarlos donde no se sostienen.
+                  </span>
+                )}
+              </span>
+            )}
             {fuente !== 'programa' && fuente !== 'referencias' && (
               <span style={{ display: 'block', marginTop: 6 }}>
                 El óvalo es el margen de error: la posición real está casi con seguridad dentro de
@@ -1379,7 +1448,8 @@ export default function Mapa({ onDiputados }) {
             <strong>Hasta dónde llega la precisión.</strong>{' '}
             {auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
               <>El eje económico ordena a los partidos, pero con poco margen: solo{' '}
-                {auditoria.economico_significativos ?? 0} de {auditoria.partidos_economico ?? 13} tienen
+                {auditoria.economico_significativos ?? 0}
+                {auditoria.partidos_economico != null && <> de {auditoria.partidos_economico}</>} tienen
                 posición distinguible del centro, porque el Congreso apenas vota normas que recorten
                 gasto o desregulen. El orden es informativo; las distancias exactas, no.{' '}</>
             )}

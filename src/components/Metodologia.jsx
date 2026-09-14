@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  traerAuditoriaPlacebo, traerAuditoriaFiabilidad, nombrarDimensiones, veredictoKappa,
+  traerAuditoriaPlacebo, traerAuditoriaFiabilidad, traerBaseProgramas,
+  nombrarDimensiones, veredictoKappa,
   NOMBRE_EJE_LEY, FUERA_DE_EJE, NOMBRE_DIMENSION_LEY, EJE_DE_DIMENSION, UMBRAL_KAPPA
 } from '../lib/auditoria.js';
 
@@ -244,11 +245,207 @@ function ComposicionEjes({ auditoria }) {
   );
 }
 
+function cuantos(n, singular, plural) {
+  return `${Number(n).toLocaleString('es')} ${n === 1 ? singular : plural}`;
+}
+
+function listarSiglas(lista) {
+  if (lista.length === 0) return null;
+  if (lista.length === 1) return lista[0];
+  return `${lista.slice(0, -1).join(', ')} y ${lista[lista.length - 1]}`;
+}
+
+function CeroProgramas({ programas }) {
+  if (programas === null) {
+    return (
+      <p style={{ margin: 0 }}>
+        Las posiciones de programa no se pueden leer ahora mismo, así que esta página no dice
+        cuántos partidos caen a cada lado del cero. Preferimos el hueco a una cifra escrita a mano
+        que deje de ser cierta en cuanto cambien los datos.
+      </p>
+    );
+  }
+
+  const conEco = [...programas]
+    .filter(p => p.economico !== null)
+    .sort((a, b) => a.economico - b.economico);
+
+  if (conEco.length === 0) {
+    return (
+      <p style={{ margin: 0 }}>
+        Ahora mismo ningún partido reúne base suficiente para tener posición económica en esta
+        pestaña, así que el eje horizontal no se dibuja.
+      </p>
+    );
+  }
+
+  const izquierda = conEco.filter(p => p.economico < 0);
+  const derecha = conEco.filter(p => p.economico > 0);
+  const masIzquierda = conEco[0];
+  const masDerecha = conEco[conEco.length - 1];
+
+  return (
+    <>
+      <p style={{ margin: 0 }}>
+        En la pestaña «Lo que prometieron» la posición de un partido sale de contar sus propias
+        promesas: cuántas empujan en un sentido y cuántas en el contrario. Esa cuenta ordena bien y
+        sitúa mal. <strong>El orden entre partidos se sostiene; el cero no es el centro
+        político.</strong>
+      </p>
+      <p style={{ margin: '10px 0 0' }}>
+        Hoy hay {cuantos(conEco.length, 'partido', 'partidos')} con base económica suficiente en
+        esta pestaña. De ellos, {cuantos(izquierda.length, 'queda', 'quedan')} a la izquierda del
+        cero y {cuantos(derecha.length, 'queda', 'quedan')} a la derecha.
+        {conEco.length === 1
+          ? ''
+          : derecha.length > 0
+            ? ` El más a la derecha es ${masDerecha.siglas}; el más a la izquierda, ${masIzquierda.siglas}.`
+            : ` No hay ninguno a la derecha del cero, y el más a la izquierda es ${masIzquierda.siglas}.`}
+      </p>
+      <p style={{ margin: '10px 0 0' }}>
+        Eso no significa que casi toda la Cámara sea de izquierdas. Un programa electoral se escribe
+        para prometer, y prometer es casi siempre prometer gasto: planes, ayudas, inversiones.
+        Comprometerse por escrito a recortar no se estila, ni siquiera entre quienes luego recortan.
+        Como la posición sale de restar las promesas de un sentido menos las del contrario, ese
+        desequilibrio de partida arrastra a todos los partidos hacia el mismo lado, y se lleva el
+        cero con ellos.
+      </p>
+      <p style={{ margin: '10px 0 0' }}>
+        De ahí sale una instrucción de lectura concreta: mira quién queda a la derecha de quién y a
+        qué distancia, no de qué lado del cero cae cada uno. Que un partido aparezca a la izquierda
+        del cero no lo hace de izquierdas; solo dice que en su programa las promesas de recortar
+        pesan menos que en el del partido que tiene a su derecha.
+      </p>
+      <p style={{ margin: '10px 0 0' }}>
+        El eje que sale de los votos se calcula de otra manera y allí el cero sí significa algo:
+        votar igual suba o baje. Son dos cuentas distintas sobre materiales distintos, y sus ceros
+        no son el mismo punto.
+      </p>
+    </>
+  );
+}
+
+function BaseProgramas({ programas }) {
+  if (programas === null) {
+    return (
+      <p style={{ margin: 0 }}>
+        Cuánto material sostiene a cada partido se guarda con las posiciones, y ahora mismo no se
+        puede leer. Mientras no se pueda, esta página no da cifras de base: preferimos el hueco.
+      </p>
+    );
+  }
+
+  const conPromesas = programas.filter(p => p.promesas !== null);
+  const ordenados = [...conPromesas].sort((a, b) => b.promesas - a.promesas);
+  const mayor = ordenados[0] ?? null;
+  const menor = ordenados[ordenados.length - 1] ?? null;
+  const sinEco = programas.filter(p => p.economico === null).map(p => p.siglas);
+  const sinSocial = programas.filter(p => p.social === null).map(p => p.siglas);
+  const lista = ordenados.length > 0 ? ordenados : programas;
+
+  const celda = (base, dims) => {
+    if (base === null) return '—';
+    if (dims === null) return Number(base).toLocaleString('es');
+    return `${Number(base).toLocaleString('es')} · ${dims}d`;
+  };
+
+  return (
+    <>
+      <p style={{ margin: 0 }}>
+        Un punto de esta pestaña puede estar calculado sobre más de mil promesas o sobre unas pocas
+        decenas. El mapa los dibuja igual, y en la pestaña de programas no hay óvalo de error ni
+        marca de base corta que avise. <strong>Transmite una precisión que no tiene.</strong>
+      </p>
+      <p style={{ margin: '10px 0 0' }}>
+        Lo que sostiene una posición no es el tamaño del programa, sino cuántas de sus promesas
+        caen dentro de las preguntas que componen cada eje: la base común, la misma para todos los
+        partidos. Un programa largo puede quedarse sin posición económica si sus promesas no tocan
+        esas preguntas. Esto es lo que hay hoy, leído de la base de datos:
+      </p>
+
+      <div style={{ marginTop: 14, borderTop: `1px solid ${C.linea}` }}>
+        <div style={{
+          display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
+          padding: '7px 0', borderBottom: `1px solid ${C.linea}`, fontSize: 11, color: C.tenue
+        }}>
+          <div style={{ flex: '1 1 140px', minWidth: 0 }}>partido</div>
+          <div className="em" style={{ flex: '0 0 74px', textAlign: 'right' }}>promesas</div>
+          <div className="em" style={{ flex: '0 0 86px', textAlign: 'right' }}>base econ.</div>
+          <div className="em" style={{ flex: '0 0 86px', textAlign: 'right' }}>base social</div>
+        </div>
+        {lista.map(p => (
+          <div key={p.siglas} style={{
+            display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
+            padding: '7px 0', borderBottom: `1px solid ${C.linea}`
+          }}>
+            <div style={{ flex: '1 1 140px', minWidth: 0, fontSize: 13, color: C.tinta }}>
+              {p.siglas}
+              {(p.economico === null || p.social === null) && (
+                <span style={{ fontSize: 11, color: C.tenue, marginLeft: 6 }}>
+                  {p.economico === null && p.social === null
+                    ? 'no se dibuja'
+                    : p.economico === null ? 'sin eje económico' : 'sin eje social'}
+                </span>
+              )}
+            </div>
+            <div className="em" style={{ fontSize: 12.5, flex: '0 0 74px', textAlign: 'right', color: C.tinta }}>
+              {p.promesas === null ? '—' : Number(p.promesas).toLocaleString('es')}
+            </div>
+            <div className="em" style={{
+              fontSize: 12.5, flex: '0 0 86px', textAlign: 'right',
+              color: p.economico === null ? C.tenue : C.tinta
+            }}>
+              {celda(p.baseEconomico, p.dimsEconomico)}
+            </div>
+            <div className="em" style={{
+              fontSize: 12.5, flex: '0 0 86px', textAlign: 'right',
+              color: p.social === null ? C.tenue : C.tinta
+            }}>
+              {celda(p.baseSocial, p.dimsSocial)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ margin: '12px 0 0' }}>
+        «Promesas» es todo lo que ese partido escribió y se ha codificado. «Base» es la parte que
+        cae dentro de las preguntas que forman el eje, y la <span className="em">d</span> de al lado,
+        cuántas de esas preguntas aporta. Es la base la que sostiene el punto, no el programa entero.
+      </p>
+
+      {sinEco.length > 0 && (
+        <p style={{ margin: '10px 0 0' }}>
+          {listarSiglas(sinEco)} no {sinEco.length === 1 ? 'aparece' : 'aparecen'} en el eje
+          horizontal de esta pestaña: no {sinEco.length === 1 ? 'reúne' : 'reúnen'} base económica
+          suficiente. El hueco es a propósito.
+        </p>
+      )}
+
+      {sinSocial.length > 0 && (
+        <p style={{ margin: '10px 0 0' }}>
+          Y sin base en el eje vertical: {listarSiglas(sinSocial)}.
+        </p>
+      )}
+
+      {mayor && menor && mayor.siglas !== menor.siglas && (
+        <p style={{ margin: '10px 0 0' }}>
+          Entre los que sí aparecen, la diferencia es grande: {mayor.siglas} entra con{' '}
+          {cuantos(mayor.promesas, 'promesa codificada', 'promesas codificadas')} y {menor.siglas}{' '}
+          con {Number(menor.promesas).toLocaleString('es')}. Los dos puntos se dibujan con la misma
+          firmeza. Mientras esa diferencia no se vea en el propio mapa, queda escrita aquí.
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function Metodologia({ cobertura }) {
   const [auditoria, setAuditoria] = useState(null);
   const [fiabilidad, setFiabilidad] = useState(null);
+  const [programas, setProgramas] = useState(null);
   useEffect(() => { traerAuditoriaPlacebo().then(setAuditoria).catch(() => setAuditoria(null)); }, []);
   useEffect(() => { traerAuditoriaFiabilidad().then(setFiabilidad).catch(() => setFiabilidad(null)); }, []);
+  useEffect(() => { traerBaseProgramas().then(setProgramas).catch(() => setProgramas(null)); }, []);
   return (
     <div style={{ maxWidth: 720 }}>
       <h1 className="ed" style={{ fontSize: 'clamp(26px, 4.5vw, 38px)', fontWeight: 800, letterSpacing: '-0.03em', margin: 0, lineHeight: 1.1 }}>
@@ -372,6 +569,14 @@ export default function Metodologia({ cobertura }) {
           En los programas electorales sí aparecen las dos direcciones. Que un partido prometa
           recortar y luego no vote ningún recorte es, en sí mismo, algo que este mapa permite ver.
         </p>
+      </Seccion>
+
+      <Seccion titulo="En el mapa de programas, el cero no es el centro">
+        <CeroProgramas programas={programas} />
+      </Seccion>
+
+      <Seccion titulo="No todos los partidos entran con la misma base">
+        <BaseProgramas programas={programas} />
       </Seccion>
 
       <Seccion titulo="El eje territorial es el más débil de los tres">

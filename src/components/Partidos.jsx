@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { traerProgramas, traerPromesas, traerResumenPromesas } from '../lib/cliente.js';
+import { traerTransparencia } from '../lib/transparencia.js';
 import { Cifra, Rotulo } from './Movimiento.jsx';
+import Transparencia from './Transparencia.jsx';
 import { siglasPartido } from '../lib/etiquetas.js';
 
 const ESTADO = {
@@ -35,15 +37,6 @@ function desdeResumen(f) {
 }
 
 const C = { superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1' };
-
-const OFICIALES = {
-  psoe: 'https://www.psoe.es', pp: 'https://www.pp.es', vox: 'https://www.voxespana.es',
-  sumar: 'https://movimientosumar.es', podemos: 'https://podemos.info',
-  erc: 'https://www.esquerra.cat', junts: 'https://www.junts.cat',
-  bildu: 'https://ehbildu.eus', pnv: 'https://www.eaj-pnv.eus',
-  bng: 'https://www.bng.gal', cc: 'https://coalicioncanaria.org',
-  upn: 'https://upn.es', compromis: 'https://compromis.net'
-};
 
 function Estado({ pr }) {
   const e = ESTADO[pr.estado] ?? ESTADO.pendiente;
@@ -135,9 +128,11 @@ export default function Partidos({ onDiputados }) {
   const [fMateria, setFMateria] = useState(null);
 
   const [resumen, setResumen] = useState(null);
+  const [transparencia, setTransparencia] = useState(null);
 
   useEffect(() => { traerProgramas().then(setProgramas).catch(() => setProgramas([])); }, []);
   useEffect(() => { traerResumenPromesas().then(setResumen).catch(() => setResumen(null)); }, []);
+  useEffect(() => { traerTransparencia().then(setTransparencia).catch(() => setTransparencia(null)); }, []);
 
   useEffect(() => {
     if (!programas?.length) return;
@@ -343,16 +338,7 @@ export default function Partidos({ onDiputados }) {
                   </div>
                 )}
 
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.linea}` }}>
-                  <a href={OFICIALES[p.partido] ?? '#'} target="_blank" rel="noreferrer" className="em"
-                    style={{ fontSize: 11, color: C.media, display: 'block' }}>
-                    Web oficial de {siglasPartido(p.siglas)} · descarga allí el programa completo →
-                  </a>
-                  <div style={{ fontSize: 10, color: C.tenue, marginTop: 7, lineHeight: 1.5 }}>
-                    No alojamos los programas: son obra de cada partido. Aquí solo se publican
-                    compromisos extraídos y reformulados, con enlace a la fuente original.
-                  </div>
-                </div>
+                <Transparencia partido={p.partido} siglas={p.siglas} datos={transparencia} />
               </div>
             )}
           </motion.div>

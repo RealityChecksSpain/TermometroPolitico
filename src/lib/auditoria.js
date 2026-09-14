@@ -119,3 +119,24 @@ export function indiceKappa(fiabilidad) {
   for (const f of fiabilidad ?? []) indice[f.dimension] = f.kappa;
   return indice;
 }
+
+export async function traerBaseProgramas() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('mv_eje_programa').select('*');
+  if (error || !data || data.length === 0) return null;
+  const num = v => (v === null || v === undefined || v === '' ? null : Number(v));
+  const filas = data
+    .map(f => ({
+      partido: f.partido ?? null,
+      siglas: String(f.siglas ?? f.partido ?? '').trim(),
+      promesas: num(f.promesas),
+      economico: num(f.eje_economico),
+      social: num(f.eje_social),
+      baseEconomico: num(f.base_economico),
+      baseSocial: num(f.base_social),
+      dimsEconomico: num(f.dimensiones_economicas),
+      dimsSocial: num(f.dimensiones_sociales)
+    }))
+    .filter(f => f.siglas);
+  return filas.length ? filas : null;
+}

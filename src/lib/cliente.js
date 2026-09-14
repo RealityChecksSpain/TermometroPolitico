@@ -321,7 +321,27 @@ export async function traerLideres(metrica) {
 
 export async function traerMapaPartidos() {
   const { data, error } = await supabase.from('v_mapa_partidos').select('*');
-  if (!error && data?.length) return data.map(normalizarFilaMapa);
+  if (!error && data?.length) {
+    const traeBase = data.some(f => f.base_economico !== undefined || f.prog_base_economico !== undefined);
+    if (traeBase) return data.map(normalizarFilaMapa);
+    const { data: bases } = await supabase.from('mv_eje_programa').select('*');
+    const porClave = new Map();
+    for (const b of bases ?? []) {
+      if (b.partido) porClave.set(String(b.partido), b);
+      if (b.siglas) porClave.set(String(b.siglas), b);
+    }
+    return data.map(f => {
+      const b = porClave.get(String(f.partido)) ?? porClave.get(String(f.siglas)) ?? null;
+      if (!b) return normalizarFilaMapa(f);
+      return normalizarFilaMapa({
+        ...f,
+        base_economico: b.base_economico,
+        base_social: b.base_social,
+        dimensiones_economicas: b.dimensiones_economicas,
+        dimensiones_sociales: b.dimensiones_sociales
+      });
+    });
+  }
 
   const [{ data: prog }, { data: votos }, { data: dips }] = await Promise.all([
     supabase.from('mv_eje_programa').select('*'),
@@ -346,6 +366,10 @@ export async function traerMapaPartidos() {
       prog_economico: p.eje_economico,
       prog_social: p.eje_social,
       prog_bruto_economico: p.bruto_economico,
+      prog_base_economico: p.base_economico ?? null,
+      prog_base_social: p.base_social ?? null,
+      prog_dims_economico: p.dimensiones_economicas ?? null,
+      prog_dims_social: p.dimensiones_sociales ?? null,
       promesas_codificadas: p.promesas,
       voto_economico: null,
       voto_social: null,
@@ -390,6 +414,10 @@ function normalizarFilaMapa(d) {
     voto_eco_nulo: d.voto_eco_nulo ?? d.economico_indistinguible_de_cero ?? null,
     voto_soc_nulo: d.voto_soc_nulo ?? d.social_indistinguible_de_cero ?? null,
     promesas_codificadas: d.promesas_codificadas ?? d.promesas ?? null,
+    prog_base_economico: d.prog_base_economico ?? d.base_economico ?? null,
+    prog_base_social: d.prog_base_social ?? d.base_social ?? null,
+    prog_dims_economico: d.prog_dims_economico ?? d.dimensiones_economicas ?? null,
+    prog_dims_social: d.prog_dims_social ?? d.dimensiones_sociales ?? null,
     leyes_valoradas: d.leyes_valoradas ?? d.leyes_apoyadas ?? null,
     escanos: d.escanos ?? d.diputados ?? 1,
     color: d.color || d.color_hex || '#8E9299'
