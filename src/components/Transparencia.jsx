@@ -1,28 +1,73 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ESTADOS } from '../lib/transparencia.js';
 import { siglasPartido } from '../lib/etiquetas.js';
 
-const C = { tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1' };
+const C = { tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#E3DFD1', fondo: '#F5F4EE' };
 
-function Chip({ estado }) {
-  const e = ESTADOS[estado] ?? ESTADOS.sin_comprobar;
+const ORDEN = ['publicado', 'parcial', 'ausente', 'no_verificable', 'sin_comprobar'];
+
+function color(estado) {
+  return (ESTADOS[estado] ?? ESTADOS.sin_comprobar).color;
+}
+
+function texto(estado) {
+  return (ESTADOS[estado] ?? ESTADOS.sin_comprobar).texto;
+}
+
+function Barra({ estados }) {
   return (
-    <span className="em" style={{
-      flexShrink: 0, fontSize: 10, padding: '2px 6px', borderRadius: 2,
-      background: e.fondo, color: e.color, fontWeight: 600
-    }}>
-      {e.texto}
-    </span>
+    <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
+      {estados.map((e, i) => (
+        <div key={i} title={texto(e)} style={{
+          flex: 1, height: 6, borderRadius: 1, background: color(e),
+          opacity: e === 'sin_comprobar' ? 0.35 : 1
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function Fila({ obligacion, dato }) {
+  const estado = dato?.estado ?? 'sin_comprobar';
+  return (
+    <div style={{ padding: '7px 0', borderTop: `1px solid ${C.linea}` }}>
+      <div style={{ display: 'flex', gap: 7, alignItems: 'baseline' }}>
+        <span style={{
+          flexShrink: 0, width: 6, height: 6, borderRadius: 3, marginTop: 1,
+          background: color(estado), opacity: estado === 'sin_comprobar' ? 0.35 : 1
+        }} />
+        <span style={{ fontSize: 11.5, color: C.tinta, lineHeight: 1.4 }}>
+          {obligacion.descripcion}
+        </span>
+      </div>
+      <div className="em" style={{ fontSize: 10, color: color(estado), marginLeft: 13, marginTop: 2, fontWeight: 600 }}>
+        {texto(estado)}
+        <span style={{ color: C.tenue, fontWeight: 400 }}> · art. {obligacion.articulo}</span>
+      </div>
+      {dato?.nota && (
+        <div style={{ fontSize: 10.5, color: C.media, marginLeft: 13, marginTop: 3, lineHeight: 1.45 }}>
+          {dato.nota}
+        </div>
+      )}
+      {dato?.url && (
+        <a href={dato.url} target="_blank" rel="noreferrer" className="em"
+          style={{ fontSize: 10, color: C.media, marginLeft: 13, display: 'inline-block', marginTop: 3 }}>
+          página consultada →
+        </a>
+      )}
+    </div>
   );
 }
 
 export default function Transparencia({ partido, siglas, datos }) {
+  const [todas, setTodas] = useState(false);
+  const nombre = siglasPartido(siglas);
+
   if (datos === null) {
     return (
-      <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.linea}` }}>
-        <div style={{ fontSize: 11.5, color: C.tenue, lineHeight: 1.5 }}>
-          Las comprobaciones de publicidad activa no se pueden leer ahora mismo, así que esta
-          ficha no dice qué publica este partido ni qué deja de publicar.
+      <div style={{ border: `1px solid ${C.linea}`, borderRadius: 3, padding: 12, background: C.fondo }}>
+        <div style={{ fontSize: 11, color: C.tenue, lineHeight: 1.5 }}>
+          Las comprobaciones de publicidad activa no se pueden leer ahora mismo.
         </div>
       </div>
     );
@@ -32,104 +77,83 @@ export default function Transparencia({ partido, siglas, datos }) {
   const r = resumen[partido] ?? null;
   const filas = detalle[partido] ?? {};
   const web = webs[partido] ?? null;
-  const nombre = siglasPartido(siglas);
 
-  const sinComprobar = catalogo.filter(o => !filas[o.codigo]).length;
+  const estados = catalogo.map(o => filas[o.codigo]?.estado ?? 'sin_comprobar');
+  const cuenta = {};
+  for (const e of estados) cuenta[e] = (cuenta[e] ?? 0) + 1;
+
+  const excepciones = catalogo.filter(o => (filas[o.codigo]?.estado ?? 'sin_comprobar') !== 'publicado');
+  const visibles = todas ? catalogo : excepciones;
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.linea}` }}>
-      <div style={{
-        fontSize: 10, color: C.tenue, textTransform: 'uppercase',
-        letterSpacing: '.05em', fontWeight: 600, marginBottom: 7
+    <div style={{ border: `1px solid ${C.linea}`, borderRadius: 3, background: C.fondo, padding: 12 }}>
+      <div className="em" style={{
+        fontSize: 9.5, color: C.tenue, textTransform: 'uppercase',
+        letterSpacing: '.06em', fontWeight: 600, marginBottom: 8
       }}>
-        Lo que la ley le obliga a publicar
-      </div>
-
-      <div style={{ fontSize: 12, color: C.media, lineHeight: 1.55, marginBottom: 10 }}>
-        El artículo 14.Ocho de la ley de financiación obliga a cada partido a publicar{' '}
-        <strong>en su propia web</strong> el balance, la cuenta de resultados, sus créditos
-        pendientes con entidad, importe, tipo de interés y plazo, las subvenciones recibidas y
-        las donaciones de más de 25.000 € con la identidad del donante. Esto es lo que había
-        cuando se miró.
+        Publicidad activa
       </div>
 
       {r === null ? (
-        <div style={{ fontSize: 12, color: C.tenue, lineHeight: 1.55, padding: '4px 0 2px' }}>
-          Todavía no se ha comprobado la web de {nombre}. Son {catalogo.length} comprobaciones y
-          ninguna está hecha, así que esta ficha no afirma nada sobre este partido.
-        </div>
+        <>
+          <Barra estados={estados} />
+          <div style={{ fontSize: 11.5, color: C.media, lineHeight: 1.5 }}>
+            Las {catalogo.length} comprobaciones de {nombre} están sin hacer. Esta ficha no afirma
+            nada sobre este partido.
+          </div>
+        </>
       ) : (
         <>
-          <div className="em" style={{ fontSize: 11.5, color: C.tinta, marginBottom: 2 }}>
-            {r.publicadas} de {r.enLaLey} publicadas
-            {sinComprobar > 0 && (
-              <span style={{ color: '#8A6D1F' }}> · {sinComprobar} sin comprobar</span>
-            )}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
+            <span className="ed" style={{ fontSize: 30, fontWeight: 600, color: C.tinta, lineHeight: 1 }}>
+              {cuenta.publicado ?? 0}
+            </span>
+            <span style={{ fontSize: 12.5, color: C.media }}>de {catalogo.length} publicadas</span>
           </div>
-          <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 10 }}>
+
+          <Barra estados={estados} />
+
+          <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 10, lineHeight: 1.5 }}>
             ejercicio {r.ejercicio}
-            {r.ultimaConsulta && <> · última consulta {r.ultimaConsulta}</>}
+            {r.ultimaConsulta && <> · consultado {r.ultimaConsulta}</>}
+            <br />
+            {ORDEN.filter(e => e !== 'publicado' && cuenta[e])
+              .map(e => `${cuenta[e]} ${texto(e)}`)
+              .join(' · ')}
           </div>
 
-          <div style={{ borderTop: `1px solid ${C.linea}` }}>
-            {catalogo.map(o => {
-              const f = filas[o.codigo] ?? null;
-              const estado = f?.estado ?? 'sin_comprobar';
-              return (
-                <div key={o.codigo} style={{
-                  padding: '7px 0', borderBottom: `1px solid ${C.linea}`,
-                  display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap'
-                }}>
-                  <div style={{ flex: '1 1 190px', minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: C.tinta, lineHeight: 1.45 }}>
-                      {o.descripcion}
-                    </div>
-                    <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 3 }}>
-                      art. {o.articulo}
-                      {f?.url && (
-                        <>
-                          {' · '}
-                          <a href={f.url} target="_blank" rel="noreferrer" style={{ color: C.media }}>
-                            página consultada →
-                          </a>
-                        </>
-                      )}
-                    </div>
-                    {f?.nota && (
-                      <div style={{ fontSize: 11, color: C.media, marginTop: 4, lineHeight: 1.45 }}>
-                        {f.nota}
-                      </div>
-                    )}
-                  </div>
-                  <Chip estado={estado} />
-                </div>
-              );
-            })}
-          </div>
+          {visibles.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: C.media, lineHeight: 1.5, paddingTop: 8, borderTop: `1px solid ${C.linea}` }}>
+              Las {catalogo.length} estaban publicadas el día que se miró.
+            </div>
+          ) : (
+            visibles.map(o => (
+              <Fila key={o.codigo} obligacion={o} dato={filas[o.codigo] ?? null} />
+            ))
+          )}
 
-          <div style={{ fontSize: 10.5, color: C.tenue, marginTop: 9, lineHeight: 1.5 }}>
-            «No publicado» significa que no aparecía en la página enlazada el día que se miró, no
-            que el partido no lo haya enviado al Tribunal de Cuentas. Son dos obligaciones
-            distintas y aquí solo se comprueba la de publicar en la web.
+          <button onClick={() => setTodas(!todas)} className="em" style={{
+            marginTop: 9, padding: '4px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 2,
+            background: 'transparent', color: C.media, border: `1px solid ${C.linea}`
+          }}>
+            {todas ? 'solo lo que falla' : `ver las ${catalogo.length}`}
+          </button>
+
+          <div style={{ fontSize: 9.5, color: C.tenue, marginTop: 10, lineHeight: 1.5 }}>
+            El art. 14.Ocho obliga a publicar en la web del partido balance, cuenta de resultados,
+            créditos con entidad, importe, tipo de interés y plazo, subvenciones y donaciones de
+            más de 25.000 € con el donante. «No publicado» significa que no estaba en la página
+            enlazada ese día, no que no se rindieran cuentas al Tribunal.
           </div>
         </>
       )}
 
-      {web ? (
+      {web && (
         <a href={web} target="_blank" rel="noreferrer" className="em"
-          style={{ fontSize: 11, color: C.media, display: 'block', marginTop: 10 }}>
-          Web oficial de {nombre} · descarga allí el programa completo →
+          style={{ fontSize: 10.5, color: C.media, display: 'block', marginTop: 9 }}>
+          Web oficial de {nombre} →
         </a>
-      ) : (
-        <div className="em" style={{ fontSize: 11, color: C.tenue, marginTop: 10 }}>
-          No hay web oficial registrada para {nombre}.
-        </div>
       )}
-
-      <div style={{ fontSize: 10, color: C.tenue, marginTop: 7, lineHeight: 1.5 }}>
-        No alojamos los programas: son obra de cada partido. Aquí solo se publican compromisos
-        extraídos y reformulados, con enlace a la fuente original.
-      </div>
     </div>
   );
 }

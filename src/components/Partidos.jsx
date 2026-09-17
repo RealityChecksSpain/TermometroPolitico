@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { traerProgramas, traerPromesas, traerResumenPromesas } from '../lib/cliente.js';
 import { traerTransparencia } from '../lib/transparencia.js';
+import { traerCuentas } from '../lib/cuentas.js';
 import { Cifra, Rotulo } from './Movimiento.jsx';
 import Transparencia from './Transparencia.jsx';
+import Cuentas from './Cuentas.jsx';
 import { siglasPartido } from '../lib/etiquetas.js';
 
 const ESTADO = {
@@ -129,10 +131,12 @@ export default function Partidos({ onDiputados }) {
 
   const [resumen, setResumen] = useState(null);
   const [transparencia, setTransparencia] = useState(null);
+  const [finanzas, setFinanzas] = useState(null);
 
   useEffect(() => { traerProgramas().then(setProgramas).catch(() => setProgramas([])); }, []);
   useEffect(() => { traerResumenPromesas().then(setResumen).catch(() => setResumen(null)); }, []);
   useEffect(() => { traerTransparencia().then(setTransparencia).catch(() => setTransparencia(null)); }, []);
+  useEffect(() => { traerCuentas().then(setFinanzas).catch(() => setFinanzas(null)); }, []);
 
   useEffect(() => {
     if (!programas?.length) return;
@@ -270,6 +274,8 @@ export default function Partidos({ onDiputados }) {
 
             {activo && (
               <div style={{ padding: '0 15px 15px' }}>
+              <div className="ficha">
+              <div style={{ minWidth: 0 }}>
                 <button onClick={() => setSoloVerificables(!soloVerificables)} className="em" style={{
                   padding: '4px 9px', fontSize: 10.5, cursor: 'pointer', borderRadius: 2, marginBottom: 10,
                   background: soloVerificables ? C.tinta : 'transparent',
@@ -338,7 +344,12 @@ export default function Partidos({ onDiputados }) {
                   </div>
                 )}
 
+              </div>
+              <aside>
+                <Cuentas partido={p.partido} datos={finanzas} />
                 <Transparencia partido={p.partido} siglas={p.siglas} datos={transparencia} />
+              </aside>
+              </div>
               </div>
             )}
           </motion.div>

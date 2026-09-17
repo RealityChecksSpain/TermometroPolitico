@@ -1,6 +1,6 @@
-import { db, exigirEnv } from './supabase';
-import { modeloActivo } from './gemini';
-import { normalizarNombre } from './texto';
+import { db, exigirEnv } from './supabase.js';
+import { modeloActivo } from './gemini.js';
+import { normalizarNombre } from './texto.js';
 
 export type OrigenResolucion = 'alias' | 'trigrama' | 'llm' | 'sin_resolver';
 
@@ -13,12 +13,29 @@ export interface Resolucion {
   candidatos: { mandatoId: string; nombre: string; similitud: number }[];
 }
 
+export interface ResumenCola {
+  procesados: number;
+  nombresIntentados: number;
+  resueltos: number;
+  porOrigen: Record<string, number>;
+  sinResolver: string[];
+  quedanPendientes: number;
+  agotadoElTiempo: boolean;
+}
+
 interface Candidato {
   mandato_id: string;
   politico_id: string;
   nombre_completo: string;
   similitud: number;
   decision: 'auto' | 'ambiguo' | 'sin_candidato';
+}
+
+const MODELO_ANTHROPIC_DEFECTO = 'claude-haiku-4-5-20251001';
+
+export function modeloAnthropic(): string {
+  const elegido = process.env.MODELO_ANTHROPIC?.trim();
+  return elegido && elegido.length > 0 ? elegido : MODELO_ANTHROPIC_DEFECTO;
 }
 
 async function porAlias(nombre: string, legislaturaId: string): Promise<string | null> {
@@ -84,6 +101,7 @@ function extraerVeredicto(texto: string, total: number): { indice: number; confi
 }
 
 async function porAnthropic(nombre: string, candidatos: Candidato[]) {
+  const modelo = modeloAnthropic();
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -92,17 +110,18 @@ async function porAnthropic(nombre: string, candidatos: Candidato[]) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: modeloActivo(),
+      model: modelo,
       max_tokens: 200,
       messages: [{ role: 'user', content: construirPrompt(nombre, candidatos) }]
     })
   });
   if (!res.ok) {
-    console.error(`resolver/anthropic ${res.status}`);
+    const cuerpo = (await res.text()).slice(0, 200).replace(/\s+/g, ' ');
+    console.error(`resolver/anthropic ${res.status} modelo=${modelo} ${cuerpo}`);
     return null;
   }
   const data = await res.json();
-  const texto = data.content
+  const texto = (data.content ?? [])
     .filter((b: any) => b.type === 'text')
     .map((b: any) => b.text)
     .join('');
@@ -110,9 +129,9 @@ async function porAnthropic(nombre: string, candidatos: Candidato[]) {
 }
 
 async function porGemini(nombre: string, candidatos: Candidato[]) {
-  const modelo = encodeURIComponent(modeloActivo());
+  const modelo = modeloActivo();
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`,
     {
       method: 'POST',
       headers: {
@@ -126,7 +145,8 @@ async function porGemini(nombre: string, candidatos: Candidato[]) {
     }
   );
   if (!res.ok) {
-    console.error(`resolver/gemini ${res.status} con modelo ${modelo}`);
+    const cuerpo = (await res.text()).slice(0, 200).replace(/\s+/g, ' ');
+    console.error(`resolver/gemini ${res.status} modelo=${modelo} ${cuerpo}`);
     return null;
   }
   const data = await res.json();
@@ -215,58 +235,151 @@ export async function guardarAlias(nombre: string, politicoId: string, origen: s
     );
 }
 
-export async function vaciarCola(legislaturaId: string, limite = 200) {
-  const { data: pendientes } = await db()
+interface FilaCola {
+  id: string;
+  nombre_origen: string;
+  votacion_id: string | null;
+  voto_origen: string | null;
+  asiento_origen: string | null;
+}
+
+interface OpcionesCola {
+  maxNombres?: number;
+  tamPagina?: number;
+  msMaximo?: number;
+}
+
+async function paginaPendiente(desdeId: string | null, tam: number): Promise<FilaCola[]> {
+  let consulta = db()
     .from('cola_revision')
     .select('id, nombre_origen, votacion_id, voto_origen, asiento_origen')
     .eq('resuelto', false)
     .eq('motivo', 'nombre_no_encontrado')
-    .limit(limite);
+    .order('id', { ascending: true })
+    .limit(tam);
 
-  if (!pendientes?.length) {
-    return { procesados: 0, resueltos: 0, porOrigen: {}, quedanPendientes: 0 };
-  }
+  if (desdeId !== null) consulta = consulta.gt('id', desdeId);
 
-  const unicos = new Map<string, typeof pendientes>();
-  pendientes.forEach(p => {
-    const clave = normalizarNombre(p.nombre_origen);
-    if (!unicos.has(clave)) unicos.set(clave, []);
-    unicos.get(clave)!.push(p);
-  });
+  const { data, error } = await consulta;
+  if (error) throw error;
+  return (data ?? []) as FilaCola[];
+}
 
-  const porOrigen: Record<string, number> = { alias: 0, trigrama: 0, llm: 0, sin_resolver: 0 };
-  let resueltos = 0;
+async function asentarNombre(
+  nombre: string,
+  mandatoId: string,
+  origen: string,
+  confianza: number
+): Promise<number> {
+  const marca = new Date().toISOString();
+  const nota = `automatico via ${origen} (confianza ${confianza.toFixed(2)})`;
+  let cerradas = 0;
+  let cursor: string | null = null;
 
-  for (const [, filas] of unicos) {
-    const r = await resolver(filas[0].nombre_origen, legislaturaId);
-    porOrigen[r.origen] = (porOrigen[r.origen] ?? 0) + 1;
-    if (!r.mandatoId) continue;
+  for (;;) {
+    let consulta = db()
+      .from('cola_revision')
+      .select('id, votacion_id, voto_origen, asiento_origen')
+      .eq('resuelto', false)
+      .eq('nombre_origen', nombre)
+      .order('id', { ascending: true })
+      .limit(1000);
 
-    const votos = filas
+    if (cursor !== null) consulta = consulta.gt('id', cursor);
+
+    const { data, error } = await consulta;
+    if (error) throw error;
+    const lote = (data ?? []) as Omit<FilaCola, 'nombre_origen'>[];
+    if (lote.length === 0) break;
+
+    const votos = lote
       .filter(f => f.votacion_id)
       .map(f => ({
         votacion_id: f.votacion_id,
-        mandato_id: r.mandatoId,
+        mandato_id: mandatoId,
         voto: mapearVoto(f.voto_origen),
         telematico: f.asiento_origen === '-1'
       }))
       .filter(v => v.voto !== null);
 
     if (votos.length > 0) {
-      await db().from('votos').upsert(votos, { onConflict: 'votacion_id,mandato_id' });
+      const { error: eVotos } = await db()
+        .from('votos')
+        .upsert(votos, { onConflict: 'votacion_id,mandato_id' });
+      if (eVotos) throw eVotos;
     }
 
-    await db()
+    const { error: eCola } = await db()
       .from('cola_revision')
-      .update({
-        resuelto: true,
-        mandato_asignado: r.mandatoId,
-        resuelto_at: new Date().toISOString(),
-        nota: `automatico via ${r.origen} (confianza ${r.confianza.toFixed(2)})`
-      })
-      .in('id', filas.map(f => f.id));
+      .update({ resuelto: true, mandato_asignado: mandatoId, resuelto_at: marca, nota })
+      .in('id', lote.map(f => f.id));
+    if (eCola) throw eCola;
 
-    resueltos += filas.length;
+    cerradas += lote.length;
+    cursor = lote[lote.length - 1].id;
+    if (lote.length < 1000) break;
+  }
+
+  return cerradas;
+}
+
+export async function vaciarCola(
+  legislaturaId: string,
+  limite: number | OpcionesCola = {}
+): Promise<ResumenCola> {
+  const opciones: OpcionesCola = typeof limite === 'number' ? { tamPagina: limite } : limite;
+  const { maxNombres = 40, tamPagina = 200, msMaximo = 25_000 } = opciones;
+  const arranque = Date.now();
+
+  const porOrigen: Record<string, number> = { alias: 0, trigrama: 0, llm: 0, sin_resolver: 0 };
+  const fallidos = new Set<string>();
+  const sinResolver: string[] = [];
+
+  let procesados = 0;
+  let nombresIntentados = 0;
+  let resueltos = 0;
+  let cursor: string | null = null;
+  let agotadoElTiempo = false;
+
+  while (nombresIntentados < maxNombres && !agotadoElTiempo) {
+    const pagina = await paginaPendiente(cursor, tamPagina);
+    if (pagina.length === 0) break;
+
+    procesados += pagina.length;
+    cursor = pagina[pagina.length - 1].id;
+
+    const orden: string[] = [];
+    const porClave = new Map<string, string>();
+    for (const fila of pagina) {
+      const clave = normalizarNombre(fila.nombre_origen);
+      if (fallidos.has(clave) || porClave.has(clave)) continue;
+      porClave.set(clave, fila.nombre_origen);
+      orden.push(clave);
+    }
+
+    for (const clave of orden) {
+      if (nombresIntentados >= maxNombres) break;
+      if (Date.now() - arranque > msMaximo) {
+        agotadoElTiempo = true;
+        break;
+      }
+
+      const nombre = porClave.get(clave)!;
+      nombresIntentados++;
+
+      const r = await resolver(nombre, legislaturaId);
+      porOrigen[r.origen] = (porOrigen[r.origen] ?? 0) + 1;
+
+      if (!r.mandatoId) {
+        fallidos.add(clave);
+        sinResolver.push(nombre);
+        continue;
+      }
+
+      resueltos += await asentarNombre(nombre, r.mandatoId, r.origen, r.confianza);
+    }
+
+    if (pagina.length < tamPagina) break;
   }
 
   const { count } = await db()
@@ -274,7 +387,15 @@ export async function vaciarCola(legislaturaId: string, limite = 200) {
     .select('id', { count: 'exact', head: true })
     .eq('resuelto', false);
 
-  return { procesados: pendientes.length, resueltos, porOrigen, quedanPendientes: count ?? 0 };
+  return {
+    procesados,
+    nombresIntentados,
+    resueltos,
+    porOrigen,
+    sinResolver,
+    quedanPendientes: count ?? 0,
+    agotadoElTiempo
+  };
 }
 
 function mapearVoto(origen: string | null): string | null {

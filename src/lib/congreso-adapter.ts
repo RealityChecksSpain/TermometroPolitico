@@ -1,10 +1,10 @@
-import { db } from './supabase';
-import { descargarHtml, extraerUrls, BASE_CONGRESO } from './descubrir';
-import { normalizarNombre, clavesBusqueda, parsearFechaCongreso } from './texto';
+import { db } from './supabase.js';
+import { descargarHtml, extraerUrls, BASE_CONGRESO } from './descubrir.js';
+import { normalizarNombre, clavesBusqueda, parsearFechaCongreso } from './texto.js';
 
 export { normalizarNombre, clavesBusqueda, parsearFechaCongreso };
 
-import { UA as USER_AGENT } from './descubrir';
+import { UA as USER_AGENT } from './descubrir.js';
 
 export interface VotacionJson {
   informacion: {

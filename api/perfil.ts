@@ -1,6 +1,6 @@
-import { db } from '../src/lib/supabase';
-import { preguntar, Cadencia, modeloActivo } from '../src/lib/gemini';
-import { sinCache } from '../src/lib/autorizar';
+import { db } from '../src/lib/supabase.js';
+import { preguntar, Cadencia, modeloActivo } from '../src/lib/gemini.js';
+import { sinCache } from '../src/lib/autorizar.js';
 
 const ESQUEMA = {
   type: 'object',

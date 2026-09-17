@@ -15,12 +15,12 @@ const CONJUNTOS = [
   },
   {
     id: 'votaciones', nombre: 'Votaciones',
-    que: 'Cada votación de la legislatura con recuentos, resultado, expediente y enlace al acta oficial.',
+    que: 'Cada votación de la legislatura con recuentos, resultado, expediente y enlace al acta oficial. Las columnas resumen, puntos_clave y a_quien_afecta las escribe un modelo de lenguaje sin revisión humana; resumen_modelo y resumen_basado_en dicen cuál y a partir de qué.',
     vista: 'mv_votaciones', orden: 'fecha'
   },
   {
     id: 'normas', nombre: 'Normas agrupadas',
-    que: 'Una fila por norma, con sus enmiendas contadas, materia, colectivos afectados y resumen.',
+    que: 'Una fila por norma, con sus enmiendas contadas, materia y colectivos afectados. La columna resumen la escribe un modelo de lenguaje sin revisión humana y aquí va sin su procedencia: esa viene en el conjunto de Votaciones.',
     vista: 'mv_normas', orden: 'fecha'
   },
   {

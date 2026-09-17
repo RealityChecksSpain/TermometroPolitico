@@ -40,7 +40,14 @@ button,input{font-family:inherit}
 @media(min-width:900px){.cols{grid-template-columns:1fr 1fr;gap:28px;align-items:start}}
 .solo1{grid-column:1/-1}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(239,239,233,.94);
-backdrop-filter:blur(10px);border-top:1px solid ${C.linea};display:flex}
+backdrop-filter:blur(10px);border-top:1px solid ${C.linea};display:flex;
+padding-bottom:env(safe-area-inset-bottom)}
+body{padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+@media(min-width:900px){body{padding-bottom:0}}
+.ficha{display:grid;grid-template-columns:1fr;gap:16px}
+.ficha>aside{order:-1}
+@media(min-width:900px){.ficha{grid-template-columns:minmax(0,1fr) 262px;gap:24px;align-items:start}
+.ficha>aside{order:0;position:sticky;top:14px}}
 @media(min-width:900px){.nav{position:static;background:none;backdrop-filter:none;border-top:none;
 border-bottom:none;margin-bottom:0;gap:2px}}
 .navb{flex:1;padding:9px 4px 8px;background:none;border:none;cursor:pointer;

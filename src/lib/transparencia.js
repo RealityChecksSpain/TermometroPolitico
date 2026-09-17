@@ -18,7 +18,19 @@ export async function traerTransparencia() {
     supabase.from('partidos').select('*')
   ]);
 
-  if (obl.error || !obl.data?.length) return null;
+  const fallos = [
+    obl.error && `transparencia_obligacion: ${obl.error.message}`,
+    res.error && `v_transparencia_resumen: ${res.error.message}`,
+    det.error && `v_transparencia: ${det.error.message}`,
+    par.error && `partidos: ${par.error.message}`
+  ].filter(Boolean);
+
+  if (fallos.length) {
+    console.error('transparencia', fallos.join(' | '));
+    return null;
+  }
+
+  if (!obl.data?.length) return null;
 
   const catalogo = obl.data
     .filter(o => o.sujeto === 'partido')

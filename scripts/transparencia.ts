@@ -66,7 +66,7 @@ async function traerCatalogos() {
   const [obl, par, fun] = await Promise.all([
     db().from('transparencia_obligacion').select('*').order('sujeto').order('orden'),
     db().from('partidos').select('*'),
-    db().from('fundaciones').select('id, nombre, activa')
+    db().from('fundaciones').select('id, nombre, web, activa')
   ]);
   if (obl.error) throw new Error(`transparencia_obligacion: ${obl.error.message}`);
   if (par.error) throw new Error(`partidos: ${par.error.message}`);
@@ -190,7 +190,7 @@ for (const p of partidos as any[]) {
 const porNombre = new Map<string, any>();
 for (const f of fundaciones as any[]) porNombre.set(String(f.nombre).toLowerCase(), f);
 
-const crudo = partirCSV(readFileSync(ruta, 'utf8'));
+const crudo = partirCSV(readFileSync(ruta, 'utf8').replace(/^\uFEFF/, ''));
 const cabeceras = (crudo[0] ?? []).map(c => c.trim());
 const col = (n: string) => cabeceras.findIndex(c => c.toLowerCase() === n);
 
@@ -279,7 +279,7 @@ for (let n = 1; n < crudo.length; n++) {
     continue;
   }
 
-  const llave = `${tipo}:${clave.toLowerCase()}:${ej}:${codigo}`;
+  const llave = `${partidoId ?? fundacionId}:${ej}:${codigo}`;
   if (vistas.has(llave)) {
     problemas.push(`linea ${linea}: repetida (${clave}, ${ej}, ${codigo})`);
     continue;

@@ -68,7 +68,9 @@
     "raras": "node --env-file=.env --import tsx scripts/verificar-raras.ts",
     "transparencia": "node --env-file=.env --import tsx scripts/transparencia.ts",
     "transparencia:plantilla": "node --env-file=.env --import tsx scripts/transparencia.ts --plantilla",
-    "transparencia:estado": "node --env-file=.env --import tsx scripts/transparencia.ts --estado"
+    "transparencia:estado": "node --env-file=.env --import tsx scripts/transparencia.ts --estado",
+    "cuentas": "node --env-file=.env --import tsx scripts/cuentas.ts",
+    "cuentas:plantilla": "node --env-file=.env --import tsx scripts/cuentas.ts --plantilla"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",

@@ -1,4 +1,4 @@
-import { exigirEnv } from './supabase';
+import { exigirEnv } from './supabase.js';
 
 export interface LimitesTier {
   rpm: number;

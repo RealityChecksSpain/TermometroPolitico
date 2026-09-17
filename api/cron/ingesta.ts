@@ -1,6 +1,6 @@
-import { ejecutarIngesta } from '../../src/lib/congreso-adapter';
-import { vaciarCola } from '../../src/lib/resolver';
-import { autorizadoPorCron, sinCache } from '../../src/lib/autorizar';
+import { ejecutarIngesta } from '../../src/lib/congreso-adapter.js';
+import { vaciarCola } from '../../src/lib/resolver.js';
+import { autorizadoPorCron, sinCache } from '../../src/lib/autorizar.js';
 
 export const config = { maxDuration: 60 };
 

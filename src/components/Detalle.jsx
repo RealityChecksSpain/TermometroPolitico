@@ -263,9 +263,13 @@ export function DetalleLey({ votacion, onVolver }) {
               </details>
             )}
             <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 12, lineHeight: 1.5 }}>
+              Resumen generado automáticamente
+              {votacion.resumen_modelo ? ` por ${votacion.resumen_modelo}` : ' por un modelo de lenguaje'}
               {votacion.resumen_basado_en === 'texto_bocg'
-                ? 'Resumen del texto oficial del BOCG.'
-                : 'Resumen a partir del título oficial.'}
+                ? ', a partir del texto oficial del BOCG.'
+                : ', a partir del título oficial: el Congreso no publica el texto de esta votación.'}
+              {votacion.resumen_revisado === true && ' Revisado a mano.'}
+              {votacion.resumen_revisado === false && ' Nadie lo ha revisado a mano.'}
               {' '}No sustituye al texto legal.
             </div>
           </Bloque>
