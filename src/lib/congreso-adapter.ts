@@ -1,10 +1,9 @@
 import { db } from './supabase.js';
-import { descargarHtml, extraerUrls, BASE_CONGRESO } from './descubrir.js';
+import { descargarHtml, extraerUrls, descargarJson, BASE_CONGRESO } from './descubrir.js';
 import { normalizarNombre, clavesBusqueda, parsearFechaCongreso } from './texto.js';
+import { mayoriaRequerida, resultadoDe, nombreMayoria, umbralDe } from './mayorias.js';
 
 export { normalizarNombre, clavesBusqueda, parsearFechaCongreso };
-
-import { UA as USER_AGENT } from './descubrir.js';
 
 export interface VotacionJson {
   informacion: {
@@ -54,8 +53,9 @@ const MAPA_VOTOS: Record<string, string> = {
   'No vota': 'no_vota'
 };
 
-
-
+function esAsentimiento(totales: VotacionJson['totales']): boolean {
+  return totales.asentimiento === 'Sí' || totales.asentimiento === 'Si';
+}
 
 export interface ResultadoValidacion {
   valida: boolean;
@@ -73,9 +73,7 @@ export function validarVotacion(json: VotacionJson): ResultadoValidacion {
   if (!t) errores.push('Falta el bloque totales');
   if (errores.length) return { valida: false, errores, avisos };
 
-  const esAsentimiento = t.asentimiento === 'Sí' || t.asentimiento === 'Si';
-
-  if (esAsentimiento) {
+  if (esAsentimiento(t)) {
     if (filas.length > 0) avisos.push('Votación por asentimiento con votos individuales');
     return { valida: true, errores, avisos };
   }
@@ -178,17 +176,30 @@ function parsearEnlaces(html: string, legDir: string, fechaCompacta: string | nu
   return salida;
 }
 
+function comprobarEstructura(html: string, url: string): void {
+  if (!/opendata\/votaciones/i.test(html)) {
+    throw new Error(
+      `${url}: la página no contiene la sección de votaciones (${html.length} caracteres). ` +
+      'El Congreso ha cambiado el listado o ha devuelto un reto de navegador.'
+    );
+  }
+}
+
 export async function descubrirVotacionesDeFecha(
   fechaIso: string,
   legislatura = 'XV'
 ): Promise<EnlaceVotacion[]> {
   const legDir = LEGISLATURAS[legislatura] ?? 'Leg15';
-  const html = await descargarHtml(urlCalendario(fechaIso, legislatura));
+  const url = urlCalendario(fechaIso, legislatura);
+  const html = await descargarHtml(url);
+  comprobarEstructura(html, url);
   return parsearEnlaces(html, legDir, fechaIso.replace(/-/g, ''));
 }
 
 export async function descubrirVotaciones(legislatura = 'Leg15'): Promise<EnlaceVotacion[]> {
-  const html = await descargarHtml(`${BASE_CONGRESO}/es/opendata/votaciones`);
+  const url = `${BASE_CONGRESO}/es/opendata/votaciones`;
+  const html = await descargarHtml(url);
+  comprobarEstructura(html, url);
   const salida = parsearEnlaces(html, legislatura, null);
   if (salida.length === 0) {
     throw new Error(
@@ -213,9 +224,7 @@ export function rangoFechas(desde: string, hasta: string, soloLaborables = true)
 }
 
 export async function descargarVotacion(url: string): Promise<VotacionJson> {
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-  if (!res.ok) throw new Error(`${url} devolvió ${res.status}`);
-  return (await res.json()) as VotacionJson;
+  return descargarJson<VotacionJson>(url);
 }
 
 interface MandatoResuelto {
@@ -223,6 +232,11 @@ interface MandatoResuelto {
   partidoSlug: string | null;
   alta: string;
   baja: string | null;
+}
+
+export interface IndiceMandatos {
+  estricto: Map<string, MandatoResuelto[]>;
+  laxo: Map<string, MandatoResuelto[]>;
 }
 
 export function vigenteEn(m: MandatoResuelto, fechaIso: string): boolean {
@@ -237,13 +251,34 @@ export function elegirMandato(
 ): MandatoResuelto | undefined {
   if (candidatos.length === 0) return undefined;
   if (candidatos.length === 1) return candidatos[0];
-  return candidatos.find(m => vigenteEn(m, fechaIso)) ?? candidatos[0];
+  return candidatos.find(m => vigenteEn(m, fechaIso));
 }
 
-async function cargarIndiceMandatos(
-  legislaturaId: string
-): Promise<Map<string, MandatoResuelto[]>> {
-  const indice = new Map<string, MandatoResuelto[]>();
+export function clavesPorNivel(nombre: string): { estrictas: string[]; laxas: string[] } {
+  const norm = normalizarNombre(nombre);
+  const [apellidos = '', propio = ''] = norm.split(',').map(s => s.trim());
+  const estrictas = [norm];
+  const laxas: string[] = [];
+  if (apellidos && propio) {
+    const completa = `${propio} ${apellidos}`;
+    if (!estrictas.includes(completa)) estrictas.push(completa);
+    const corta = `${propio.split(' ')[0]} ${apellidos.split(' ')[0]}`;
+    if (!estrictas.includes(corta)) laxas.push(corta);
+  }
+  return { estrictas, laxas };
+}
+
+function anadir(mapa: Map<string, MandatoResuelto[]>, clave: string, m: MandatoResuelto) {
+  const lista = mapa.get(clave);
+  if (!lista) {
+    mapa.set(clave, [m]);
+    return;
+  }
+  if (!lista.some(x => x.mandatoId === m.mandatoId)) lista.push(m);
+}
+
+async function cargarIndiceMandatos(legislaturaId: string): Promise<IndiceMandatos> {
+  const indice: IndiceMandatos = { estricto: new Map(), laxo: new Map() };
   const tam = 1000;
   let desde = 0;
 
@@ -252,6 +287,7 @@ async function cargarIndiceMandatos(
       .from('mandatos')
       .select('id, partido_id, partido_efectivo_id, fecha_alta, fecha_baja, politicos!inner(nombre, apellidos)')
       .eq('legislatura_id', legislaturaId)
+      .order('id')
       .range(desde, desde + tam - 1);
 
     if (error) throw error;
@@ -265,14 +301,12 @@ async function cargarIndiceMandatos(
         alta: row.fecha_alta,
         baja: row.fecha_baja
       };
-      clavesBusqueda(completo).forEach(clave => {
-        const lista = indice.get(clave);
-        if (lista) {
-          if (!lista.some(m => m.mandatoId === resuelto.mandatoId)) lista.push(resuelto);
-        } else {
-          indice.set(clave, [resuelto]);
-        }
+      const { estrictas, laxas } = clavesPorNivel(completo);
+      estrictas.forEach(c => {
+        anadir(indice.estricto, c, resuelto);
+        anadir(indice.laxo, c, resuelto);
       });
+      laxas.forEach(c => anadir(indice.laxo, c, resuelto));
     });
 
     if (data.length < tam) break;
@@ -291,10 +325,45 @@ export interface ResultadoProceso {
   avisos: string[];
 }
 
+interface Atribucion {
+  mandato?: MandatoResuelto;
+  nota: string | null;
+}
+
+function atribuir(nombre: string, indice: IndiceMandatos, fecha: string): Atribucion {
+  const { estrictas, laxas } = clavesPorNivel(nombre);
+
+  for (const clave of estrictas) {
+    const candidatos = indice.estricto.get(clave);
+    if (!candidatos || candidatos.length === 0) continue;
+    const elegido = elegirMandato(candidatos, fecha);
+    if (!elegido) return { nota: 'homonimos sin mandato vigente en la fecha' };
+    if (!vigenteEn(elegido, fecha)) {
+      return { mandato: elegido, nota: 'voto fuera de las fechas del mandato' };
+    }
+    return { mandato: elegido, nota: null };
+  }
+
+  for (const clave of [...estrictas, ...laxas]) {
+    const candidatos = indice.laxo.get(clave);
+    if (!candidatos || candidatos.length === 0) continue;
+    if (candidatos.length > 1) return { nota: 'nombre ambiguo por coincidencia parcial' };
+    const elegido = candidatos[0];
+    return {
+      mandato: elegido,
+      nota: vigenteEn(elegido, fecha)
+        ? 'atribuido por coincidencia parcial del nombre'
+        : 'coincidencia parcial y voto fuera de las fechas del mandato'
+    };
+  }
+
+  return { nota: null };
+}
+
 export async function procesarVotacion(
   enlace: EnlaceVotacion,
   legislaturaId: string,
-  indice: Map<string, MandatoResuelto[]>
+  indice: IndiceMandatos
 ): Promise<ResultadoProceso> {
   const base: ResultadoProceso = {
     url: enlace.urlJson,
@@ -319,6 +388,21 @@ export async function procesarVotacion(
   }
 
   const fecha = parsearFechaCongreso(json.informacion.fecha);
+  const asentimiento = esAsentimiento(json.totales);
+  const textos = {
+    titulo: json.informacion.titulo,
+    subtitulo: json.informacion.textoExpediente || null,
+    total_si: json.totales.afavor,
+    total_no: json.totales.enContra
+  };
+  const mayoria = mayoriaRequerida(textos);
+  const resultado = resultadoDe(textos);
+  if (!asentimiento && umbralDe(mayoria) !== null) {
+    base.avisos = [
+      ...base.avisos,
+      `exige ${nombreMayoria(mayoria)} (${umbralDe(mayoria)} síes): ${json.totales.afavor} a favor, ${resultado}`
+    ];
+  }
 
   const { data: sesion, error: errSesion } = await db()
     .from('sesiones')
@@ -351,8 +435,8 @@ export async function procesarVotacion(
         total_abstencion: json.totales.abstenciones,
         total_no_vota: json.totales.noVotan,
         total_presentes: json.totales.presentes,
-        resultado: json.totales.afavor > json.totales.enContra ? 'aprobada' : 'rechazada',
-        es_nominal: json.totales.asentimiento !== 'Sí',
+        resultado: asentimiento ? 'aprobada' : resultado,
+        es_nominal: !asentimiento,
         fuente_url: enlace.urlJson
       },
       { onConflict: 'sesion_id,orden' }
@@ -364,21 +448,16 @@ export async function procesarVotacion(
 
   const filas: any[] = [];
   const pendientes: any[] = [];
+  const notas = new Set<string>();
 
   json.votaciones.forEach(v => {
     const voto = MAPA_VOTOS[v.voto];
     if (!voto) return;
 
-    let resuelto: MandatoResuelto | undefined;
-    for (const clave of clavesBusqueda(v.diputado)) {
-      const candidatos = indice.get(clave);
-      if (candidatos && candidatos.length > 0) {
-        resuelto = elegirMandato(candidatos, fecha);
-        break;
-      }
-    }
+    const { mandato, nota } = atribuir(v.diputado, indice, fecha);
+    if (nota) notas.add(`${v.diputado}: ${nota}`);
 
-    if (!resuelto) {
+    if (!mandato) {
       base.sinResolver.push(v.diputado);
       pendientes.push({
         votacion_id: votacion.id,
@@ -387,13 +466,14 @@ export async function procesarVotacion(
         voto_origen: v.voto,
         asiento_origen: v.asiento,
         motivo: 'nombre_no_encontrado',
+        nota,
         fuente_url: enlace.urlJson
       });
       return;
     }
 
     const grupoSlug = MAPA_GRUPOS[v.grupo];
-    if (grupoSlug === 'MIXTO_REQUIERE_RESOLUCION' && !resuelto.partidoSlug) {
+    if (grupoSlug === 'MIXTO_REQUIERE_RESOLUCION' && !mandato.partidoSlug) {
       pendientes.push({
         votacion_id: votacion.id,
         nombre_origen: v.diputado,
@@ -401,17 +481,20 @@ export async function procesarVotacion(
         voto_origen: v.voto,
         asiento_origen: v.asiento,
         motivo: 'mixto_sin_partido_asignado',
+        nota: null,
         fuente_url: enlace.urlJson
       });
     }
 
     filas.push({
       votacion_id: votacion.id,
-      mandato_id: resuelto.mandatoId,
+      mandato_id: mandato.mandatoId,
       voto,
       telematico: v.asiento === '-1'
     });
   });
+
+  if (notas.size > 0) base.avisos = [...base.avisos, ...Array.from(notas).slice(0, 10)];
 
   if (filas.length > 0) {
     const { error } = await db()
@@ -422,7 +505,10 @@ export async function procesarVotacion(
   }
 
   if (pendientes.length > 0) {
-    await db().from('cola_revision').insert(pendientes);
+    const { error } = await db().from('cola_revision').insert(pendientes);
+    if (error) {
+      return { ...base, estado: 'error', errores: [`cola_revision: ${error.message}`] };
+    }
   }
 
   return base;
@@ -430,70 +516,115 @@ export async function procesarVotacion(
 
 export interface ResumenIngesta {
   fechasConsultadas: number;
+  fechasConError: number;
   descubiertas: number;
   nuevas: number;
   procesadas: number;
   conError: number;
+  estado: 'ok' | 'parcial' | 'error';
+  plazoAgotado: boolean;
   nombresSinResolver: string[];
   errores: string[];
+}
+
+async function urlsConocidas(urls: string[]): Promise<Set<string>> {
+  const conocidas = new Set<string>();
+  for (let i = 0; i < urls.length; i += 40) {
+    const lote = urls.slice(i, i + 40);
+    const { data, error } = await db().from('votaciones').select('fuente_url').in('fuente_url', lote);
+    if (error) throw error;
+    (data ?? []).forEach((r: any) => conocidas.add(r.fuente_url));
+  }
+  return conocidas;
 }
 
 export async function ingestarFechas(
   fechas: string[],
   legislaturaId: string,
   legislatura = 'XV',
-  opciones: { pausaMs?: number; alProgreso?: (i: number, total: number, fecha: string, n: number) => void } = {}
+  opciones: {
+    pausaMs?: number;
+    plazoMs?: number;
+    alProgreso?: (i: number, total: number, fecha: string, n: number) => void;
+  } = {}
 ): Promise<ResumenIngesta> {
-  const { pausaMs = 700, alProgreso } = opciones;
+  const { pausaMs = 700, plazoMs, alProgreso } = opciones;
+  const arranque = Date.now();
   const inicio = new Date().toISOString();
+  const sinPlazo = () => plazoMs === undefined || Date.now() - arranque < plazoMs;
 
-  const { data: camara } = await db()
+  const { data: camara, error: errCamara } = await db()
     .from('camaras')
     .select('id, permite_scraping')
     .eq('slug', 'congreso')
     .single();
 
+  if (errCamara) throw new Error(`No se puede leer la camara congreso: ${errCamara.message}`);
   if (!camara?.permite_scraping) throw new Error('La camara no permite acceso automatizado');
-
-  const { data: existentes } = await db().from('votaciones').select('fuente_url');
-  const yaTenemos = new Set((existentes ?? []).map(r => r.fuente_url));
 
   const indice = await cargarIndiceMandatos(legislaturaId);
 
   let descubiertas = 0;
+  let fechasConsultadas = 0;
+  let fechasConError = 0;
+  let plazoAgotado = false;
   const resultados: ResultadoProceso[] = [];
   const errores: string[] = [];
 
   for (let i = 0; i < fechas.length; i++) {
+    if (!sinPlazo()) {
+      plazoAgotado = true;
+      errores.push(`plazo agotado tras ${fechasConsultadas} de ${fechas.length} fechas`);
+      break;
+    }
+
     const fecha = fechas[i];
     let enlaces: EnlaceVotacion[] = [];
     try {
       enlaces = await descubrirVotacionesDeFecha(fecha, legislatura);
+      fechasConsultadas++;
     } catch (e) {
+      fechasConError++;
       errores.push(`${fecha}: ${e}`);
+      await new Promise(res => setTimeout(res, pausaMs));
+      continue;
     }
 
     descubiertas += enlaces.length;
     alProgreso?.(i + 1, fechas.length, fecha, enlaces.length);
 
+    const yaTenemos = enlaces.length ? await urlsConocidas(enlaces.map(e => e.urlJson)) : new Set<string>();
     const nuevos = enlaces.filter(e => !yaTenemos.has(e.urlJson));
+
     for (const enlace of nuevos) {
+      if (!sinPlazo()) {
+        plazoAgotado = true;
+        errores.push(`plazo agotado dentro de ${fecha}`);
+        break;
+      }
       const r = await procesarVotacion(enlace, legislaturaId, indice);
       resultados.push(r);
-      yaTenemos.add(enlace.urlJson);
       if (r.estado !== 'ok') errores.push(`${enlace.urlJson}: ${r.errores.join('; ')}`);
       await new Promise(res => setTimeout(res, pausaMs));
     }
 
+    if (plazoAgotado) break;
     await new Promise(res => setTimeout(res, pausaMs));
   }
 
   const conError = resultados.filter(r => r.estado !== 'ok').length;
+  const todoFalla = resultados.length > 0 && conError === resultados.length;
+  const ningunaFecha = fechasConsultadas === 0 && fechas.length > 0;
 
-  await db().from('etl_runs').insert({
+  const estado: ResumenIngesta['estado'] =
+    ningunaFecha || todoFalla ? 'error'
+    : fechasConError > 0 || conError > 0 || plazoAgotado ? 'parcial'
+    : 'ok';
+
+  const { error: errRun } = await db().from('etl_runs').insert({
     camara_id: camara.id,
     recurso: 'votaciones',
-    estado: conError === 0 ? 'ok' : conError < resultados.length ? 'parcial' : 'error',
+    estado,
     registros_leidos: descubiertas,
     registros_insertados: resultados.reduce((a, r) => a + r.votosInsertados, 0),
     registros_actualizados: 0,
@@ -501,26 +632,39 @@ export async function ingestarFechas(
     iniciado_at: inicio,
     finalizado_at: new Date().toISOString()
   });
+  if (errRun) throw new Error(`No se ha podido registrar la ejecucion en etl_runs: ${errRun.message}`);
 
-  if (conError === 0) {
-    await db().rpc('registrar_exito_etl', { p_camara_id: camara.id, p_recurso: 'votaciones' });
+  if (estado === 'ok') {
+    const { error: errExito } = await db().rpc('registrar_exito_etl', {
+      p_camara_id: camara.id,
+      p_recurso: 'votaciones'
+    });
+    if (errExito) errores.push(`registrar_exito_etl: ${errExito.message}`);
   }
 
   return {
-    fechasConsultadas: fechas.length,
+    fechasConsultadas,
+    fechasConError,
     descubiertas,
     nuevas: resultados.length,
     procesadas: resultados.filter(r => r.estado === 'ok').length,
     conError,
+    estado,
+    plazoAgotado,
     nombresSinResolver: Array.from(new Set(resultados.flatMap(r => r.sinResolver))),
     errores: errores.slice(0, 20)
   };
 }
 
-export async function ejecutarIngesta(legislaturaId: string, legislatura = 'XV', diasAtras = 10) {
+export async function ejecutarIngesta(
+  legislaturaId: string,
+  legislatura = 'XV',
+  diasAtras = 10,
+  opciones: { plazoMs?: number } = {}
+) {
   const hoy = new Date();
   const desde = new Date(hoy);
   desde.setUTCDate(desde.getUTCDate() - diasAtras);
   const fechas = rangoFechas(desde.toISOString().slice(0, 10), hoy.toISOString().slice(0, 10));
-  return ingestarFechas(fechas, legislaturaId, legislatura);
+  return ingestarFechas(fechas, legislaturaId, legislatura, opciones);
 }

@@ -158,6 +158,7 @@ function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
 
 export default function Mapa({ onDiputados }) {
   const [datos, setDatos] = useState(null);
+  const [falloDatos, setFalloDatos] = useState(false);
   const [subejes, setSubejes] = useState(null);
   const [kappas, setKappas] = useState({});
   const [baseComun, setBaseComun] = useState(null);
@@ -202,7 +203,8 @@ export default function Mapa({ onDiputados }) {
   const reencuadrar = useCallback(() => setVista({ z: 1, px: 0, py: 0 }), []);
 
   useEffect(() => {
-    traerMapaPartidos().then(setDatos).catch(() => setDatos([]));
+    traerMapaPartidos().then(d => { setDatos(d); setFalloDatos(false); })
+      .catch(e => { console.error('Mapa: no se han podido leer las posiciones', e); setDatos([]); setFalloDatos(true); });
     traerSesgo().then(setSesgo).catch(() => setSesgo(null));
     traerAuditoriaEjeVotos().then(setAuditoria).catch(() => setAuditoria(null));
     traerSubejes().then(setSubejes).catch(() => setSubejes(null));
@@ -546,7 +548,7 @@ export default function Mapa({ onDiputados }) {
     return { a: activo.siglas, b: anclado.siglas, partes };
   })();
   const comparando = Boolean(anclado && activo && anclado.partido !== activo.partido);
-  const faltan = 13 - (datos?.length ?? 0);
+  const faltan = fuente === 'referencias' ? 0 : Math.max(0, (datos?.length ?? 0) - puntos.length);
 
   const Ficha = ({ activo }) => (
     <div>
@@ -561,7 +563,9 @@ export default function Mapa({ onDiputados }) {
         <span style={{ color: '#F2F3F0', fontSize: 14.5, fontWeight: 600 }}>{activo.siglas}</span>
         {fuente === 'referencias'
           ? <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.pais} · {activo.anio}</span>
-          : <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.escanos} escaños</span>}
+          : activo.escanos != null
+          ? <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>{activo.escanos} escaños</span>
+          : <span className="em" style={{ color: '#9AA0A6', fontSize: 11 }}>escaños sin dato</span>}
       </div>
       {fuente === 'referencias' && (
         <div className="em" style={{ color: '#A8AEB4', fontSize: 11.5, marginTop: 6, lineHeight: 1.6 }}>
@@ -800,11 +804,13 @@ export default function Mapa({ onDiputados }) {
             ? (referencias === null
               ? 'Cargando las posiciones externas…'
               : 'No hay posiciones externas publicadas. Carga una fuente con npm run posiciones:cargar, verifica los polos y publícala.')
+            : falloDatos
+            ? 'Ahora mismo no se pueden leer las posiciones de los partidos. Vuelve a intentarlo en un momento.'
+            : datos === null
+            ? 'Cargando las posiciones…'
             : datos.length > 0
             ? `Hay ${datos.length} partidos en la base, pero ninguno tiene aún los dos ejes (${fuente === 'programa' ? 'programa' : 'votos'}) completos.`
-            : (fuente === 'programa'
-              ? 'Todavía no hay suficientes compromisos codificados. Ejecuta npm run codificar y luego el SQL sql/create_v_mapa_partidos.sql.'
-              : 'Todavía no hay suficientes leyes codificadas. Ejecuta npm run codificar:leyes y el SQL sql/create_v_mapa_partidos.sql.')}
+            : 'Todavía no hay base suficiente para situar a los partidos en este eje.'}
         </div>
       ) : (
         <div style={{
@@ -1078,7 +1084,7 @@ export default function Mapa({ onDiputados }) {
 
             {faltan > 0 && fuente !== 'referencias' && (
               <div className="em" style={{ fontSize: 10.5, color: '#8E959C', marginBottom: 8 }}>
-                {datos.length} de 13 partidos con datos suficientes. El resto aparecerá cuando termine la codificación.
+                {puntos.length} de {datos.length} partidos de la base tienen los dos ejes. El resto aparecerá cuando haya normas suficientes.
               </div>
             )}
 

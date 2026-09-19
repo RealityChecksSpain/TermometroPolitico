@@ -53,15 +53,6 @@ const QUIEN = [
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
-const MUESTRA = [
-  { id: 'a', materia: 'VIVIENDA', color: '#C88A1E', frase: 'Medidas fiscales contra la especulación', oficial: 'Proposición de Ley de medidas fiscales contra la especulación inmobiliaria', etiquetas: ['Inquilinos', 'Propietarios de vivienda'], si: 178, no: 172, aprobada: true, fecha: '' },
-  { id: 'b', materia: 'IMPUESTOS', color: '#1F7A72', frase: 'Deducciones para damnificados por la DANA', oficial: 'Real Decreto-ley de medidas urgentes de apoyo a los damnificados', etiquetas: ['Contribuyentes', 'Autónomos'], si: 340, no: 0, aprobada: true, fecha: '' },
-  { id: 'c', materia: 'MUTUALIDADES', color: '#B4552F', frase: 'Reforma del régimen de clases pasivas', oficial: 'Proposición de Ley de modificación del Real Decreto Legislativo 8/2015', etiquetas: ['Pensionistas', 'Empleo público'], si: 176, no: 174, aprobada: false, fecha: '' },
-  { id: 'd', materia: 'SANIDAD', color: '#2E7D5B', frase: 'Cribado neonatal obligatorio cada dos años', oficial: 'Proposición de Ley sobre el programa de cribado neonatal', etiquetas: ['Familias', 'Pacientes'], si: 331, no: 4, aprobada: true, fecha: '' },
-  { id: 'e', materia: 'ENERGÍA', color: '#8A6BB5', frase: 'Plan de respuesta a la crisis energética', oficial: 'Tramitación como Proyecto de Ley por el procedimiento de urgencia', etiquetas: ['Consumidores', 'Pymes / microempresas'], si: 182, no: 168, aprobada: true, fecha: '' },
-  { id: 'f', materia: 'TRABAJO', color: '#B4552F', frase: 'Reducción de la jornada laboral', oficial: 'Proposición de Ley de reducción de la jornada máxima legal', etiquetas: ['Trabajadores por cuenta ajena', 'Pymes / microempresas'], si: 170, no: 178, aprobada: false, fecha: '' }
-];
-
 function pct(v, total) {
   return `${(v / total) * 100}%`;
 }
@@ -78,7 +69,6 @@ function fechaCorta(f) {
 }
 
 function normalizar(n, i, colectivos) {
-  if (n && n.__muestra) return n;
   const oficial = String(nombreOficialNorma(n) ?? '');
   return {
     id: n.clave_norma ?? `n${i}`,
@@ -280,7 +270,7 @@ function Tarjeta({ t, indice, activo, onEntrar, onSalir, onAbrir, reducido, estr
 }
 
 export default function Portada({
-  onIr, onLey, escanos = 350, leyes, ultimas = [], colectivos = [],
+  onIr, onLey, escanos = 350, leyes, ultimas = [], estadoUltimas = 'cargando', colectivos = [],
   valor = '', onValor, onEnviar, pensando = false, ejemplos = []
 }) {
   const reducido = useReducedMotion();
@@ -346,8 +336,7 @@ export default function Portada({
       vistas.add(clave);
       return true;
     });
-    const filas = unicas.length ? unicas.slice(0, 6) : MUESTRA.map(m => ({ ...m, __muestra: true }));
-    return filas.map((n, i) => normalizar(n, i, colectivos));
+    return unicas.slice(0, 6).map((n, i) => normalizar(n, i, colectivos));
   }, [ultimas, colectivos]);
 
   const pistas = ejemplos.slice(0, 4);
@@ -501,15 +490,28 @@ export default function Portada({
           <button className="em pvTodas" onClick={() => onIr?.('leyes')}>Ver todas →</button>
         </motion.div>
 
-        <div className="pvTarjetas" style={{ width: anchoUtil }}>
-          {tarjetas.map((t, i) => (
-            <Tarjeta key={t.id} t={t} indice={i} reducido={reducido} estrecho={estrecho}
-              activo={encima === i}
-              onEntrar={() => setEncima(i)}
-              onSalir={() => setEncima(null)}
-              onAbrir={() => { disparar(); t.fila && onLey ? onLey(t.fila) : onIr?.('leyes'); }} />
-          ))}
-        </div>
+        {tarjetas.length > 0 ? (
+          <div className="pvTarjetas" style={{ width: anchoUtil }}>
+            {tarjetas.map((t, i) => (
+              <Tarjeta key={t.id} t={t} indice={i} reducido={reducido} estrecho={estrecho}
+                activo={encima === i}
+                onEntrar={() => setEncima(i)}
+                onSalir={() => setEncima(null)}
+                onAbrir={() => { disparar(); t.fila && onLey ? onLey(t.fila) : onIr?.('leyes'); }} />
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            width: anchoUtil, border: '1px solid #D6CFBB', borderRadius: 2,
+            padding: '18px 16px', fontSize: 13, lineHeight: 1.55, color: '#5C5442'
+          }}>
+            {estadoUltimas === 'cargando'
+              ? 'Cargando las últimas votaciones del pleno…'
+              : estadoUltimas === 'error'
+              ? 'Ahora mismo no se pueden leer las últimas votaciones. No enseñamos nada antes que enseñar algo que no sea el registro oficial.'
+              : 'Todavía no hay votaciones cargadas en la base.'}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -9,10 +9,35 @@ const HASTA = Number(process.argv[3] ?? 450);
 const PAUSA = 550;
 const LEG_FOTO = process.env.LEG_FOTO ?? '15';
 
-/**
- * Página HTML de la ficha (lifecycle=0). NUNCA usar agendaDiputados:
- * ese resource_id devuelve JSON de agenda, no la ficha.
- */
+const PATRON_DOC = /\/docbienes\/leg\d+\/(\d+)\/\d+_(\d+)_[a-z]_(\d+)_(\d{8})\.pdf$/i;
+
+interface DocumentoBienes {
+  url: string;
+  expediente: string | null;
+  secuencia: number | null;
+  fecha: string | null;
+}
+
+function describirDocumento(ruta: string): DocumentoBienes {
+  const url = BASE_CONGRESO + ruta;
+  const m = ruta.match(PATRON_DOC);
+  if (!m) return { url, expediente: null, secuencia: null, fecha: null };
+  const f = m[4];
+  return {
+    url,
+    expediente: m[1],
+    secuencia: Number(m[2]),
+    fecha: `${f.slice(0, 4)}-${f.slice(4, 6)}-${f.slice(6, 8)}`
+  };
+}
+
+function ordenarDocumentos(rutas: string[]): DocumentoBienes[] {
+  return rutas.map(describirDocumento).sort((a, b) => {
+    if (a.fecha && b.fecha && a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
+    return (a.secuencia ?? 0) - (b.secuencia ?? 0);
+  });
+}
+
 function urlPublica(cod: number) {
   return `${BASE_CONGRESO}/es/busqueda-de-diputados?p_p_id=diputadomodule&p_p_lifecycle=0` +
     `&p_p_state=normal&p_p_mode=view&_diputadomodule_mostrarFicha=true` +
@@ -74,10 +99,13 @@ function extraer(html: string, cod: number) {
     if (limpio.length > 6 && limpio.length < 80) nombre = limpio;
   }
 
+  const documentos = ordenarDocumentos(bienes);
+
   return {
     nombre,
     foto: foto ? BASE_CONGRESO + foto[0] : null,
-    bienes: bienes.length ? BASE_CONGRESO + bienes[bienes.length - 1] : null,
+    documentos,
+    bienes: documentos.length ? documentos[documentos.length - 1].url : null,
     actividades: acteco.length ? BASE_CONGRESO + acteco[acteco.length - 1] : null,
     email: email ? email[1] : null,
     ficha: urlPublica(cod)
@@ -155,7 +183,53 @@ console.log(`\nRecorriendo fichas del ${DESDE} al ${HASTA}`);
 console.log('(HTML lifecycle=0 + sondeo de /docu/imgweb/diputados/)\n');
 
 let conNombre = 0, vacias = 0, asignadas = 0, sinCruce = 0, conFotoOk = 0;
+let documentosNuevos = 0, mandatosConCadena = 0, erroresCadena = 0;
+const repartoCadena = new Map<number, number>();
+const motivosCadena = new Map<string, number>();
 const noCruzan: string[] = [];
+
+function avisarCadena(motivo: string) {
+  erroresCadena++;
+  const vistos = motivosCadena.get(motivo) ?? 0;
+  motivosCadena.set(motivo, vistos + 1);
+  if (vistos === 0) console.log(`  cadena: ${motivo}`);
+}
+
+async function guardarCadena(mandatoId: string, ficha: string, documentos: DocumentoBienes[]) {
+  if (!documentos.length) return;
+  repartoCadena.set(documentos.length, (repartoCadena.get(documentos.length) ?? 0) + 1);
+  if (documentos.length > 1) mandatosConCadena++;
+
+  const { data: previas, error: eLectura } = await db()
+    .from('declaraciones_bienes')
+    .select('documento_url')
+    .eq('mandato_id', mandatoId);
+
+  if (eLectura) {
+    avisarCadena(`lectura: ${eLectura.message}`);
+    return;
+  }
+
+  const conocidas = new Set((previas ?? []).map((r: any) => r.documento_url));
+  const filas = documentos
+    .filter(d => !conocidas.has(d.url))
+    .map(d => ({
+      mandato_id: mandatoId,
+      fecha_declaracion: d.fecha,
+      documento_url: d.url,
+      fuente_url: ficha,
+      extraido_at: new Date().toISOString()
+    }));
+
+  if (!filas.length) return;
+
+  const { error } = await db().from('declaraciones_bienes').insert(filas);
+  if (error) {
+    avisarCadena(`escritura: ${error.message}`);
+    return;
+  }
+  documentosNuevos += filas.length;
+}
 
 for (let cod = DESDE; cod <= HASTA; cod++) {
   let html = '';
@@ -183,7 +257,6 @@ for (let cod = DESDE; cod <= HASTA; cod++) {
   const d = extraer(html, cod);
   const foto = await resolverFoto(cod, d.foto);
 
-  // Sin nombre en HTML y sin foto: probablemente código vacío / otra legislatura
   if (!d.nombre && !foto) {
     vacias++;
     await new Promise(res => setTimeout(res, PAUSA));
@@ -221,6 +294,7 @@ for (let cod = DESDE; cod <= HASTA; cod++) {
   }).eq('id', mejor.mandato_id);
 
   if (!error) asignadas++;
+  await guardarCadena(mejor.mandato_id, d.ficha, d.documentos);
 
   if (asignadas % 25 === 0 && asignadas > 0) {
     console.log(`  [${String(cod).padStart(3)}] ${asignadas} asignadas · ultimo: ${String(mejor.nombre_completo).slice(0, 40)}`);
@@ -248,8 +322,23 @@ const { count: conBienes } = await db().from('mandatos')
   .select('id', { count: 'exact', head: true })
   .eq('legislatura_id', legislaturaId).not('url_bienes', 'is', null);
 
+const { count: docsEnBd } = await db().from('declaraciones_bienes')
+  .select('id', { count: 'exact', head: true });
+
 console.log(`\n  con foto en BD:   ${conFoto ?? 0}`);
 console.log(`  con bienes en BD: ${conBienes ?? 0}`);
+
+console.log('\nCADENA DE DECLARACIONES');
+console.log(`  documentos nuevos guardados: ${documentosNuevos}`);
+console.log(`  diputados con más de un documento: ${mandatosConCadena}`);
+console.log(`  filas totales en declaraciones_bienes: ${docsEnBd ?? 0}`);
+if (erroresCadena) {
+  console.log(`  errores al guardar la cadena: ${erroresCadena}`);
+  Array.from(motivosCadena.entries()).sort((a, b) => b[1] - a[1])
+    .forEach(([motivo, cuantos]) => console.log(`    ${String(cuantos).padStart(4)}  ${motivo.slice(0, 120)}`));
+}
+Array.from(repartoCadena.entries()).sort((a, b) => a[0] - b[0])
+  .forEach(([docs, cuantos]) => console.log(`  ${String(docs).padStart(2)} documento(s): ${cuantos} diputados`));
 
 await refrescarMetricas();
 console.log('\n  Metricas refrescadas.\n');

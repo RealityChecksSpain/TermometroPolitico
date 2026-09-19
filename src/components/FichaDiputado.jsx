@@ -283,7 +283,9 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
               )}
               <div>
                 <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>
-                  {(d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0) || d.n_vehiculos || 0}
+                  {[d.n_coches, d.n_motos, d.n_embarcaciones, d.n_aeronaves, d.n_vehiculos].every(x => x == null)
+                    ? '—'
+                    : (d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0) || d.n_vehiculos || 0}
                 </div>
                 <div style={{ fontSize: 10, color: C.tenue }}>
                   {[
@@ -291,7 +293,10 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                     d.n_motos ? `${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}` : null,
                     d.n_embarcaciones ? `${d.n_embarcaciones} emb.` : null,
                     d.n_aeronaves ? `${d.n_aeronaves} aer.` : null
-                  ].filter(Boolean).join(' · ') || 'vehículos'}
+                  ].filter(Boolean).join(' · ')
+                    || ([d.n_coches, d.n_motos, d.n_embarcaciones, d.n_aeronaves, d.n_vehiculos].every(x => x == null)
+                      ? 'vehículos sin dato'
+                      : 'vehículos')}
                 </div>
               </div>
             </div>
@@ -355,8 +360,18 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
             {!d.vehiculos_lista?.length && d.vehiculos_detalle && (
               <div style={{ fontSize: 12, color: C.media, lineHeight: 1.45 }}>{d.vehiculos_detalle}</div>
             )}
-            <div className="em" style={{ fontSize: 9.5, color: C.tenue, marginTop: 8 }}>
-              Del PDF oficial. El patrimonio no valora inmuebles. Abre la declaración para comprobar.
+            {d.bienes_outlier && (
+              <div className="em" style={{
+                fontSize: 10, color: '#8A5A00', background: '#FDF6E3', border: '1px solid #E8D9A8',
+                padding: '6px 8px', marginTop: 8, lineHeight: 1.45
+              }}>
+                Cifra marcada como dudosa al leer el PDF. Compruébala en la declaración antes de usarla.
+              </div>
+            )}
+            <div className="em" style={{ fontSize: 9.5, color: C.tenue, marginTop: 8, lineHeight: 1.5 }}>
+              Cifras extraídas del PDF oficial por un modelo de lenguaje, sin revisión humana
+              {d.bienes_confianza ? ` (confianza declarada: ${d.bienes_confianza})` : ''}. El patrimonio
+              no valora los inmuebles. Abre la declaración para comprobarla.
               {d.url_bienes && (
                 <>{' '}<a href={d.url_bienes} target="_blank" rel="noreferrer" style={{ color: C.media }}>PDF →</a></>
               )}

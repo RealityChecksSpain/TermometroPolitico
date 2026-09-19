@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "comprobar:api": "node --import tsx scripts/comprobar-api.ts",
+    "build": "node --import tsx scripts/comprobar-api.ts && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "censo:inspeccionar": "node --import tsx scripts/poblar-censo.ts --inspeccionar",

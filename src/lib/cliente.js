@@ -52,10 +52,14 @@ export async function traerDiputados() {
     const fotos = [];
     for (let i = 0; i < sinFoto.length; i += 200) {
       const chunk = sinFoto.slice(i, i + 200);
-      const { data: filas } = await supabase
+      const { data: filas, error } = await supabase
         .from('mandatos')
         .select('id, foto_url, cod_parlamentario, url_ficha, url_bienes')
         .in('id', chunk);
+      if (error) {
+        console.error(`traerDiputados: no se pueden leer las fichas de mandato (${error.message}).`);
+        break;
+      }
       if (filas?.length) fotos.push(...filas);
     }
     if (fotos.length) {
@@ -85,12 +89,10 @@ export async function traerDiputados() {
       .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
       .in('mandato_id', chunk);
     if (error) {
-      const { data: filas2 } = await supabase
-        .from('bienes_declarados')
-        .select('mandato_id, patrimonio_euros, n_inmuebles, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle')
-        .in('mandato_id', chunk);
-      if (filas2?.length) bienes.push(...filas2);
-    } else if (filas?.length) bienes.push(...filas);
+      console.error(`traerDiputados: no se pueden leer los bienes declarados (${error.message}). Se muestran los diputados sin patrimonio.`);
+      break;
+    }
+    if (filas?.length) bienes.push(...filas);
   }
   if (bienes.length) {
     const bm = new Map(bienes.map(b => [b.mandato_id, b]));
@@ -170,6 +172,14 @@ export async function traerDiputados() {
   return lista;
 }
 
+export function patronBusqueda(texto) {
+  return String(texto ?? '')
+    .replace(/[%_*,.:()"\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
 export async function traerVotaciones(limite = 200, filtros = {}) {
   if (filtros.id) {
     const { data, error } = await supabase.from('mv_votaciones').select('*').eq('id', filtros.id);
@@ -179,8 +189,9 @@ export async function traerVotaciones(limite = 200, filtros = {}) {
   let q = supabase.from('mv_normas').select('*');
   if (filtros.materia) q = q.eq('materia', filtros.materia);
   if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
-  if (filtros.texto?.trim()) {
-    q = q.or(`titular.ilike.%${filtros.texto}%,resumen.ilike.%${filtros.texto}%`);
+  const patron = patronBusqueda(filtros.texto);
+  if (patron) {
+    q = q.or(`titular.ilike.*${patron}*,resumen.ilike.*${patron}*`);
   }
   const { data, error } = await q.order('fecha', { ascending: false }).limit(limite);
   if (error) throw error;
@@ -202,10 +213,12 @@ export async function traerFacetas() {
 }
 
 export async function buscarVotaciones(texto, limite = 60) {
+  const patron = patronBusqueda(texto);
+  if (!patron) return [];
   const { data, error } = await supabase
     .from('mv_votaciones')
     .select('*')
-    .or(`titulo.ilike.%${texto}%,subtitulo.ilike.%${texto}%`)
+    .or(`titulo.ilike.*${patron}*,subtitulo.ilike.*${patron}*`)
     .order('fecha', { ascending: false })
     .limit(limite);
   if (error) throw error;
@@ -282,12 +295,8 @@ export async function traerPromesas(partido, soloVerificables = false, limite = 
   let q = supabase.from('v_promesa_estado').select('*').eq('partido', partido);
   if (soloVerificables) q = q.eq('verificable', true);
   const { data, error } = await q.order('orden').limit(limite);
-  if (!error) return data ?? [];
-  let q2 = supabase.from('v_promesas').select('*').eq('partido', partido);
-  if (soloVerificables) q2 = q2.eq('verificable', true);
-  const { data: d2, error: e2 } = await q2.order('orden').limit(limite);
-  if (e2) throw e2;
-  return d2 ?? [];
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function traerResumenPromesas() {
@@ -321,82 +330,37 @@ export async function traerLideres(metrica) {
 
 export async function traerMapaPartidos() {
   const { data, error } = await supabase.from('v_mapa_partidos').select('*');
-  if (!error && data?.length) {
-    const traeBase = data.some(f => f.base_economico !== undefined || f.prog_base_economico !== undefined);
-    if (traeBase) return data.map(normalizarFilaMapa);
-    const { data: bases } = await supabase.from('mv_eje_programa').select('*');
-    const porClave = new Map();
-    for (const b of bases ?? []) {
-      if (b.partido) porClave.set(String(b.partido), b);
-      if (b.siglas) porClave.set(String(b.siglas), b);
-    }
-    return data.map(f => {
-      const b = porClave.get(String(f.partido)) ?? porClave.get(String(f.siglas)) ?? null;
-      if (!b) return normalizarFilaMapa(f);
-      return normalizarFilaMapa({
-        ...f,
-        base_economico: b.base_economico,
-        base_social: b.base_social,
-        dimensiones_economicas: b.dimensiones_economicas,
-        dimensiones_sociales: b.dimensiones_sociales
-      });
+  if (error) {
+    console.error(`traerMapaPartidos: no se puede leer v_mapa_partidos (${error.message})`);
+    throw error;
+  }
+  if (!data?.length) return [];
+
+  const traeBase = data.some(f => f.base_economico !== undefined || f.prog_base_economico !== undefined);
+  if (traeBase) return data.map(normalizarFilaMapa);
+
+  const { data: bases, error: eBases } = await supabase.from('mv_eje_programa').select('*');
+  if (eBases) {
+    console.error(`traerMapaPartidos: no se puede leer mv_eje_programa (${eBases.message}). El mapa sale sin las bases de programa.`);
+    return data.map(normalizarFilaMapa);
+  }
+
+  const porClave = new Map();
+  for (const b of bases ?? []) {
+    if (b.partido) porClave.set(String(b.partido), b);
+    if (b.siglas) porClave.set(String(b.siglas), b);
+  }
+  return data.map(f => {
+    const b = porClave.get(String(f.partido)) ?? porClave.get(String(f.siglas)) ?? null;
+    if (!b) return normalizarFilaMapa(f);
+    return normalizarFilaMapa({
+      ...f,
+      base_economico: b.base_economico,
+      base_social: b.base_social,
+      dimensiones_economicas: b.dimensiones_economicas,
+      dimensiones_sociales: b.dimensiones_sociales
     });
-  }
-
-  const [{ data: prog }, { data: votos }, { data: dips }] = await Promise.all([
-    supabase.from('mv_eje_programa').select('*'),
-    supabase.from('mv_eje_votos_base').select('*'),
-    supabase.from('mv_diputados').select('partido_siglas, partido, activo')
-  ]);
-
-  const escanos = new Map();
-  for (const d of dips ?? []) {
-    if (d.activo === false) continue;
-    const k = d.partido_siglas || d.partido;
-    if (!k) continue;
-    escanos.set(k, (escanos.get(k) ?? 0) + 1);
-  }
-
-  const porSlug = new Map();
-  for (const p of prog ?? []) {
-    porSlug.set(p.partido, {
-      partido: p.partido,
-      siglas: p.siglas,
-      color: p.color,
-      prog_economico: p.eje_economico,
-      prog_social: p.eje_social,
-      prog_bruto_economico: p.bruto_economico,
-      prog_base_economico: p.base_economico ?? null,
-      prog_base_social: p.base_social ?? null,
-      prog_dims_economico: p.dimensiones_economicas ?? null,
-      prog_dims_social: p.dimensiones_sociales ?? null,
-      promesas_codificadas: p.promesas,
-      voto_economico: null,
-      voto_social: null,
-      leyes_valoradas: null,
-      escanos: escanos.get(p.siglas) ?? escanos.get(p.partido) ?? 0
-    });
-  }
-  for (const v of votos ?? []) {
-    const base = porSlug.get(v.partido) ?? {
-      partido: v.partido,
-      siglas: v.siglas,
-      color: v.color,
-      prog_economico: null,
-      prog_social: null,
-      promesas_codificadas: null,
-      escanos: escanos.get(v.siglas) ?? 0
-    };
-    porSlug.set(v.partido, {
-      ...base,
-      color: base.color || v.color,
-      voto_economico: v.eje_economico,
-      voto_social: v.eje_social,
-      leyes_valoradas: v.leyes_valoradas ?? v.leyes_apoyadas
-    });
-  }
-
-  return Array.from(porSlug.values()).map(normalizarFilaMapa);
+  });
 }
 
 function normalizarFilaMapa(d) {
@@ -419,7 +383,7 @@ function normalizarFilaMapa(d) {
     prog_dims_economico: d.prog_dims_economico ?? d.dimensiones_economicas ?? null,
     prog_dims_social: d.prog_dims_social ?? d.dimensiones_sociales ?? null,
     leyes_valoradas: d.leyes_valoradas ?? d.leyes_apoyadas ?? null,
-    escanos: d.escanos ?? d.diputados ?? 1,
+    escanos: d.escanos ?? d.diputados ?? null,
     color: d.color || d.color_hex || '#8E9299'
   };
 }
@@ -490,9 +454,8 @@ export async function traerHallazgos() {
   const { data, error } = await supabase.from('v_hallazgos_publicos')
     .select('*').order('relevancia', { ascending: false, nullsFirst: false }).order('orden');
   if (error) {
-    const alt = await supabase.from('v_hallazgos_todos')
-      .select('*').order('relevancia', { ascending: false, nullsFirst: false }).order('orden');
-    return (alt.data ?? []).filter(h => h.titular);
+    console.error(`traerHallazgos: no se puede leer v_hallazgos_publicos (${error.message}). No se enseña ningun hallazgo.`);
+    return [];
   }
   return (data ?? []).filter(h => h.titular);
 }
@@ -517,7 +480,10 @@ export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
 
 export async function traerPromesaVsVoto() {
   const { data, error } = await supabase.from('v_promesa_vs_voto').select('*').order('brecha_gasto');
-  if (error) return [];
+  if (error) {
+    console.error(`traerPromesaVsVoto: no se puede leer v_promesa_vs_voto (${error.message}). El grafico de brecha no se pinta.`);
+    return [];
+  }
   return data ?? [];
 }
 
@@ -527,7 +493,7 @@ export async function traerUltimas(limite = 6) {
     .order('fecha', { ascending: false }).limit(limite);
   if (error) {
     console.error(`traerUltimas: no se puede leer v_normas_completas (${error.message})`);
-    return [];
+    throw error;
   }
   return data ?? [];
 }

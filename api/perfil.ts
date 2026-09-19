@@ -18,10 +18,11 @@ const LIMITE_TEXTO = 300;
 const LIMITE_CUERPO = 8_000;
 const VENTANA_MS = 60_000;
 const MAX_POR_VENTANA = 6;
-const MAX_IA_POR_VENTANA = 40;
+const MAX_IA_POR_MINUTO = Number(process.env.TOPE_IA_MINUTO ?? 40);
+const MAX_IA_POR_IP_HORA = Number(process.env.TOPE_IA_IP_HORA ?? 20);
+const MAX_IA_POR_DIA = Number(process.env.TOPE_IA_DIA ?? 500);
 
 const visitas = new Map<string, number[]>();
-let llamadasIa: number[] = [];
 
 function huella(req: Request): string {
   const vercel = req.headers.get('x-vercel-forwarded-for');
@@ -50,12 +51,15 @@ function pasaCadencia(clave: string): boolean {
   return true;
 }
 
-function pasaTopeGlobal(): boolean {
-  const ahora = Date.now();
-  llamadasIa = llamadasIa.filter(t => ahora - t < VENTANA_MS);
-  if (llamadasIa.length >= MAX_IA_POR_VENTANA) return false;
-  llamadasIa.push(ahora);
-  return true;
+async function consumirCupo(clave: string, ventanaSeg: number, maximo: number): Promise<boolean | null> {
+  const { data, error } = await db().rpc('consumir_cupo', {
+    p_clave: clave, p_ventana_seg: ventanaSeg, p_max: maximo
+  });
+  if (error) {
+    console.error('perfil/consumir_cupo', error.message);
+    return null;
+  }
+  return data === true;
 }
 
 function normalizar(t: string): string {
@@ -73,7 +77,7 @@ function origenValido(req: Request): boolean {
   const permitido = process.env.ORIGEN_PERMITIDO;
   if (!permitido) return true;
   const origen = req.headers.get('origin');
-  if (!origen) return true;
+  if (!origen) return false;
   return permitido.split(',').map(o => o.trim()).includes(origen);
 }
 
@@ -141,7 +145,18 @@ export default async function handler(req: Request): Promise<Response> {
     return sinCache({ colectivos: [], materias: [], origen: 'sin_ia' });
   }
 
-  if (!pasaTopeGlobal()) {
+  const dia = new Date().toISOString().slice(0, 10);
+  const claveIp = `perfil:ip:${await huellaTexto(`${huella(req)}|${dia}`)}`;
+  const cupos = [
+    await consumirCupo(claveIp, 3600, MAX_IA_POR_IP_HORA),
+    await consumirCupo('perfil:global:minuto', 60, MAX_IA_POR_MINUTO),
+    await consumirCupo('perfil:global:dia', 86_400, MAX_IA_POR_DIA)
+  ];
+
+  if (cupos.some(c => c === null)) {
+    return sinCache({ colectivos: [], materias: [], origen: 'sin_resolver' }, 503);
+  }
+  if (cupos.some(c => c === false)) {
     return sinCache({ colectivos: [], materias: [], origen: 'demasiadas_peticiones' }, 429);
   }
 

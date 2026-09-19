@@ -8,6 +8,7 @@ import HistorialNorma from './HistorialNorma.jsx';
 import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
 import { implicacionDe } from '../lib/implicaciones.js';
 import { VOTO } from '../lib/paleta.js';
+import { mayoriaRequerida, umbralDe, nombreMayoria, faltaronPara } from '../lib/mayorias.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -15,6 +16,12 @@ const C = {
 };
 
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abstención', no_vota: 'No vota' };
+
+const SIN_TEXTO_PROPIO = /proposici[óo]n no de ley|moci[óo]n|interpelaci[óo]n/i;
+
+function registradosEnActa(v) {
+  return (v.total_si ?? 0) + (v.total_no ?? 0) + (v.total_abstencion ?? 0) + (v.total_no_vota ?? 0);
+}
 
 export function analizarVotacion(diputados, votos) {
   if (!votos?.length) return null;
@@ -50,14 +57,11 @@ export function analizarVotacion(diputados, votos) {
 
   const totSi = lista.reduce((a, g) => a + g.si, 0);
   const totNo = lista.reduce((a, g) => a + g.no, 0);
-  const aprobada = totSi > totNo;
-  const margen = Math.abs(totSi - totNo);
-
-  const faltaron = aprobada ? 0 : Math.floor((totNo - totSi) / 2) + 1;
   const abstenciones = lista.reduce((a, g) => a + g.abstencion, 0);
   const ausencias = lista.reduce((a, g) => a + g.no_vota, 0);
+  const contados = totSi + totNo + abstenciones + ausencias;
 
-  return { grupos: lista, totSi, totNo, aprobada, margen, faltaron, abstenciones, ausencias };
+  return { grupos: lista, totSi, totNo, abstenciones, ausencias, contados };
 }
 
 function Sello({ aprobada }) {
@@ -107,6 +111,8 @@ export function DetalleLey({ votacion, onVolver }) {
   }, [votacion.id, votacion.votacion_principal]);
 
   const aprobada = votacion.resultado === 'aprobada';
+  const mayoria = mayoriaRequerida(votacion);
+  const umbral = umbralDe(mayoria);
   const enlaces = String(votacion.enlaces_bocg ?? '').split(/[\s·]+/).filter(u => u.startsWith('http')).slice(0, 3);
   const frase = fraseCortaDeNorma(votacion, 72);
   const [seccion, setSeccion] = useState('afecta');
@@ -192,6 +198,11 @@ export function DetalleLey({ votacion, onVolver }) {
         </div>
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Sello aprobada={aprobada} />
+          {umbral !== null && (
+            <span className="em" style={{ fontSize: 11, color: C.media }}>
+              exigía {nombreMayoria(mayoria)}: {umbral} síes
+            </span>
+          )}
           {votacion.votaciones_norma > 1 && (
             <span className="em" style={{ fontSize: 11, color: C.media }}>
               {votacion.votaciones_norma} votaciones (enmiendas incluidas)
@@ -266,8 +277,10 @@ export function DetalleLey({ votacion, onVolver }) {
               Resumen generado automáticamente
               {votacion.resumen_modelo ? ` por ${votacion.resumen_modelo}` : ' por un modelo de lenguaje'}
               {votacion.resumen_basado_en === 'texto_bocg'
-                ? ', a partir del texto oficial del BOCG.'
-                : ', a partir del título oficial: el Congreso no publica el texto de esta votación.'}
+                ? ', a partir del texto publicado en el BOCG, anterior a las enmiendas.'
+                : votacion.resumen_basado_en
+                ? ', a partir del título oficial: el Congreso no publica el texto de esta votación.'
+                : '.'}
               {votacion.resumen_revisado === true && ' Revisado a mano.'}
               {votacion.resumen_revisado === false && ' Nadie lo ha revisado a mano.'}
               {' '}No sustituye al texto legal.
@@ -321,9 +334,11 @@ export function DetalleLey({ votacion, onVolver }) {
         {!votacion.resumen && (
           <Bloque titulo="Sin resumen disponible" aviso>
             <div style={{ fontSize: 12.5, color: '#6B5518', lineHeight: 1.55 }}>
-              Esta votación es una proposición no de ley, moción o interpelación. El Congreso no
-              publica su texto en el portal de datos abiertos, así que solo disponemos del título
-              oficial y del acta de la votación.
+              {SIN_TEXTO_PROPIO.test(`${votacion.titulo ?? ''} ${votacion.subtitulo ?? ''}`)
+                ? <>El Congreso no publica en datos abiertos el texto de las proposiciones no de ley,
+                  mociones e interpelaciones, así que de esta votación solo hay título oficial y acta.</>
+                : <>Todavía no hay resumen de esta votación: o el Congreso no ha publicado su texto en
+                  datos abiertos, o no se ha podido leer. Queda el título oficial y el acta.</>}
             </div>
             <a href={votacion.fuente_url} target="_blank" rel="noreferrer" className="em"
               style={{ fontSize: 11, color: '#6B5518', display: 'block', marginTop: 10 }}>
@@ -379,6 +394,11 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
   const total = votacion.total_si + votacion.total_no + votacion.total_abstencion || 1;
   const seg = [[votacion.total_si, C.si], [votacion.total_abstencion, C.abs], [votacion.total_no, C.no]];
   const aprobada = votacion.resultado === 'aprobada';
+  const mayoria = mayoriaRequerida(votacion);
+  const umbral = umbralDe(mayoria);
+  const margen = Math.abs((votacion.total_si ?? 0) - (votacion.total_no ?? 0));
+  const faltaron = faltaronPara(votacion);
+  const registrados = registradosEnActa(votacion);
 
   return (
     <div className="e">
@@ -387,13 +407,13 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
           Resultado de la votación
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Sello aprobada={aprobada} />
-          {analisis && (
-            <span className="em" style={{ fontSize: 11, color: C.media }}>
-              por {analisis.margen} voto{analisis.margen === 1 ? '' : 's'}
-            </span>
-          )}
+          <span className="em" style={{ fontSize: 11, color: C.media }}>
+            {umbral === null
+              ? `por ${margen} voto${margen === 1 ? '' : 's'}`
+              : `${votacion.total_si ?? 0} síes de los ${umbral} que exige la ${nombreMayoria(mayoria)}`}
+          </span>
         </div>
 
         <div style={{ display: 'flex', height: 7, borderRadius: 4, overflow: 'hidden', background: '#E4E4DC', marginTop: 12 }}>
@@ -417,20 +437,21 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
 
       {analisis && (
         <>
-          {!aprobada && analisis.faltaron > 0 && (
+          {!aprobada && faltaron > 0 && (
             <Bloque titulo="Cuánto faltó">
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <span className="ed" style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>
-                  {analisis.faltaron}
+                  {faltaron}
                 </span>
                 <span style={{ fontSize: 12.5, color: C.media, lineHeight: 1.4 }}>
-                  voto{analisis.faltaron === 1 ? '' : 's'} tendrían que haber cambiado de No a Sí
-                  para que saliera adelante.
+                  {umbral === null
+                    ? `voto${faltaron === 1 ? '' : 's'} tendrían que haber cambiado de No a Sí para que saliera adelante.`
+                    : `voto${faltaron === 1 ? '' : 's'} a favor más para llegar a los ${umbral} que exige la ${nombreMayoria(mayoria)}.`}
                 </span>
               </div>
-              {(analisis.abstenciones > 0 || analisis.ausencias > 0) && (
+              {((votacion.total_abstencion ?? 0) > 0 || (votacion.total_no_vota ?? 0) > 0) && (
                 <div className="em" style={{ fontSize: 11, color: C.tenue, marginTop: 10 }}>
-                  Hubo {analisis.abstenciones} abstenciones y {analisis.ausencias} sin votar.
+                  Hubo {votacion.total_abstencion ?? 0} abstenciones y {votacion.total_no_vota ?? 0} sin votar.
                 </div>
               )}
             </Bloque>
@@ -478,8 +499,13 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
 
 
           <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 14, lineHeight: 1.5 }}>
-            Recuentos calculados sobre los {votos.length} votos individuales publicados por el
-            Congreso. Ninguno es una estimación.
+            El acta del Congreso registra {registrados} votos individuales y {analisis.contados} están
+            asignados a un diputado con partido: son los que suman en el desglose de arriba.
+            {registrados !== analisis.contados && (
+              <> Los {Math.abs(registrados - analisis.contados)} restantes están pendientes de
+              identificar, así que el desglose por partido no los incluye.</>
+            )}
+            {' '}Ninguna cifra es una estimación.
           </div>
         </>
       )}

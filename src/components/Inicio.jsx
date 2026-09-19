@@ -63,6 +63,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   const [filtro, setFiltro] = useState(null);
   const [etiqueta, setEtiqueta] = useState(null);
   const [ultimas, setUltimas] = useState([]);
+  const [estadoUltimas, setEstadoUltimas] = useState('cargando');
   const [ausentes, setAusentes] = useState([]);
   const [guardado, setGuardado] = useState(() => cargarPerfilGuardado());
   const [novedades, setNovedades] = useState([]);
@@ -70,13 +71,18 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   useEffect(() => {
     traerUltimas(12).then(rows => {
       setUltimas(rows);
+      setEstadoUltimas('ok');
       const g = cargarPerfilGuardado();
       if (g) {
         const desde = ultimaVista();
         setNovedades(filtrarNovedades(rows, g, desde));
       }
       marcarVistoAhora();
-    }).catch(() => setUltimas([]));
+    }).catch(e => {
+      console.error('Inicio: no se han podido leer las ultimas normas', e);
+      setUltimas([]);
+      setEstadoUltimas('error');
+    });
     traerLideres('ausencias').then(setAusentes).catch(() => setAusentes([]));
 
     const g = cargarPerfilGuardado();
@@ -154,7 +160,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
 
   return (
     <div>
-      <Portada onIr={onIr} onLey={onVotacion} ultimas={ultimas} colectivos={colectivos}
+      <Portada onIr={onIr} onLey={onVotacion} ultimas={ultimas} estadoUltimas={estadoUltimas} colectivos={colectivos}
         escanos={cobertura?.escanos ?? 350} leyes={cobertura?.normas}
         valor={perfil} onValor={cambiarPerfil} onEnviar={buscar}
         pensando={pensando} ejemplos={EJEMPLOS} />
@@ -314,10 +320,11 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
       <div style={{ marginTop: 20, padding: 16, background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3 }}>
         <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>De dónde salen estos datos</div>
         <div style={{ fontSize: 13, color: C.media, lineHeight: 1.6, marginTop: 7 }}>
-          Del portal de datos abiertos del Congreso, actualizado cada noche. Los recuentos salen de los
-          votos individuales que publica la Cámara. Los resúmenes se generan del texto oficial del
-          Boletín de las Cortes y siempre puedes abrirlo para comprobarlo. Esta herramienta no valora
-          ni puntúa a nadie: enseña lo que se hizo y te deja juzgar a ti.
+          Del portal de datos abiertos del Congreso. Los recuentos salen de los votos individuales que
+          publica la Cámara. Cuando el Congreso publica el texto de la norma, el resumen lo escribe un
+          modelo de lenguaje a partir de ese texto y cada ficha dice a partir de qué está hecho; cuando
+          no lo publica, solo hay título y acta. Esta herramienta no valora ni puntúa a nadie: enseña lo
+          que se hizo y te deja juzgar a ti.
         </div>
       </div>
     </div>
