@@ -11,9 +11,36 @@ import {
 import { traerAuditoriaFiabilidad, indiceKappa, UMBRAL_KAPPA } from '../lib/auditoria.js';
 import { marcaDe } from '../lib/regimenes-marca.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
+import { useTactil, useTelefono } from '../lib/pantalla.js';
 
 const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
+
+const estilosMapa = `
+.mapaLayout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:stretch}
+.mapaLayout>*{min-width:0}
+.mapaGuias>*{min-width:0}
+.mapaLienzo{order:-1}
+.mapaGuias{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.mapaPlegable{background:#FFFFFF;border:1px solid #E3DFD1;border-radius:3px}
+.mapaPlegable>summary{list-style:none;cursor:pointer;padding:12px 14px;font-size:13.5px;
+font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mapaPlegable>summary::-webkit-details-marker{display:none}
+.mapaPlegable>summary::after{content:'+';color:#7C8288;font-size:16px;line-height:1}
+.mapaPlegable[open]>summary::after{content:'−'}
+.mapaPlegable[open]>summary{border-bottom:1px solid #E3DFD1}
+.mapaTabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:6px;
+scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.mapaTabs::-webkit-scrollbar{display:none}
+.mapaTabs>button{flex:0 0 auto}
+@media(min-width:701px){.mapaTabs{flex-wrap:wrap;overflow-x:visible;padding-bottom:0}}
+@media(min-width:960px){
+.mapaLayout{grid-template-columns:minmax(200px,.85fr) minmax(320px,1.3fr) minmax(200px,.85fr)}
+.mapaGuias{display:contents}
+.mapaLienzo{order:0}
+.mapaGuias{display:contents}
+}
+`;
 
 const VIAJE = { type: 'spring', stiffness: 90, damping: 20, mass: 1 };
 
@@ -120,11 +147,10 @@ const ETIQUETA_DIM = {
   calidad_democratica: ['debilitar los controles del poder', 'reforzar los controles del poder']
 };
 
-function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
+function CuerpoGuia({ intro, a, b, miramos, colorA, colorB }) {
   return (
-    <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15, height: '100%' }}>
-      <div className="ed" style={{ fontSize: 15, fontWeight: 600 }}>{titulo}</div>
-      <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginTop: 8 }}>{intro}</div>
+    <>
+      <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6 }}>{intro}</div>
 
       <div style={{ marginTop: 12, paddingTop: 11, borderTop: `1px solid ${C.linea}` }}>
         <div className="em" style={{
@@ -152,11 +178,32 @@ function GuiaEje({ titulo, intro, a, b, miramos, colorA, colorB }) {
         </div>
         <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 5 }}>{miramos}</div>
       </div>
+    </>
+  );
+}
+
+function GuiaEje({ titulo, plegable, ...resto }) {
+  if (plegable) {
+    return (
+      <details className="mapaPlegable">
+        <summary className="ed">{titulo}</summary>
+        <div style={{ padding: '12px 14px 15px' }}>
+          <CuerpoGuia {...resto} />
+        </div>
+      </details>
+    );
+  }
+  return (
+    <div style={{ background: C.superficie, border: `1px solid ${C.linea}`, borderRadius: 3, padding: 15, height: '100%' }}>
+      <div className="ed" style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{titulo}</div>
+      <CuerpoGuia {...resto} />
     </div>
   );
 }
 
 export default function Mapa({ onDiputados }) {
+  const estrecho = useTelefono();
+  const tactil = useTactil();
   const [datos, setDatos] = useState(null);
   const [falloDatos, setFalloDatos] = useState(false);
   const [subejes, setSubejes] = useState(null);
@@ -484,18 +531,19 @@ export default function Mapa({ onDiputados }) {
 
   const onPointerDown = useCallback(e => {
     if (e.button != null && e.button !== 0) return;
+    if (tactil && vista.z <= 1) { arrastre.current = null; return; }
     arrastre.current = {
       sx: e.clientX, sy: e.clientY,
       px: vista.px, py: vista.py, z: vista.z,
       movido: false
     };
-    try { svgRef.current?.setPointerCapture?.(e.pointerId); } catch { /* sin captura */ }
-  }, [vista]);
+    try { svgRef.current?.setPointerCapture?.(e.pointerId); } catch { setEncima(null); }
+  }, [vista, tactil]);
 
   const onPointerUp = useCallback(e => {
     const a = arrastre.current;
     arrastre.current = null;
-    try { svgRef.current?.releasePointerCapture?.(e.pointerId); } catch { /* sin captura */ }
+    try { svgRef.current?.releasePointerCapture?.(e.pointerId); } catch { setEncima(prev => prev); }
     if (a?.movido) return;
     const hit = resolver(e.clientX, e.clientY);
     if (!hit) {
@@ -510,6 +558,7 @@ export default function Mapa({ onDiputados }) {
     const svg = svgRef.current;
     if (!svg) return;
     const alRodar = e => {
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       e.stopPropagation();
       const p = puntoSvg(svg, e.clientX, e.clientY);
@@ -786,10 +835,11 @@ export default function Mapa({ onDiputados }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+      <style>{estilosMapa}</style>
+      <div className="mapaTabs">
         {[['programa', 'Lo que prometieron'], ['votos', 'Lo que han votado'], ['territorio', 'Territorialidad'], ['referencias', 'Comparativa externa'], ['democracia', 'Democracia en el mundo']].map(([k, t]) => (
-          <button key={k} onClick={() => setFuente(k)} style={{
-            padding: '9px 16px', fontSize: 13.5, cursor: 'pointer', borderRadius: 2,
+          <button key={k} onClick={() => { setFuente(k); reencuadrar(); }} style={{
+            padding: '9px 14px', fontSize: 13, cursor: 'pointer', borderRadius: 2, whiteSpace: 'nowrap',
             fontWeight: fuente === k ? 600 : 400,
             background: fuente === k ? C.tinta : 'transparent',
             color: fuente === k ? C.papel : C.media,
@@ -803,7 +853,7 @@ export default function Mapa({ onDiputados }) {
           {fuente === 'referencias'
             ? (referencias === null
               ? 'Cargando las posiciones externas…'
-              : 'No hay posiciones externas publicadas. Carga una fuente con npm run posiciones:cargar, verifica los polos y publícala.')
+              : 'Todavía no hay posiciones externas publicadas para comparar.')
             : falloDatos
             ? 'Ahora mismo no se pueden leer las posiciones de los partidos. Vuelve a intentarlo en un momento.'
             : datos === null
@@ -813,19 +863,8 @@ export default function Mapa({ onDiputados }) {
             : 'Todavía no hay base suficiente para situar a los partidos en este eje.'}
         </div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: 12,
-          alignItems: 'stretch'
-        }}
-          className="mapaLayout">
-          <style>{`
-            @media(min-width:960px){
-              .mapaLayout{grid-template-columns:minmax(200px,.85fr) minmax(320px,1.3fr) minmax(200px,.85fr)!important}
-            }
-          `}</style>
-
+        <div className="mapaLayout">
+          <div className="mapaGuias">
           <div className="mapaLado">
             {fuente === 'votos' && auditoria?.economico_margen_escaso && (
               <div style={{
@@ -844,6 +883,7 @@ export default function Mapa({ onDiputados }) {
               </div>
             )}
             <GuiaEje
+              plegable={estrecho}
               titulo={fuente === 'territorio' ? 'Eje territorial' : 'Eje económico'}
               intro={fuente === 'territorio'
                 ? 'Mide dónde debe residir el poder: en el Estado central o en las comunidades autónomas. Es independiente de los otros dos ejes y en España es el que más separa a los partidos.'
@@ -880,34 +920,43 @@ export default function Mapa({ onDiputados }) {
             />
           </div>
 
-          <div style={{
+          </div>
+
+          <div className="mapaLienzo" style={{
             position: 'relative',
-            background: C.pizarra, borderRadius: 3, padding: 'clamp(14px, 2.5vw, 22px)', minWidth: 0
+            background: C.pizarra, borderRadius: 3, padding: 'clamp(12px, 2.5vw, 22px)', minWidth: 0
           }}>
             <DestelloSuave color="rgba(232,197,106,0.35)" n={6} />
             <div style={{
-              position: 'absolute', right: 14, top: 14, zIndex: 2,
-              display: 'flex', flexDirection: 'column', gap: 4
+              position: 'absolute', right: 12, zIndex: 2,
+              top: estrecho ? 'auto' : 12,
+              bottom: estrecho ? 12 : 'auto',
+              display: 'flex', flexDirection: estrecho ? 'row' : 'column', gap: 5
             }}>
               {[['+', () => acercar(1.4, null)], ['−', () => acercar(1 / 1.4, null)]].map(([t, fn]) => (
                 <button key={t} onClick={fn} aria-label={t === '+' ? 'Acercar' : 'Alejar'} style={{
-                  width: 26, height: 26, borderRadius: 3, cursor: 'pointer', lineHeight: 1,
-                  background: 'rgba(255,255,255,0.09)', color: '#D8DCE0',
-                  border: '1px solid rgba(255,255,255,0.16)', fontSize: 15, fontWeight: 600
+                  width: 32, height: 32, borderRadius: 3, cursor: 'pointer', lineHeight: 1,
+                  background: 'rgba(24,33,30,0.82)', color: '#D8DCE0',
+                  border: '1px solid rgba(255,255,255,0.22)', fontSize: 16, fontWeight: 600
                 }}>{t}</button>
               ))}
               {vista.z > 1 && (
                 <button onClick={reencuadrar} aria-label="Reencuadrar" style={{
-                  width: 26, height: 26, borderRadius: 3, cursor: 'pointer', lineHeight: 1,
-                  background: 'rgba(255,255,255,0.09)', color: '#D8DCE0',
-                  border: '1px solid rgba(255,255,255,0.16)', fontSize: 11
+                  width: 32, height: 32, borderRadius: 3, cursor: 'pointer', lineHeight: 1,
+                  background: 'rgba(24,33,30,0.82)', color: '#D8DCE0',
+                  border: '1px solid rgba(255,255,255,0.22)', fontSize: 12
                 }}>⤢</button>
               )}
             </div>
             <svg ref={svgRef}
               viewBox={viewBox}
               preserveAspectRatio="xMidYMid meet"
-              style={{ width: '100%', height: 'auto', maxHeight: '58vh', display: 'block', margin: '0 auto', touchAction: 'none', cursor: vista.z > 1 ? 'grab' : 'crosshair', userSelect: 'none' }}
+              style={{
+                width: '100%', height: 'auto', maxHeight: estrecho ? '54vh' : '58vh',
+                minHeight: estrecho ? 280 : 0, display: 'block', margin: '0 auto',
+                touchAction: tactil && vista.z <= 1 ? 'pan-y' : 'none',
+                cursor: vista.z > 1 ? 'grab' : 'crosshair', userSelect: 'none'
+              }}
               onPointerMove={onPointerMove}
               onPointerLeave={onPointerLeave}
               onPointerDown={onPointerDown}
@@ -1190,8 +1239,10 @@ export default function Mapa({ onDiputados }) {
             </div>
           </div>
 
+          <div className="mapaGuias">
           <div className="mapaLado">
             <GuiaEje
+              plegable={estrecho}
               titulo="Eje social"
               intro="Es un eje independiente del económico. Se puede situar a un lado en economía y al otro en este. En España se confunden a menudo; por eso el mapa los separa."
               colorA="#B8912E"
@@ -1211,6 +1262,7 @@ export default function Mapa({ onDiputados }) {
                     conservador y abajo progresista, igual que en el resto del mapa.</>
                 : <>Derechos individuales y reglas de entrada/regularización de migrantes. Nada más.</>}
             />
+          </div>
           </div>
         </div>
       )}

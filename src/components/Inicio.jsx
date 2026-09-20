@@ -11,7 +11,8 @@ import {
   marcarVistoAhora, ultimaVista, filtrarNovedades
 } from '../lib/alertas.js';
 import { traerUltimas, traerLideres } from '../lib/cliente.js';
-import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
+import { titularDeNorma } from '../lib/fraseCorta.js';
+import { useTelefono } from '../lib/pantalla.js';
 import { VOTO } from '../lib/paleta.js';
 
 const C = {
@@ -29,14 +30,6 @@ function corta(f) {
   if (dias === 1) return 'ayer';
   if (dias < 8) return `hace ${dias} d`;
   return `${d.getDate()} ${MESES[d.getMonth()]}`;
-}
-
-function limpiarTitular(t) {
-  if (!t) return t;
-  return String(t)
-    .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
-    .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
-    .trim() || t;
 }
 
 function Seccion({ titulo, texto, pie, onClick }) {
@@ -57,6 +50,7 @@ function Seccion({ titulo, texto, pie, onClick }) {
 }
 
 export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onIr }) {
+  const estrecho = useTelefono();
   const [perfil, setPerfil] = useState('');
   const [deteccion, setDeteccion] = useState({ colectivos: [], materias: [] });
   const [pensando, setPensando] = useState(false);
@@ -206,7 +200,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
               <button onClick={guardarAlerta} style={{
                 marginLeft: 'auto', padding: '5px 12px', fontSize: 12, cursor: 'pointer',
                 borderRadius: 20, border: `1px solid ${C.si}`, background: 'transparent', color: C.si
-              }}>{guardado ? 'Actualizar alerta' : 'Avisarme de nuevas'}</button>
+              }}>{guardado ? 'Actualizar mi perfil' : 'Guardar y marcar las nuevas'}</button>
               {guardado && (
                 <button onClick={olvidarAlerta} className="em" style={{
                   background: 'none', border: 'none', color: C.tenue, fontSize: 11, cursor: 'pointer', padding: 0
@@ -227,14 +221,15 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             {novedades.length} norma{novedades.length === 1 ? '' : 's'} nueva{novedades.length === 1 ? '' : 's'} para tu perfil
           </div>
           <div style={{ fontSize: 12.5, color: C.media, marginBottom: 10, lineHeight: 1.45 }}>
-            Desde tu última visita, con los colectivos que guardaste.
+            Votadas desde tu última visita, con los colectivos que guardaste. El perfil se guarda en
+            este navegador: no hay cuenta, no hay correo y nadie te escribe.
           </div>
           {novedades.slice(0, 4).map(n => (
             <button key={n.clave_norma} onClick={() => onVotacion(n)} style={{
               display: 'block', width: '100%', textAlign: 'left', background: 'none',
               border: 'none', borderTop: `1px solid #C5DFD0`, cursor: 'pointer', padding: '8px 0'
             }}>
-              <span style={{ fontSize: 13, color: C.tinta }}>{fraseCortaDeNorma(n, 60) || limpiarTitular(n.titular)}</span>
+              <span style={{ fontSize: 13, color: C.tinta }}>{titularDeNorma(n, 72)}</span>
               <span className="em" style={{ fontSize: 10, color: C.tenue, marginLeft: 8 }}>{corta(n.fecha)}</span>
             </button>
           ))}
@@ -272,12 +267,12 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             }}>quitar filtro</button>
           </div>
         )}
-        {!etiqueta && <div className="rot" style={{ marginBottom: 12 }}>Todas las leyes votadas</div>}
-        <Feed filtros={filtro ?? {}} onAbrir={onVotacion} limpiarTitular={limpiarTitular} />
+        {!etiqueta && <div className="rot" style={{ marginBottom: 12 }}>Todo lo que ha votado el Pleno</div>}
+        <Feed filtros={filtro ?? {}} onAbrir={onVotacion} />
       </div>
 
       {ausentes.length > 0 && (
-        <div className="tarjeta" style={{ padding: 16, marginTop: 28 }}>
+        <div className="tarjeta" style={{ padding: 14, marginTop: 24 }}>
           <div className="ed" style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>
             Diputado más ausente de cada partido
           </div>
@@ -285,7 +280,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             Número de votaciones sin voto emitido. Cargos institucionales acumulan ausencias por agenda; no implica dejadez por sí solo.
           </div>
           <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            {ausentes.slice(0, 12).map(l => (
+            {ausentes.slice(0, estrecho ? 6 : 12).map(l => (
               <div key={l.partido} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                 <span style={{ width: 3, height: 28, background: l.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -305,7 +300,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
         <GraficoBrecha />
       </div>
 
-      <div style={{ marginTop: 20, display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}>
+      <div style={{ marginTop: 20, display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
         <Seccion titulo="Tu diputado"
           texto="Busca por provincia o nombre. Su historial completo de votos, ausencias y si rompió con su partido."
           pie="Buscar diputado" onClick={() => onIr('diputados')} />

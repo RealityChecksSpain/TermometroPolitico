@@ -16,30 +16,58 @@ const TEMAS = {
   vivienda: { nombre: 'Vivienda', color: '#C88A1E' }
 };
 
+const MAXIMO = 8;
+
+function baseDe(h) {
+  if (h.base_texto) return String(h.base_texto);
+  if (h.denominador_texto) return String(h.denominador_texto);
+  const n = h.base_n ?? h.denominador ?? null;
+  if (n == null) return null;
+  const que = h.base_unidad ?? h.unidad ?? 'registros';
+  return `Calculado sobre ${Number(n).toLocaleString('es')} ${que}.`;
+}
+
+function utilizable(h) {
+  if (!h?.titular) return false;
+  if (!h.detalle || String(h.detalle).trim().length < 20) return false;
+  return true;
+}
+
 export default function Hallazgos({ onIr }) {
   const reducido = useReducedMotion();
   const [lista, setLista] = useState([]);
   const [i, setI] = useState(0);
   const [pausa, setPausa] = useState(false);
+  const [manual, setManual] = useState(false);
   const [sentido, setSentido] = useState(1);
+  const [verTodos, setVerTodos] = useState(false);
+  const [descartados, setDescartados] = useState(0);
 
   useEffect(() => {
-    traerHallazgos().then(setLista).catch(() => setLista([]));
+    traerHallazgos()
+      .then(filas => {
+        const buenos = (filas ?? []).filter(utilizable);
+        setDescartados((filas ?? []).length - buenos.length);
+        setLista(buenos.slice(0, MAXIMO));
+      })
+      .catch(() => setLista([]));
   }, []);
 
   useEffect(() => {
-    if (pausa || reducido || lista.length < 2) return;
-    const t = setInterval(() => { setSentido(1); setI(v => (v + 1) % lista.length); }, 7000);
+    if (pausa || manual || reducido || lista.length < 2) return;
+    const t = setInterval(() => { setSentido(1); setI(v => (v + 1) % lista.length); }, 9000);
     return () => clearInterval(t);
-  }, [pausa, reducido, lista.length]);
+  }, [pausa, manual, reducido, lista.length]);
 
   const ir = useCallback(n => {
+    setManual(true);
     setSentido(n);
     setI(v => (v + n + lista.length) % lista.length);
   }, [lista.length]);
 
   const h = lista[i];
   const tema = useMemo(() => (h?.tema ? TEMAS[h.tema] : null), [h]);
+  const base = useMemo(() => (h ? baseDe(h) : null), [h]);
 
   if (!lista.length) return null;
 
@@ -64,35 +92,70 @@ export default function Hallazgos({ onIr }) {
               transition={{ type: 'spring', stiffness: 320, damping: 24 }}
               style={{
                 fontSize: 9.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
-                color: '#F3F1E8', background: tema.color, padding: '3px 8px', borderRadius: 2,
-                marginLeft: 10
+                color: '#F3F1E8', background: tema.color, padding: '3px 8px', borderRadius: 2
               }}>{tema.nombre}</motion.span>
           )}
           <div className="hallazgosNav">
-            <button onClick={() => ir(-1)} aria-label="Anterior">‹</button>
+            <button onClick={() => ir(-1)} aria-label="Hallazgo anterior">‹</button>
             <span className="em contador">{i + 1}/{lista.length}</span>
-            <button onClick={() => ir(1)} aria-label="Siguiente">›</button>
+            <button onClick={() => ir(1)} aria-label="Hallazgo siguiente">›</button>
           </div>
         </div>
 
-        <button className="hallazgoCuerpo" onClick={() => h.seccion && onIr?.(h.seccion)}
-          style={{ display: 'grid' }}>
-          <AnimatePresence mode="wait" custom={sentido} initial={false}>
-            <motion.span key={h.titular} custom={sentido} variants={variantes}
-              initial={reducido ? false : 'entra'} animate="centro" exit={reducido ? undefined : 'sale'}
-              transition={SALIDA} style={{ display: 'block' }}>
-              <span className="ed hallazgoTitular" style={{ display: 'block' }}>{h.titular}</span>
-              <span className="hallazgoDetalle" style={{ display: 'block' }}>{h.detalle}</span>
-            </motion.span>
-          </AnimatePresence>
-        </button>
+        {verTodos ? (
+          <div>
+            {lista.map((x, n) => (
+              <button key={x.titular} className="hallazgoCuerpo"
+                onClick={() => x.seccion && onIr?.(x.seccion)}
+                style={{
+                  minHeight: 0, padding: '11px 0',
+                  borderTop: n ? '1px solid #2C3339' : 'none'
+                }}>
+                <span className="ed hallazgoTitular" style={{ fontSize: 15.5 }}>{x.titular}</span>
+                <span className="hallazgoDetalle" style={{ fontSize: 12.5 }}>{x.detalle}</span>
+                {baseDe(x) && <span className="hallazgoBase">{baseDe(x)}</span>}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button className="hallazgoCuerpo" onClick={() => h.seccion && onIr?.(h.seccion)}
+            style={{ display: 'grid' }}>
+            <AnimatePresence mode="wait" custom={sentido} initial={false}>
+              <motion.span key={h.titular} custom={sentido} variants={variantes}
+                initial={reducido ? false : 'entra'} animate="centro" exit={reducido ? undefined : 'sale'}
+                transition={SALIDA} style={{ display: 'block' }}>
+                <span className="ed hallazgoTitular" style={{ display: 'block' }}>{h.titular}</span>
+                <span className="hallazgoDetalle" style={{ display: 'block' }}>{h.detalle}</span>
+                {base && <span className="hallazgoBase">{base}</span>}
+              </motion.span>
+            </AnimatePresence>
+          </button>
+        )}
 
-        <div className="hallazgosPuntos">
-          {lista.map((_, n) => (
-            <button key={n} onClick={() => { setSentido(n > i ? 1 : -1); setI(n); }}
-              data-on={n === i ? '1' : '0'} aria-label={`Hallazgo ${n + 1}`} />
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {!verTodos && (
+            <div className="hallazgosPuntos">
+              {lista.map((_, n) => (
+                <button key={n} onClick={() => { setManual(true); setSentido(n > i ? 1 : -1); setI(n); }}
+                  data-on={n === i ? '1' : '0'} aria-label={`Hallazgo ${n + 1}`} />
+              ))}
+            </div>
+          )}
+          <button onClick={() => setVerTodos(v => !v)} className="em" style={{
+            marginLeft: 'auto', marginTop: 12, background: 'none', border: '1px solid #3A4048',
+            borderRadius: 2, color: '#9AA4AC', fontSize: 10.5, padding: '4px 9px', cursor: 'pointer'
+          }}>
+            {verTodos ? 'ver de uno en uno' : `ver los ${lista.length}`}
+          </button>
         </div>
+
+        {descartados > 0 && (
+          <div className="em" style={{ fontSize: 10, color: '#6C737B', marginTop: 10, lineHeight: 1.5 }}>
+            {descartados === 1
+              ? 'Un hallazgo no se enseña porque no trae el dato en que se apoya.'
+              : `${descartados} hallazgos no se enseñan porque no traen el dato en que se apoyan.`}
+          </div>
+        )}
       </section>
     </Entrada>
   );

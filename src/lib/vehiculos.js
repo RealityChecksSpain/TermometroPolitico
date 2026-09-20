@@ -1,8 +1,3 @@
-/**
- * Clasifica filas de "VEHÍCULOS, EMBARCACIONES Y AERONAVES" del PDF del Congreso.
- * Parte del texto de descripción (p. ej. "MOTOCICLETA BMW R80RT").
- */
-
 function trozosDetalle(detalle) {
   if (!detalle) return [];
   return String(detalle)
@@ -37,7 +32,6 @@ export function clasificarVehiculos(detalle, totalDeclarado = null) {
   }
 
   const clasificados = coches + motos + embarcaciones + aeronaves + otros;
-  // Si Gemini solo puso un número total sin detalle, úsalo como coches aproximados
   let total = clasificados;
   if (totalDeclarado != null && Number(totalDeclarado) > clasificados) {
     const hueco = Number(totalDeclarado) - clasificados;

@@ -1,6 +1,6 @@
 import { db } from '../src/lib/supabase.js';
 import { preguntar, Cadencia, modeloActivo } from '../src/lib/gemini.js';
-import { sinCache } from '../src/lib/autorizar.js';
+import { cabecera, cuerpoTexto, metodo, responder, responderTexto } from '../src/lib/autorizar.js';
 
 const ESQUEMA = {
   type: 'object',
@@ -24,12 +24,12 @@ const MAX_IA_POR_DIA = Number(process.env.TOPE_IA_DIA ?? 500);
 
 const visitas = new Map<string, number[]>();
 
-function huella(req: Request): string {
-  const vercel = req.headers.get('x-vercel-forwarded-for');
+function huella(req: any): string {
+  const vercel = cabecera(req, 'x-vercel-forwarded-for');
   if (vercel) return vercel.split(',')[0].trim();
-  const real = req.headers.get('x-real-ip');
+  const real = cabecera(req, 'x-real-ip');
   if (real) return real.trim();
-  const cadena = req.headers.get('x-forwarded-for') ?? '';
+  const cadena = cabecera(req, 'x-forwarded-for');
   const partes = cadena.split(',').map(p => p.trim()).filter(Boolean);
   return partes.length ? partes[partes.length - 1] : 'desconocido';
 }
@@ -73,10 +73,10 @@ async function huellaTexto(normalizado: string): Promise<string> {
   return Array.from(new Uint8Array(resumen)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function origenValido(req: Request): boolean {
+function origenValido(req: any): boolean {
   const permitido = process.env.ORIGEN_PERMITIDO;
   if (!permitido) return true;
-  const origen = req.headers.get('origin');
+  const origen = cabecera(req, 'origin');
   if (!origen) return false;
   return permitido.split(',').map(o => o.trim()).includes(origen);
 }
@@ -92,39 +92,39 @@ async function registrar(clave: string, colectivos: string[], materias: string[]
   }
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== 'POST') return new Response('Metodo no permitido', { status: 405 });
-  if (!origenValido(req)) return new Response('Origen no permitido', { status: 403 });
+export default async function handler(req: any, res?: any): Promise<Response | undefined> {
+  if (metodo(req) !== 'POST') return responderTexto(res, 'Metodo no permitido', 405);
+  if (!origenValido(req)) return responderTexto(res, 'Origen no permitido', 403);
 
-  const tipo = req.headers.get('content-type') ?? '';
+  const tipo = cabecera(req, 'content-type');
   if (!tipo.includes('application/json')) {
-    return sinCache({ colectivos: [], materias: [], origen: 'vacio' }, 415);
+    return responder(res, { colectivos: [], materias: [], origen: 'vacio' }, 415);
   }
   if (!pasaCadencia(huella(req))) {
-    return sinCache({ colectivos: [], materias: [], origen: 'demasiadas_peticiones' }, 429);
+    return responder(res, { colectivos: [], materias: [], origen: 'demasiadas_peticiones' }, 429);
   }
 
   let bruto: string;
   try {
-    bruto = await req.text();
+    bruto = await cuerpoTexto(req, LIMITE_CUERPO + 1);
   } catch {
-    return sinCache({ colectivos: [], materias: [], origen: 'vacio' });
+    return responder(res, { colectivos: [], materias: [], origen: 'vacio' });
   }
   if (bruto.length > LIMITE_CUERPO) {
-    return sinCache({ colectivos: [], materias: [], origen: 'vacio' }, 413);
+    return responder(res, { colectivos: [], materias: [], origen: 'vacio' }, 413);
   }
 
   let cuerpo: any;
   try {
     cuerpo = JSON.parse(bruto);
   } catch {
-    return sinCache({ colectivos: [], materias: [], origen: 'vacio' });
+    return responder(res, { colectivos: [], materias: [], origen: 'vacio' });
   }
 
   const texto = (typeof cuerpo?.texto === 'string' ? cuerpo.texto : '').slice(0, LIMITE_TEXTO).trim();
   const normalizado = normalizar(texto);
   if (!texto || normalizado.length < 3) {
-    return sinCache({ colectivos: [], materias: [], origen: 'vacio' });
+    return responder(res, { colectivos: [], materias: [], origen: 'vacio' });
   }
 
   const clave = await huellaTexto(normalizado);
@@ -133,7 +133,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (eCache) console.error('perfil/buscar_en_cache', eCache.message);
   const enCache = Array.isArray(cache) ? cache[0] : cache;
   if (enCache?.colectivos?.length) {
-    return sinCache({
+    return responder(res, {
       colectivos: enCache.colectivos,
       materias: enCache.materias ?? [],
       origen: 'cache'
@@ -142,7 +142,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   if (!process.env.GEMINI_API_KEY) {
     await registrar(clave, [], [], 'sin_resolver');
-    return sinCache({ colectivos: [], materias: [], origen: 'sin_ia' });
+    return responder(res, { colectivos: [], materias: [], origen: 'sin_ia' });
   }
 
   const dia = new Date().toISOString().slice(0, 10);
@@ -154,10 +154,10 @@ export default async function handler(req: Request): Promise<Response> {
   ];
 
   if (cupos.some(c => c === null)) {
-    return sinCache({ colectivos: [], materias: [], origen: 'sin_resolver' }, 503);
+    return responder(res, { colectivos: [], materias: [], origen: 'sin_resolver' }, 503);
   }
   if (cupos.some(c => c === false)) {
-    return sinCache({ colectivos: [], materias: [], origen: 'demasiadas_peticiones' }, 429);
+    return responder(res, { colectivos: [], materias: [], origen: 'demasiadas_peticiones' }, 429);
   }
 
   const [{ data: cols, error: eCols }, { data: mats, error: eMats }] = await Promise.all([
@@ -166,7 +166,7 @@ export default async function handler(req: Request): Promise<Response> {
   ]);
   if (eCols || eMats) {
     console.error('perfil/catalogos', eCols?.message ?? eMats?.message);
-    return sinCache({ colectivos: [], materias: [], origen: 'sin_resolver' }, 503);
+    return responder(res, { colectivos: [], materias: [], origen: 'sin_resolver' }, 503);
   }
 
   const prompt = `Una persona describe su situación personal para ver qué leyes le afectan.
@@ -208,5 +208,5 @@ REGLAS:
   const origen = colectivos.length ? 'ia' : 'sin_resolver';
   await registrar(clave, colectivos, materias, origen);
 
-  return sinCache({ colectivos, materias, origen });
+  return responder(res, { colectivos, materias, origen });
 }

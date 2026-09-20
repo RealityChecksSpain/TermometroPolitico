@@ -1,5 +1,3 @@
-/** Implicaciones prácticas por colectivo. Solo hechos genéricos de uso; sin valorar la norma. */
-
 export const IMPLICACIONES = {
   autonomos: {
     etiqueta: 'Autónomos',

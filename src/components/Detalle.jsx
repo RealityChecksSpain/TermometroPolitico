@@ -5,7 +5,10 @@ import { traerVotacionesDeNorma, traerRelacionadas, traerIniciativaDeVotacion } 
 import { estaSeguido } from '../lib/seguimientos.js';
 import BotonSeguir from './BotonSeguir.jsx';
 import HistorialNorma from './HistorialNorma.jsx';
-import { fraseCortaDeNorma } from '../lib/fraseCorta.js';
+import Posturas from './Posturas.jsx';
+import {
+  nombreCompletoNorma, procedenciaResumen, resumenBreve, restoResumen, titularDeNorma, vehiculoNorma
+} from '../lib/fraseCorta.js';
 import { implicacionDe } from '../lib/implicaciones.js';
 import { VOTO } from '../lib/paleta.js';
 import { mayoriaRequerida, umbralDe, nombreMayoria, faltaronPara } from '../lib/mayorias.js';
@@ -114,7 +117,12 @@ export function DetalleLey({ votacion, onVolver }) {
   const mayoria = mayoriaRequerida(votacion);
   const umbral = umbralDe(mayoria);
   const enlaces = String(votacion.enlaces_bocg ?? '').split(/[\s·]+/).filter(u => u.startsWith('http')).slice(0, 3);
-  const frase = fraseCortaDeNorma(votacion, 72);
+  const frase = titularDeNorma(votacion, 110);
+  const oficial = nombreCompletoNorma(votacion);
+  const vehiculo = vehiculoNorma(votacion);
+  const cabeza = resumenBreve(votacion, 2);
+  const resto = restoResumen(votacion, 2);
+  const procedencia = procedenciaResumen(votacion);
   const [seccion, setSeccion] = useState('afecta');
   const refAfecta = useRef(null);
   const refResumen = useRef(null);
@@ -186,16 +194,28 @@ export function DetalleLey({ votacion, onVolver }) {
           <span>{votacion.fecha} · Sesión {votacion.sesion}</span>
         </div>
         {frase && (
-          <div className="ed" style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.25, marginBottom: 8 }}>
+          <div className="ed" style={{ fontSize: 'clamp(19px,4.6vw,23px)', fontWeight: 600, lineHeight: 1.25, marginBottom: 8 }}>
             {frase}
           </div>
         )}
-        <div className="em" style={{ fontSize: 11.5, color: C.media, lineHeight: 1.4 }}>
-          {String(votacion.subtitulo || votacion.titulo || '')
-            .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
-            .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
-            .trim() || (votacion.subtitulo || votacion.titulo)}
+        {vehiculo && (
+          <div className="em" style={{
+            fontSize: 9.5, color: C.media, fontWeight: 700, letterSpacing: '.06em',
+            textTransform: 'uppercase', marginBottom: 4
+          }}>{vehiculo.nombre}</div>
+        )}
+        <div className="em" style={{ fontSize: 11.5, color: C.media, lineHeight: 1.5 }}>
+          {oficial}
         </div>
+        {vehiculo && !vehiculo.fuerzaDeLey && (
+          <div style={{
+            fontSize: 12, color: '#6B5518', background: '#FFF8E6', border: '1px solid #E8D9A8',
+            borderRadius: 2, padding: '7px 10px', marginTop: 10, lineHeight: 1.5
+          }}>
+            Esto no es una ley. Una {vehiculo.nombre.toLowerCase()} fija una posición política del
+            Pleno y no cambia por sí sola ninguna norma en vigor.
+          </div>
+        )}
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Sello aprobada={aprobada} />
           {umbral !== null && (
@@ -252,38 +272,32 @@ export function DetalleLey({ votacion, onVolver }) {
       </div>
 
       <div ref={refs.resumen} data-sec="resumen" style={{ scrollMarginTop: 52 }}>
-        {votacion.resumen && (
+        {cabeza && (
           <Bloque titulo="Qué dice esta norma">
-            <div style={{ fontSize: 14.5, lineHeight: 1.6 }}>
-              {String(votacion.resumen).split(/(?<=\.)\s+/).slice(0, 2).join(' ')}
-            </div>
-            {(String(votacion.resumen).split(/(?<=\.)\s+/).length > 2 ||
-              (Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0)) && (
+            <div style={{ fontSize: 15, lineHeight: 1.6 }}>{cabeza}</div>
+            {(resto || (Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0)) && (
               <details style={{ marginTop: 12 }}>
-                <summary className="em" style={{ fontSize: 11.5, color: C.media, cursor: 'pointer' }}>
+                <summary className="em" style={{ fontSize: 12, color: C.media, cursor: 'pointer', padding: '4px 0' }}>
                   Leer el detalle completo
                 </summary>
-                <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 10, color: C.media }}>
-                  {String(votacion.resumen).split(/(?<=\.)\s+/).slice(2).join(' ')}
-                </div>
+                {resto && (
+                  <div style={{ fontSize: 13.5, lineHeight: 1.6, marginTop: 10, color: C.media }}>{resto}</div>
+                )}
                 {Array.isArray(votacion.puntos_clave) && votacion.puntos_clave.length > 0 && (
-                  <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, lineHeight: 1.55, color: C.media }}>
-                    {votacion.puntos_clave.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
+                  <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 13, lineHeight: 1.6, color: C.media }}>
+                    {votacion.puntos_clave.map((p, i) => <li key={i} style={{ marginBottom: 6 }}>{p}</li>)}
                   </ul>
                 )}
               </details>
             )}
+            {votacion.a_quien_afecta && (
+              <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.55, marginTop: 12,
+                paddingTop: 10, borderTop: `1px solid ${C.linea}` }}>
+                <strong style={{ color: C.tinta }}>A quién nombra el texto:</strong> {votacion.a_quien_afecta}
+              </div>
+            )}
             <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 12, lineHeight: 1.5 }}>
-              Resumen generado automáticamente
-              {votacion.resumen_modelo ? ` por ${votacion.resumen_modelo}` : ' por un modelo de lenguaje'}
-              {votacion.resumen_basado_en === 'texto_bocg'
-                ? ', a partir del texto publicado en el BOCG, anterior a las enmiendas.'
-                : votacion.resumen_basado_en
-                ? ', a partir del título oficial: el Congreso no publica el texto de esta votación.'
-                : '.'}
-              {votacion.resumen_revisado === true && ' Revisado a mano.'}
-              {votacion.resumen_revisado === false && ' Nadie lo ha revisado a mano.'}
-              {' '}No sustituye al texto legal.
+              {procedencia}
             </div>
           </Bloque>
         )}
@@ -332,13 +346,23 @@ export function DetalleLey({ votacion, onVolver }) {
         )}
 
         {!votacion.resumen && (
-          <Bloque titulo="Sin resumen disponible" aviso>
-            <div style={{ fontSize: 12.5, color: '#6B5518', lineHeight: 1.55 }}>
+          <Bloque titulo="Qué dice esta norma" aviso>
+            {vehiculo?.queEs && (
+              <div style={{ fontSize: 14.5, lineHeight: 1.6, color: C.tinta, marginBottom: 12 }}>
+                {vehiculo.queEs}
+              </div>
+            )}
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: C.tinta,
+              paddingLeft: 11, borderLeft: `2px solid ${C.linea}` }}>
+              {oficial}
+            </div>
+            <div style={{ fontSize: 12.5, color: '#6B5518', lineHeight: 1.55, marginTop: 12 }}>
               {SIN_TEXTO_PROPIO.test(`${votacion.titulo ?? ''} ${votacion.subtitulo ?? ''}`)
-                ? <>El Congreso no publica en datos abiertos el texto de las proposiciones no de ley,
-                  mociones e interpelaciones, así que de esta votación solo hay título oficial y acta.</>
-                : <>Todavía no hay resumen de esta votación: o el Congreso no ha publicado su texto en
-                  datos abiertos, o no se ha podido leer. Queda el título oficial y el acta.</>}
+                ? <>Ese es el texto completo que el Congreso publica en datos abiertos: de las
+                  proposiciones no de ley, mociones e interpelaciones no publica el articulado, así
+                  que no hay más que resumir.</>
+                : <>Todavía no hay resumen: o el Congreso no ha publicado el texto en datos abiertos,
+                  o no se ha podido leer. Arriba queda el título oficial completo, y abajo el acta.</>}
             </div>
             <a href={votacion.fuente_url} target="_blank" rel="noreferrer" className="em"
               style={{ fontSize: 11, color: '#6B5518', display: 'block', marginTop: 10 }}>
@@ -348,6 +372,43 @@ export function DetalleLey({ votacion, onVolver }) {
         )}
       </div>
     </div>
+  );
+}
+
+function Disidentes({ analisis, onDiputado }) {
+  const [todos, setTodos] = useState(false);
+  const lista = analisis.grupos.flatMap(g => g.rebeldes.map(r => ({ ...r, partido: g.grupo })));
+  if (lista.length === 0) {
+    return (
+      <Bloque titulo="Votaron distinto que su partido">
+        <div style={{ fontSize: 12.5, color: C.tenue }}>
+          Ninguno. Todos los diputados votaron con la mayoría de su partido.
+        </div>
+      </Bloque>
+    );
+  }
+  const TOPE = 12;
+  const visibles = todos ? lista : lista.slice(0, TOPE);
+  return (
+    <Bloque titulo={`Votaron distinto que su partido · ${lista.length}`} aviso>
+      {visibles.map(r => (
+        <button key={r.d.mandato_id} onClick={() => onDiputado?.(r.d)} style={{
+          display: 'block', width: '100%', textAlign: 'left', background: 'none',
+          border: 'none', cursor: 'pointer', padding: '6px 0', fontSize: 13, color: '#6B5518'
+        }}>
+          {r.d.nombre_completo}
+          <span className="em" style={{ opacity: 0.75, fontSize: 11 }}> ({r.partido}) → {ETIQUETA[r.voto]}</span>
+        </button>
+      ))}
+      {lista.length > TOPE && (
+        <button onClick={() => setTodos(!todos)} className="em" style={{
+          marginTop: 8, padding: '6px 11px', fontSize: 11.5, cursor: 'pointer', borderRadius: 2,
+          background: 'transparent', border: '1px solid #E8D9A8', color: '#6B5518'
+        }}>
+          {todos ? 'Ver solo los primeros 12' : `Ver los ${lista.length - TOPE} restantes`}
+        </button>
+      )}
+    </Bloque>
   );
 }
 
@@ -457,27 +518,9 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
             </Bloque>
           )}
 
-          {(() => {
-            const disidentes = analisis.grupos.flatMap(g => g.rebeldes.map(r => ({ ...r, partido: g.grupo })));
-            const hay = disidentes.length > 0;
-            return (
-              <Bloque titulo="Votaron distinto que su partido" aviso={hay}>
-                {hay ? disidentes.map(r => (
-                  <button key={r.d.mandato_id} onClick={() => onDiputado?.(r.d)} style={{
-                    display: 'block', width: '100%', textAlign: 'left', background: 'none',
-                    border: 'none', cursor: 'pointer', padding: '5px 0', fontSize: 12.5, color: '#6B5518'
-                  }}>
-                    {r.d.nombre_completo}
-                    <span className="em" style={{ opacity: 0.75, fontSize: 11 }}> ({r.partido}) → {ETIQUETA[r.voto]}</span>
-                  </button>
-                )) : (
-                  <div style={{ fontSize: 12.5, color: C.tenue }}>
-                    Ninguno. Todos los diputados votaron con la mayoría de su partido.
-                  </div>
-                )}
-              </Bloque>
-            );
-          })()}
+          <Disidentes analisis={analisis} onDiputado={onDiputado} />
+
+      <Posturas analisis={analisis} />
 
       {enmiendas && enmiendas.length > 1 && <HistorialNorma enmiendas={enmiendas} />}
 
@@ -488,7 +531,7 @@ export default function Detalle({ votacion, diputados, votos, onDiputado, onNorm
               display: 'block', width: '100%', textAlign: 'left', background: 'none',
               border: 'none', borderTop: `1px solid ${C.linea}`, cursor: 'pointer', padding: '9px 0'
             }}>
-              <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>{String(rn.titular).slice(0, 130)}</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>{titularDeNorma(rn, 130)}</div>
               <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 3 }}>
                 {rn.fecha} · <span style={{ color: C.si }}>aprobada</span> · {rn.total_si}–{rn.total_no}
               </div>

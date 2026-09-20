@@ -1,15 +1,9 @@
-/**
- * Normaliza importes de declaraciones (formato ES + erratas de 3 “decimales”).
- * Ej.: 187425535 (leído de «187.425,535») → 187425.54
- */
-
 export function sanearImporte(n) {
   if (n == null || n === '') return null;
   let x = typeof n === 'string' ? parseEuroES(n) : Number(n);
   if (x == null || !Number.isFinite(x)) return null;
 
   const abs = Math.abs(x);
-  // Entero enorme con residuo de 3 dígitos (céntimos mal pegados)
   if (abs >= 5_000_000 && Number.isInteger(x) && (abs % 1000) !== 0) {
     const y = x / 1000;
     if (Math.abs(y) < 5_000_000) x = y;

@@ -6,6 +6,8 @@ import { traerVotosDeDiputado, traerResumenDiputado, traerActividades, traerPoli
 import { estaSeguido } from '../lib/seguimientos.js';
 import BotonSeguir from './BotonSeguir.jsx';
 import AvatarPartido from './AvatarPartido.jsx';
+import { useBloqueoScroll, useTelefono } from '../lib/pantalla.js';
+import { tituloCorto, vehiculoNorma } from '../lib/fraseCorta.js';
 import { VOTO } from '../lib/paleta.js';
 
 const C = {
@@ -31,6 +33,8 @@ function Dato({ etiqueta, valor, sufijo = '' }) {
 
 export default function FichaDiputado({ d, onCerrar, onVotacion }) {
   const reducido = useReducedMotion();
+  const estrecho = useTelefono();
+  useBloqueoScroll(Boolean(d));
   const [votos, setVotos] = useState(null);
   const [resumen, setResumen] = useState(null);
   const [fallo, setFallo] = useState(null);
@@ -83,6 +87,8 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
 
   const lista = (votos ?? []).filter(v => !soloDisidencias || v.disidente);
   const nDisidencias = Number(resumen?.disidencias ?? 0);
+  const hayBienes = d.patrimonio_euros != null || d.n_casas != null || d.n_inmuebles != null
+    || Boolean(d.vehiculos_detalle) || (d.n_vehiculos ?? 0) > 0;
 
   return (
     <motion.div
@@ -95,12 +101,22 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
         initial={reducido ? false : { y: 44, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 30, mass: 0.9 }}
+        drag={estrecho && !reducido ? 'y' : false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
+        onDragEnd={(_e, info) => { if (info.offset.y > 110 || info.velocity.y > 620) onCerrar?.(); }}
         style={{
-          background: C.superficie, width: '100%', maxWidth: 620, borderRadius: '4px 4px 0 0',
-          maxHeight: '92vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain'
+          background: C.superficie, width: '100%', maxWidth: 620, borderRadius: '10px 10px 0 0',
+          maxHeight: '90vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          paddingBottom: 'env(safe-area-inset-bottom)'
         }}>
-        <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${C.linea}` }}>
+        {estrecho && (
+          <div style={{ padding: '8px 0 2px', display: 'flex', justifyContent: 'center' }}>
+            <span style={{ width: 38, height: 4, borderRadius: 4, background: '#D5D2C6' }} />
+          </div>
+        )}
+        <div style={{ padding: '14px 16px 12px', borderBottom: `1px solid ${C.linea}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12, minWidth: 0 }}>
               <AvatarPartido
@@ -142,7 +158,10 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                   compacto
                 />
               )}
-              <button onClick={onCerrar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.tenue, fontSize: 24, lineHeight: 1 }}>×</button>
+              <button onClick={onCerrar} aria-label="Cerrar ficha" style={{
+                background: 'none', border: 'none', cursor: 'pointer', color: C.tenue,
+                fontSize: 26, lineHeight: 1, width: 40, height: 40, flexShrink: 0
+              }}>×</button>
             </div>
           </div>
 
@@ -174,7 +193,8 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 22, marginTop: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'grid', gap: 12, marginTop: 16,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))' }}>
                 <Dato etiqueta="Asistencia" valor={d.asistencia} sufijo="%" />
                 <Dato etiqueta="Intervenciones" valor={d.intervenciones} />
                 <Dato etiqueta="Minutos hablando" valor={d.minutos_tribuna} />
@@ -195,19 +215,22 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 4, padding: '10px 18px 0', borderBottom: `1px solid ${C.linea}`,
-          position: 'sticky', top: 0, background: C.superficie, zIndex: 2 }}>
+        <div style={{ display: 'flex', gap: 4, padding: '10px 16px 0', borderBottom: `1px solid ${C.linea}`,
+          position: 'sticky', top: 0, background: C.superficie, zIndex: 2, overflowX: 'auto' }}>
           {[['votos', `Votaciones${resumen ? ` (${resumen.total_votos})` : ''}`],
-            ['intereses', `Intereses declarados${actividades.length ? ` (${actividades.length})` : ''}`]].map(([k, t]) => (
+            hayBienes ? ['bienes', 'Bienes'] : null,
+            ['intereses', `Intereses${actividades.length ? ` (${actividades.length})` : ''}`]]
+            .filter(Boolean).map(([k, t]) => (
             <button key={k} onClick={() => setPestana(k)} style={{
-              padding: '8px 12px', fontSize: 12.5, cursor: 'pointer', background: 'none',
+              padding: '9px 12px', fontSize: 12.5, cursor: 'pointer', background: 'none',
               border: 'none', borderBottom: `2px solid ${pestana === k ? C.tinta : 'transparent'}`,
-              color: pestana === k ? C.tinta : C.tenue, fontWeight: pestana === k ? 600 : 400, marginBottom: -1
+              color: pestana === k ? C.tinta : C.tenue, fontWeight: pestana === k ? 600 : 400,
+              marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0
             }}>{t}</button>
           ))}
         </div>
 
-        <div style={{ padding: '12px 18px 18px', display: pestana === 'intereses' ? 'block' : 'none' }}>
+        <div style={{ padding: '12px 16px 18px', display: pestana === 'intereses' ? 'block' : 'none' }}>
           {actividades.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 12 }}>
               Sin declaraciones registradas.
@@ -255,8 +278,9 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           </div>
         </div>
 
-        {(d.patrimonio_euros != null || d.n_casas != null || d.n_inmuebles != null || d.vehiculos_detalle || (d.n_vehiculos ?? 0) > 0) && (
-          <div style={{ padding: '12px 18px', borderBottom: `1px solid ${C.linea}`, background: '#F8F6EE' }}>
+        {hayBienes && (
+          <div style={{ padding: '12px 16px 18px', background: '#F8F6EE',
+            display: pestana === 'bienes' ? 'block' : 'none' }}>
             <div className="em" style={{
               fontSize: 10, color: C.tenue, letterSpacing: '.05em', textTransform: 'uppercase',
               fontWeight: 600, marginBottom: 8
@@ -379,7 +403,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
           </div>
         )}
 
-        <div style={{ padding: '0 18px 18px', display: pestana === 'votos' ? 'block' : 'none' }}>
+        <div style={{ padding: '12px 16px 18px', display: pestana === 'votos' ? 'block' : 'none' }}>
           {votos === null && !fallo && <div style={{ padding: 30, textAlign: 'center', color: C.tenue, fontSize: 12 }}>Cargando su historial de votos…</div>}
 
           {fallo && (
@@ -401,20 +425,26 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
               border: 'none', borderBottom: `1px solid ${C.linea}`, cursor: 'pointer', padding: '10px 4px'
             }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span className="em" style={{ fontSize: 11, fontWeight: 500, color: COLOR[v.voto], width: 52, flexShrink: 0 }}>
+                <span className="em" style={{ fontSize: 11, fontWeight: 600, color: COLOR[v.voto], width: 50, flexShrink: 0 }}>
                   {ETIQUETA[v.voto] ?? v.voto}
                 </span>
-                <span style={{ fontSize: 12.5, lineHeight: 1.4, flex: 1, minWidth: 0 }}>
-                  {v.subtitulo || v.titulo}
+                <span style={{ fontSize: 13, lineHeight: 1.4, flex: 1, minWidth: 0 }}>
+                  {tituloCorto({ titular: v.subtitulo || v.titulo }, 120)}
                 </span>
               </div>
-              <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, marginLeft: 60, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, marginLeft: 58, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {v.materia && (
                   <span style={{ background: (v.materia_color || '#8E9299') + '22', color: v.materia_color || C.media, padding: '1px 5px', borderRadius: 2 }}>
                     {v.materia}
                   </span>
                 )}
                 <span>{v.fecha}</span>
+                {(() => {
+                  const veh = vehiculoNorma({ titular: v.subtitulo || v.titulo });
+                  return veh && !veh.fuerzaDeLey
+                    ? <span style={{ color: '#8A6D1F' }}>{veh.nombre}</span>
+                    : null;
+                })()}
                 <span style={{ color: v.resultado === 'aprobada' ? C.si : C.no }}>{v.resultado}</span>
                 {v.telematico && <span>telemático</span>}
                 {v.disidente && <span style={{ color: '#6B5518', fontWeight: 600 }}>

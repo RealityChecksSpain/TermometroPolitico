@@ -34,20 +34,20 @@ export function guardarPerfil(perfil) {
       ...perfil,
       guardadoEn: new Date().toISOString()
     }));
-  } catch { /* ignore */ }
+  } catch {}
 }
 
 export function borrarPerfilGuardado() {
   try {
     localStorage.removeItem(CLAVE_PERFIL);
     for (const vieja of ANTIGUAS_PERFIL) localStorage.removeItem(vieja);
-  } catch { /* ignore */ }
+  } catch {}
 }
 
 export function marcarVistoAhora() {
   try {
     localStorage.setItem(CLAVE_VISTO, new Date().toISOString().slice(0, 10));
-  } catch { /* ignore */ }
+  } catch {}
 }
 
 export function ultimaVista() {

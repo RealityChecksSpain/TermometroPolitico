@@ -1,4 +1,3 @@
-﻿/** Convierte coordenadas de pantalla a espacio del viewBox del SVG. */
 export function puntoSvg(svg, clientX, clientY) {
   if (!svg) return null;
   const ctm = svg.getScreenCTM();
@@ -9,10 +8,6 @@ export function puntoSvg(svg, clientX, clientY) {
   return pt.matrixTransform(ctm.inverse());
 }
 
-/**
- * Índice del punto más cercano a (x,y) dentro de maxDist (unidades SVG).
- * puntos: [{ cx, cy }, ...]
- */
 export function indiceMasCercano(puntos, x, y, maxDist) {
   const max2 = maxDist * maxDist;
   let best = -1;

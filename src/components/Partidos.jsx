@@ -190,8 +190,8 @@ export default function Partidos({ onDiputados }) {
     return (
       <div style={{ padding: 24, background: '#FFF8E6', border: '1px solid #E8D9A8', borderRadius: 3 }}>
         <div style={{ fontSize: 13, color: '#6B5518', lineHeight: 1.6 }}>
-          Todavía no hay programas cargados. Pon los PDF en <code>programas/</code> y ejecuta{' '}
-          <code>npm run programas</code>.
+          Todavía no hay programas electorales cargados, así que no se puede comparar lo prometido
+          con lo votado. Esta sección se llenará cuando estén.
         </div>
       </div>
     );

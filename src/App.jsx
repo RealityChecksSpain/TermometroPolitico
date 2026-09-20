@@ -12,7 +12,9 @@ const Partidos = lazy(() => import('./components/Partidos.jsx'));
 import Inicio from './components/Inicio.jsx';
 const FeedPersonal = lazy(() => import('./components/FeedPersonal.jsx'));
 import AvatarPartido from './components/AvatarPartido.jsx';
-import { fraseCortaDeNorma } from './lib/fraseCorta.js';
+import { titularDeNorma, tituloCorto, vehiculoNorma } from './lib/fraseCorta.js';
+import { totalSeguimientos } from './lib/seguimientos.js';
+import { useTelefono } from './lib/pantalla.js';
 import {
   faltaConfig, problemasConfig, traerDiputados, traerVotaciones, traerVotos,
   traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
@@ -27,18 +29,19 @@ const C = {
 
 const estilos = `
 *{box-sizing:border-box}
-html,body{margin:0;background:${C.papel};-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:${C.papel};-webkit-font-smoothing:antialiased;overflow-x:hidden}
 .e{font-family:'Archivo Variable','Archivo',system-ui,sans-serif}
 .ed{font-family:'Newsreader Variable','Newsreader',Georgia,serif;letter-spacing:-0.012em;font-optical-sizing:auto}
 .em{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
 button,input{font-family:inherit}
-.app{max-width:1120px;margin:0 auto;padding:0 16px 96px}
+.app{max-width:1120px;margin:0 auto;padding:0 14px 96px}
 @media(min-width:900px){.app{padding:0 28px 40px}}
-.hero{background:${C.pizarra};border-radius:4px;padding:20px 18px 14px}
+.hero{background:${C.pizarra};border-radius:4px;padding:16px 14px 12px}
 @media(min-width:900px){.hero{padding:26px 32px 18px}}
-.cols{display:grid;grid-template-columns:1fr;gap:20px;margin-top:8px}
-@media(min-width:900px){.cols{grid-template-columns:1fr 1fr;gap:28px;align-items:start}}
-.solo1{grid-column:1/-1}
+.cols{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;margin-top:8px}
+.cols>*{min-width:0}
+@media(min-width:900px){.cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}}
+.solo1{grid-column:1/-1;min-width:0}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(239,239,233,.94);
 backdrop-filter:blur(10px);border-top:1px solid ${C.linea};display:flex;
 padding-bottom:env(safe-area-inset-bottom)}
@@ -50,25 +53,27 @@ body{padding-bottom:calc(58px + env(safe-area-inset-bottom))}
 .ficha>aside{order:0;position:sticky;top:14px}}
 @media(min-width:900px){.nav{position:static;background:none;backdrop-filter:none;border-top:none;
 border-bottom:none;margin-bottom:0;gap:2px}}
-.navb{flex:1;padding:9px 4px 8px;background:none;border:none;cursor:pointer;
-display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:${C.tenue};
-border-top:2px solid transparent}
+.navb{flex:1;padding:9px 2px 8px;background:none;border:none;cursor:pointer;
+display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:${C.tenue};
+border-top:2px solid transparent;position:relative;min-width:0}
 @media(min-width:900px){.navb{flex:none;flex-direction:row;gap:7px;font-size:13px;padding:9px 16px;
 border-top:none;border-bottom:2px solid transparent;margin-bottom:-2px}}
 .navb[data-on="1"]{color:${C.tinta};font-weight:600;border-top-color:${C.tinta}}
 @media(min-width:900px){.navb[data-on="1"]{border-top-color:transparent;border-bottom-color:${C.tinta}}}
+.navb .senal{position:absolute;top:6px;left:calc(50% + 9px);width:6px;height:6px;border-radius:6px;
+background:#E0492E}
+@media(min-width:900px){.navb .senal{position:static;margin-left:2px}}
 .tarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:3px;
 box-shadow:0 1px 0 rgba(20,22,26,0.03)}
 .fila{transition:background 140ms ease, transform 140ms ease}
-.fila:hover{background:#EDEBE0}
+@media(hover:hover){.fila:hover{background:#EDEBE0}}
 .chip{padding:6px 12px;font-size:11px;font-weight:600;border-radius:0;cursor:pointer;
 display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:transparent;
-color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,color 140ms ease,border-color 140ms ease,transform 140ms ease}
-.chip:hover{border-color:${C.tinta}}
+color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,color 140ms ease,border-color 140ms ease}
+@media(hover:hover){.chip:hover{border-color:${C.tinta}}}
 .chip[data-on="1"]{background:${C.tinta};color:${C.papel};border-color:${C.tinta}}
 .navb{transition:color 140ms ease,border-color 140ms ease}
 .hero .chip{color:#C9CDD2;border-color:#4A5057;background:transparent}
-.hero .chip:hover{color:#FFFFFF;border-color:#8E959C}
 .hero .chip[data-on="1"]{background:#F2F3F0;color:#14161A;border-color:#F2F3F0}
 .trabajo{display:grid;grid-template-columns:1fr;gap:18px;align-items:start}
 @media(min-width:980px){.trabajo{grid-template-columns:minmax(360px,44%) 1fr;gap:22px}
@@ -79,19 +84,28 @@ color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,co
 .contents{display:contents}
 .ejesGuia{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:820px){.ejesGuia{grid-template-columns:1fr 1fr}}
-.split{display:grid;grid-template-columns:1fr;gap:16px;margin-top:8px}
+.split{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:8px}
+.split>*{min-width:0}
 @media(min-width:960px){.split{grid-template-columns:minmax(380px,1.15fr) minmax(300px,.9fr);gap:18px;align-items:start}
 .split>.izq{position:sticky;top:14px}}
-.split.splitDiputados{grid-template-columns:1fr}
-@media(min-width:960px){.split.splitDiputados{grid-template-columns:1fr;gap:14px}
+.split.splitDiputados{grid-template-columns:minmax(0,1fr)}
+@media(min-width:960px){.split.splitDiputados{grid-template-columns:minmax(0,1fr);gap:14px}
 .split.splitDiputados>.izq{position:static;top:auto}
 .split.splitDiputados .hemiSvg{max-height:240px;width:auto;margin:0 auto}}
-.rejillaDip .fila{display:grid;grid-template-columns:26px 34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;cursor:pointer;border:none}
-@media(min-width:960px){.rejillaDip .fila{grid-template-columns:26px 34px minmax(0,1fr) 150px 130px}}
+
+.tiraChips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;
+-webkit-overflow-scrolling:touch}
+.tiraChips::-webkit-scrollbar{display:none}
+.tiraChips>*{flex:0 0 auto}
+@media(min-width:701px){.tiraChips{flex-wrap:wrap;overflow-x:visible;padding-bottom:0}}
+
+.rejillaDip .fila{display:grid;grid-template-columns:22px 30px minmax(0,1fr) auto;align-items:center;
+gap:9px;width:100%;text-align:left;padding:9px 10px 9px 12px;cursor:pointer;border:none}
+@media(min-width:960px){.rejillaDip .fila{grid-template-columns:26px 34px minmax(0,1fr) 150px 130px;gap:10px}}
 .rejillaDip .celdaNombre{min-width:0}
-.rejillaDip .dipNombre{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rejillaDip .dipNombre{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rejillaDip .fila[data-top="1"] .dipNombre{font-weight:600}
-.rejillaDip .dipMeta{display:block;font-size:9.5px;color:${C.tenue};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.rejillaDip .dipMeta{display:block;font-size:10px;color:${C.tenue};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .rejillaDip .celdaCirc{display:none;font-size:10.5px;color:${C.tenue};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(min-width:960px){.rejillaDip .celdaCirc{display:block}}
 .rejillaDip .celdaDato{text-align:right;min-width:0}
@@ -105,8 +119,8 @@ color:${C.media};border:1px solid ${C.linea};transition:background 140ms ease,co
 }
 body{font-size:15px;line-height:1.55}
 h1,h2,h3{margin:0;font-family:'Newsreader Variable','Newsreader',Georgia,serif;letter-spacing:-0.018em;line-height:1.15}
-.display{font-size:clamp(28px,4.6vw,44px);font-weight:600;letter-spacing:-0.028em;line-height:1.08}
-.t1{font-size:clamp(21px,2.6vw,27px);font-weight:600;line-height:1.2}
+.display{font-size:clamp(24px,4.6vw,44px);font-weight:600;letter-spacing:-0.028em;line-height:1.08}
+.t1{font-size:clamp(20px,2.6vw,27px);font-weight:600;line-height:1.2}
 .t2{font-size:clamp(17px,1.9vw,20px);font-weight:600;line-height:1.28}
 .cifra{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
 font-size:clamp(24px,3.4vw,34px);font-weight:500;letter-spacing:-0.02em;line-height:1}
@@ -129,66 +143,97 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #3D7A
 .listaFilete .fila:first-child{border-top:1px solid var(--acentoTenue,#E3DFD1)}
 .listaFilete .fila:last-child{border-bottom:1px solid var(--acentoTenue,#E3DFD1)}
 .dato{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
-font-size:clamp(19px,2.1vw,26px);font-weight:500;letter-spacing:-0.03em;line-height:1;
+font-size:clamp(18px,2.1vw,26px);font-weight:500;letter-spacing:-0.03em;line-height:1;
 color:var(--acento,#16181B)}
 .datoUnidad{display:block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
 color:#8E9299;margin-top:3px;font-weight:600}
 .puesto{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
 font-size:10.5px;color:#A9AEB2;width:22px;flex-shrink:0;text-align:right}
-.fila[data-top="1"] .dato{font-size:clamp(23px,2.6vw,32px)}
+.fila[data-top="1"] .dato{font-size:clamp(21px,2.6vw,32px)}
 .nota{background:var(--acentoTenue,#F5F3EA);border:0;border-left:2px solid var(--acentoClaro,#B58A22);
 border-radius:0 var(--radio) var(--radio) 0;padding:10px 13px;margin-bottom:var(--s3);
 font-size:11.5px;line-height:1.55;color:#4A4F55}
 
 .hallazgos{background:linear-gradient(135deg,#16211D 0%,#1E2A26 60%,#1A2F28 100%);
-border-radius:var(--radioG);padding:var(--s3) var(--s4) var(--s4);margin-bottom:var(--s4);position:relative}
-.hallazgosCab{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);
-padding-bottom:var(--s2);border-bottom:1px solid #333941;margin-bottom:var(--s3)}
+border-radius:var(--radioG);padding:var(--s3) var(--s3) var(--s4);margin-bottom:var(--s4);position:relative}
+@media(min-width:701px){.hallazgos{padding:var(--s3) var(--s4) var(--s4)}}
+.hallazgosCab{display:flex;align-items:center;gap:var(--s2);
+padding-bottom:var(--s2);border-bottom:1px solid #333941;margin-bottom:var(--s3);flex-wrap:wrap}
 .hallazgos .rotulo{color:#E8C56A;letter-spacing:.12em}
-.hallazgosNav{display:flex;align-items:center;gap:var(--s2)}
-.hallazgosNav button{width:22px;height:22px;border-radius:2px;cursor:pointer;line-height:1;font-size:15px;
+.hallazgosNav{display:flex;align-items:center;gap:var(--s2);margin-left:auto}
+.hallazgosNav button{width:26px;height:26px;border-radius:2px;cursor:pointer;line-height:1;font-size:15px;
 background:transparent;color:#8E959C;border:1px solid #3A4048;padding:0}
-.hallazgosNav button:hover{color:#F2F3F0;border-color:#6C737B}
 .hallazgosNav .contador{font-size:10.5px;color:#6C737B;min-width:26px;text-align:center}
 .hallazgoCuerpo{display:block;width:100%;text-align:left;background:none;border:none;padding:0;
-cursor:pointer;color:inherit;min-height:88px}
+cursor:pointer;color:inherit;min-height:104px}
 @media(min-width:900px){.hallazgoCuerpo{min-height:76px}}
 .hallazgoTitular{display:block;color:#F7F8F5;font-size:clamp(16px,2.1vw,22px);font-weight:600;
 line-height:1.28;letter-spacing:-0.016em;animation:entra 380ms cubic-bezier(.2,.7,.3,1)}
-.hallazgoCuerpo:hover .hallazgoTitular{color:#FFFFFF;text-decoration:underline;text-underline-offset:3px;
-text-decoration-thickness:1px;text-decoration-color:#6C737B}
 .hallazgoDetalle{display:block;color:#BFC9C2;font-size:13px;line-height:1.6;margin-top:var(--s2);
 max-width:none;overflow-wrap:anywhere}
+.hallazgoBase{display:block;color:#7F8A84;font-size:10.5px;line-height:1.5;margin-top:var(--s2)}
 @keyframes entra{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
-.hallazgosPuntos{display:flex;gap:5px;margin-top:var(--s3)}
+.hallazgosPuntos{display:flex;gap:5px;margin-top:var(--s3);flex-wrap:wrap}
 .hallazgosPuntos button{width:16px;height:3px;border-radius:3px;border:none;padding:0;cursor:pointer;
 background:#3A4048;transition:background 220ms ease,width 220ms ease}
 .hallazgosPuntos button[data-on="1"]{background:#E8C56A;width:26px}
 
-.heroCols{display:grid;grid-template-columns:1fr;gap:14px}
+.heroCols{display:grid;grid-template-columns:1fr;gap:12px}
+.heroCols>*{min-width:0}
 @media(min-width:760px){.heroCols.conPanel{grid-template-columns:128px 1fr;gap:12px;align-items:start}}
-.panelGrupos{max-height:min(52vh,440px);overflow-y:auto;padding-right:4px}
-.panelGrupos::-webkit-scrollbar{width:5px}
+.panelGrupos{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;
+-webkit-overflow-scrolling:touch}
+.panelGrupos::-webkit-scrollbar{display:none}
+.panelRot{display:none}
+.grupoChip{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:6px 10px;
+border:1px solid #3A4048;border-radius:2px;background:transparent;color:#DDE1E5;font-size:11.5px;
+cursor:pointer;white-space:nowrap;width:auto;font-family:inherit}
+.grupoChip[data-on="1"]{background:#2B3037;border-color:#6C737B}
+.grupoChip .grupoBarra{width:3px;height:14px;border-radius:3px;flex-shrink:0}
+.grupoChip .grupoSiglas{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(min-width:760px){
+.panelGrupos{display:block;max-height:min(52vh,440px);overflow-y:auto;overflow-x:visible;
+padding-right:4px;padding-bottom:0}
+.panelGrupos::-webkit-scrollbar{display:block;width:5px}
 .panelGrupos::-webkit-scrollbar-thumb{background:#4A5057;border-radius:5px}
+.panelRot{display:block}
+.grupoChip{display:grid;grid-template-columns:3px minmax(0,1fr) auto;width:100%;border:none;
+padding:5px 4px;margin-bottom:2px;text-align:left}
+.grupoChip.grupoTodos{grid-template-columns:minmax(0,1fr) auto}
+.grupoChip[data-on="1"]{background:#2B3037}
+.grupoChip .grupoBarra{height:16px}
+}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .rot{font-size:10px;color:${C.tenue};text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
 
 .chipsCcaa{margin-top:14px;padding-top:12px;border-top:1px solid #3A4048}
 .chipsCcaaTitulo{font-size:9.5px;color:#8E959C;text-transform:uppercase;letter-spacing:.07em;
-margin-bottom:8px}
-.chipsCcaaLista{display:flex;flex-wrap:wrap;gap:5px}
-.chipsCcaaLista button{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;
+margin-bottom:8px;background:none;border:0;padding:0;cursor:pointer;display:flex;align-items:center;gap:6px}
+.chipsCcaaLista{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chipsCcaaLista::-webkit-scrollbar{display:none}
+@media(min-width:701px){.chipsCcaaLista{flex-wrap:wrap;overflow-x:visible}}
+.chipsCcaaLista button{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:6px 10px;
 border-radius:2px;border:1px solid #3A4048;background:transparent;color:#C7CDD2;
 font-family:'Archivo Variable','Archivo',system-ui,sans-serif;font-size:11px;cursor:pointer;
-transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
-.chipsCcaaLista button:hover{border-color:#6C737B;color:#F2F3F0}
+white-space:nowrap;transition:background 150ms ease,border-color 150ms ease,color 150ms ease}
 .chipsCcaaLista button span{font-family:'DM Mono',ui-monospace,monospace;font-size:10px;color:#8E959C}
 .chipsCcaaLista button[data-on="1"]{background:#E8C56A;border-color:#E8C56A;color:#15171A;font-weight:600}
 .chipsCcaaLista button[data-on="1"] span{color:#5C4A14}
 
 .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
 flex-wrap:wrap;padding:var(--s4) 0 var(--s3)}
-
+.cabecera{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0 0;flex-wrap:wrap}
+.cabeceraTitulo{display:flex;align-items:center;gap:10px;background:none;border:none;padding:0;
+cursor:pointer;color:${C.tinta}}
+.cabeceraTitulo img{width:44px;height:44px;display:block;flex-shrink:0}
+@media(min-width:701px){.cabeceraTitulo{gap:12px}.cabeceraTitulo img{width:64px;height:64px}}
+.filaLey{display:block;width:100%;text-align:left;cursor:pointer;padding:12px;background:transparent;border:none}
+.filaLeyTitular{font-size:15px;font-weight:600;line-height:1.3}
+.filaLeyOficial{font-size:10.5px;color:${C.tenue};margin-top:4px;line-height:1.4;
+display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.filaLeyAcciones{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.filaLeyAcciones span{font-size:11px;font-weight:600;padding:3px 8px;border-radius:2px;
+background:#F1EFE4;color:#3A3F45;border:1px solid ${C.linea}}
 `;
 
 const DIFERIDAS = ['siguiendo', 'partidos', 'ejes', 'metodo', 'datos'];
@@ -260,7 +305,7 @@ const ICONOS = {
 function Icono({ tipo }) {
   const Figura = ICONOS[tipo] ?? IconoInicio;
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
       style={{ flexShrink: 0 }}>
       <Figura acento="#E0492E" papel={C.papel} />
     </svg>
@@ -302,12 +347,25 @@ function Chip({ on, onClick, color, children, titulo }) {
   );
 }
 
-function limpiarTitular(t) {
-  if (!t) return t;
-  return String(t)
-    .replace(/^\s*proposición\s+de\s+ley\s+presentada\s+por\s+el\s+grupo\s+parlamentario\s+de\s+\S+\s*[:.\-–—]?\s*/i, '')
-    .replace(/^\s*presentada\s+por\s+el\s+grupo\s+parlamentario\s+(de\s+)?[^.:\-–—]+[:.\-–—]\s*/i, '')
-    .trim() || t;
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+function fechaCorta(f) {
+  if (!f) return '';
+  const d = new Date(`${f}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return String(f);
+  const hoy = new Date();
+  const dias = Math.round((hoy - d) / 86400000);
+  if (dias === 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  if (dias < 7) return `hace ${dias} días`;
+  return `${d.getDate()} ${MESES[d.getMonth()]}${d.getFullYear() !== hoy.getFullYear() ? ` ${d.getFullYear()}` : ''}`;
+}
+
+function metaDiputado(d) {
+  const siglas = d.partido_siglas || null;
+  const grupo = d.grupo || null;
+  if (siglas && grupo && siglas !== grupo) return `${siglas} · ${grupo}`;
+  return siglas || grupo || '—';
 }
 
 function Barra({ si, no, abs, alto = 5 }) {
@@ -321,6 +379,7 @@ function Barra({ si, no, abs, alto = 5 }) {
 }
 
 export default function App() {
+  const estrecho = useTelefono();
   const [seccion, setSeccion] = useState('inicio');
   const [coherencia, setCoherencia] = useState([]);
   const [destacadas, setDestacadas] = useState([]);
@@ -342,12 +401,13 @@ export default function App() {
   const [fMateria, setFMateria] = useState(null);
   const [fColectivo, setFColectivo] = useState(null);
   const [verMas, setVerMas] = useState(false);
+  const [verCcaa, setVerCcaa] = useState(false);
   const [buscaFaceta, setBuscaFaceta] = useState('');
   const [orden, setOrden] = useState('nombre');
   const [lideres, setLideres] = useState([]);
-  const [encimaDip, setEncimaDip] = useState(null);
   const [encimaEscano, setEncimaEscano] = useState(null);
   const [cargandoLista, setCargandoLista] = useState(false);
+  const [siguiendo, setSiguiendo] = useState(0);
 
   useEffect(() => {
     if (faltaConfig) {
@@ -359,6 +419,13 @@ export default function App() {
       .catch(e => setError(String(e.message ?? e)))
       .finally(() => setCargando(false));
   }, []);
+
+  useEffect(() => {
+    const leer = () => { try { setSiguiendo(totalSeguimientos()); } catch { setSiguiendo(0); } };
+    leer();
+    window.addEventListener('focus', leer);
+    return () => window.removeEventListener('focus', leer);
+  }, [seccion]);
 
   useEffect(() => {
     if (!votacionSel) { setVotos(null); return; }
@@ -447,22 +514,21 @@ export default function App() {
   </div></>;
 
   const secciones = [['inicio', 'Inicio'], ['siguiendo', 'Siguiendo'], ['leyes', 'Leyes'], ['diputados', 'Diputados'], ['partidos', 'Partidos'], ['ejes', 'Mapa']];
-  const mostrarHemiciclo = seccion === 'leyes' || seccion === 'diputados';
+  const heroUtil = seccion === 'diputados' || (seccion === 'leyes' && Boolean(votacionSel));
+  const mostrarHemiciclo = estrecho
+    ? heroUtil
+    : (seccion === 'leyes' || seccion === 'diputados');
+  const rejilla = seccion === 'leyes' || seccion === 'diputados';
 
   return (
     <>
       <style>{estilos}</style>
       <div className="e app">
 
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '18px 0 0', flexWrap: 'wrap' }}>
+        <div className="cabecera">
           <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
-            aria-label="Ir al inicio"
-            className="ed display" style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.tinta
-            }}>
+            aria-label="Ir al inicio" className="ed display cabeceraTitulo">
             <img src="/logo.svg" alt="" width="64" height="64"
-              style={{ display: 'block', flexShrink: 0 }}
               onError={e => { e.currentTarget.style.display = 'none'; }} />
             Lente Democrática
           </button>
@@ -478,13 +544,14 @@ export default function App() {
             <button key={k} className="navb" data-on={seccion === k ? '1' : '0'}
               onClick={() => { setSeccion(k); setVotacionSel(null); setBusqueda(''); }}>
               <Icono tipo={k} />{t}
+              {k === 'siguiendo' && siguiendo > 0 && <span className="senal" />}
             </button>
           ))}
         </nav>
 
         <AnimatePresence mode="wait" initial={false}>
         <motion.div key={seccion} data-seccion={seccion}
-          className={mostrarHemiciclo ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}
+          className={rejilla ? (seccion === 'diputados' ? 'split splitDiputados' : 'split') : 'cols'}
           initial={{ y: 18 }}
           animate={{ y: 0 }}
           exit={{ y: -10 }}
@@ -505,45 +572,35 @@ export default function App() {
             </div>
 
             <div className="heroCols conPanel">
-              <div className="panelGrupos">
-                <div className="em" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
+              <div>
+                <div className="em panelRot" style={{ fontSize: 9.5, color: '#8E959C', textTransform: 'uppercase',
                   letterSpacing: '.07em', marginBottom: 9 }}>
                   {votacionSel && votos ? 'Cómo votó cada partido' : 'Filtrar por partido'}
                 </div>
-                <button
-                  onClick={() => setFPartido(null)}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 6,
-                    width: '100%', textAlign: 'left', padding: '5px 4px',
-                    background: !fPartido ? '#2B3037' : 'transparent',
-                    border: 'none', borderRadius: 2, cursor: 'pointer', marginBottom: 2
-                  }}>
-                  <span style={{ fontSize: 11.5, color: '#DDE1E5' }}>Todos</span>
-                  <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{enHemiciclo.length}</span>
-                </button>
-                {(votacionSel && votos ? posicionPartidos : partidos.map(([siglas, { n, color }]) => ({
-                  siglas, color, n, total: n, voto: null
-                }))).map(g => (
-                  <button key={g.siglas}
-                    onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}
-                    style={{
-                      display: 'grid', gridTemplateColumns: '3px 1fr auto', alignItems: 'center', gap: 6,
-                      width: '100%', textAlign: 'left', padding: '5px 4px',
-                      background: fPartido === g.siglas ? '#2B3037' : 'transparent',
-                      border: 'none', borderRadius: 2, cursor: 'pointer', transition: 'background 140ms ease'
-                    }}>
-                    <span style={{ width: 3, height: 16, background: g.color, borderRadius: 3 }} />
-                    <span style={{ fontSize: 11.5, color: '#DDE1E5', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.siglas}</span>
-                    {g.voto ? (
-                      <span className="em" style={{ fontSize: 11, fontWeight: 500,
-                        color: g.voto === 'si' ? '#5FBF92' : g.voto === 'no' ? '#E08278' : '#E0BB6A' }}>
-                        {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'}{g.n}
-                      </span>
-                    ) : (
-                      <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{g.n}</span>
-                    )}
+                <div className="panelGrupos">
+                  <button className="grupoChip grupoTodos" data-on={!fPartido ? '1' : '0'}
+                    onClick={() => setFPartido(null)}>
+                    <span className="grupoSiglas">Todos</span>
+                    <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{enHemiciclo.length}</span>
                   </button>
-                ))}
+                  {(votacionSel && votos ? posicionPartidos : partidos.map(([siglas, { n, color }]) => ({
+                    siglas, color, n, total: n, voto: null
+                  }))).map(g => (
+                    <button key={g.siglas} className="grupoChip" data-on={fPartido === g.siglas ? '1' : '0'}
+                      onClick={() => setFPartido(fPartido === g.siglas ? null : g.siglas)}>
+                      <span className="grupoBarra" style={{ background: g.color }} />
+                      <span className="grupoSiglas">{g.siglas}</span>
+                      {g.voto ? (
+                        <span className="em" style={{ fontSize: 11, fontWeight: 500,
+                          color: g.voto === 'si' ? '#5FBF92' : g.voto === 'no' ? '#E08278' : '#E0BB6A' }}>
+                          {g.voto === 'si' ? '✓' : g.voto === 'no' ? '✕' : '−'}{g.n}
+                        </span>
+                      ) : (
+                        <span className="em" style={{ fontSize: 11, color: '#8E959C' }}>{g.n}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div style={{ minWidth: 0 }}>
@@ -558,25 +615,30 @@ export default function App() {
                 />
                 {votacionSel && (
                   <div style={{ marginTop: 10, color: '#DDE1E5', fontSize: 13, lineHeight: 1.45 }}>
-                    {limpiarTitular(votacionSel.titular || votacionSel.subtitulo || votacionSel.titulo)}
+                    {titularDeNorma(votacionSel, 120)}
                   </div>
                 )}
               </div>
             </div>
             {ccaa.length > 0 && (
               <div className="chipsCcaa">
-                <div className="em chipsCcaaTitulo">Filtrar por comunidad autónoma</div>
-                <div className="chipsCcaaLista">
-                  <button onClick={() => setFCcaa(null)} data-on={!fCcaa ? '1' : '0'}>
-                    Toda España <span>{activos.length}</span>
-                  </button>
-                  {ccaa.map(c => (
-                    <button key={c.slug} data-on={fCcaa === c.slug ? '1' : '0'}
-                      onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)}>
-                      {c.nombre} <span>{c.diputados}</span>
+                <button className="em chipsCcaaTitulo" onClick={() => setVerCcaa(v => !v)}>
+                  Filtrar por comunidad autónoma
+                  <span style={{ color: '#E8C56A' }}>{verCcaa || !estrecho ? '−' : '+'}</span>
+                </button>
+                {(verCcaa || !estrecho) && (
+                  <div className="chipsCcaaLista">
+                    <button onClick={() => setFCcaa(null)} data-on={!fCcaa ? '1' : '0'}>
+                      Toda España <span>{activos.length}</span>
                     </button>
-                  ))}
-                </div>
+                    {ccaa.map(c => (
+                      <button key={c.slug} data-on={fCcaa === c.slug ? '1' : '0'}
+                        onClick={() => setFCcaa(fCcaa === c.slug ? null : c.slug)}>
+                        {c.nombre} <span>{c.diputados}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -584,12 +646,12 @@ export default function App() {
             </div>
           )}
 
-          <div className={mostrarHemiciclo ? 'der' : 'contents'} style={mostrarHemiciclo ? { minWidth: 0 } : undefined}>
+          <div className={rejilla ? 'der' : 'contents'} style={rejilla ? { minWidth: 0 } : undefined}>
           {seccion === 'leyes' && !votacionSel && (
             <>
               <div>
                 <div className="rot">Leyes que te afectan</div>
-                <div className="chips">
+                <div className="tiraChips">
                   {facetas.colectivos.filter(c => c.destacado).map(c => (
                     <Chip key={c.slug} on={fColectivo === c.slug} titulo={c.descripcion}
                       onClick={() => { const n = fColectivo === c.slug ? null : c.slug; setFColectivo(n); recargar({ colectivo: n }); }}>
@@ -603,7 +665,7 @@ export default function App() {
                   <div className="tarjeta" style={{ marginTop: 8, padding: 11 }}>
                     <input value={buscaFaceta} onChange={e => setBuscaFaceta(e.target.value)}
                       placeholder="Buscar colectivo o materia…" autoFocus
-                      style={{ width: '100%', padding: '7px 10px', fontSize: 13, border: `1px solid ${C.linea}`, borderRadius: 2, marginBottom: 9 }} />
+                      style={{ width: '100%', padding: '9px 10px', fontSize: 16, border: `1px solid ${C.linea}`, borderRadius: 2, marginBottom: 9 }} />
                     <div className="chips" style={{ maxHeight: 300, overflowY: 'auto' }}>
                       {facetas.colectivos.filter(c => !c.destacado)
                         .filter(c => !buscaFaceta.trim() || (c.nombre + (c.descripcion ?? '')).toLowerCase().includes(buscaFaceta.toLowerCase()))
@@ -628,7 +690,7 @@ export default function App() {
                 <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && recargar({ texto: busqueda })}
                   placeholder="Buscar ley y pulsar Enter"
-                  style={{ width: '100%', padding: '10px 12px', fontSize: 14, margin: '12px 0',
+                  style={{ width: '100%', padding: '11px 12px', fontSize: 16, margin: '12px 0',
                     border: `1px solid ${C.linea}`, borderRadius: 2, background: C.superficie }} />
 
                 {(fMateria || fColectivo) && (
@@ -646,18 +708,18 @@ export default function App() {
                   </div>
                 )}
                 {votaciones.map((v, i) => {
-                  const frase = fraseCortaDeNorma(v, 52);
-                  const legal = limpiarTitular(v.titular || v.subtitulo || v.titulo);
+                  const titular = titularDeNorma(v, 96);
+                  const oficial = tituloCorto(v, 170);
+                  const vehiculo = vehiculoNorma(v);
+                  const resultado = v.resultado_final ?? v.resultado_ultima ?? v.resultado ?? null;
                   return (
-                  <button key={v.clave_norma ?? v.id} className="fila"
+                  <button key={v.clave_norma ?? v.id} className="fila filaLey"
                     onClick={async () => {
                       const id = v.votacion_principal ?? v.id;
                       const completa = (await traerVotaciones(1, { id }))[0];
                       if (completa) setVotacionSel({ ...completa, clave_norma: v.clave_norma, votaciones_norma: v.votaciones });
-                    }} style={{
-                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', padding: '11px 12px',
-                    background: 'transparent', border: 'none', borderTop: i ? `1px solid ${C.linea}` : 'none'
-                  }}>
+                    }}
+                    style={{ borderTop: i ? `1px solid ${C.linea}` : 'none' }}>
                     <div className="em" style={{ fontSize: 10, color: C.tenue, marginBottom: 5, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       {v.materia_nombre && (
                         <span style={{
@@ -665,22 +727,28 @@ export default function App() {
                           borderRadius: 2, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 10
                         }}>{v.materia_nombre}</span>
                       )}
-                      <span>{v.fecha}</span>
+                      <span>{fechaCorta(v.fecha)}</span>
+                      {vehiculo && !vehiculo.fuerzaDeLey && (
+                        <span style={{ color: '#8A6D1F' }}>{vehiculo.nombre} · sin fuerza de ley</span>
+                      )}
                       {v.votaciones > 1 && (
                         <span style={{ color: C.media }}>
                           {v.votaciones} vot.{v.tramites > 0 ? ` · ${v.tramites} enm.` : ''}
                         </span>
                       )}
                     </div>
-                    <div className="ed" style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3 }}>
-                      {frase || (String(legal).length > 70 ? String(legal).slice(0, 67) + '…' : legal)}
-                    </div>
-                    {frase && (
-                      <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, lineHeight: 1.35 }}>
-                        {String(legal).length > 90 ? String(legal).slice(0, 87) + '…' : legal}
+                    <div className="ed filaLeyTitular">{titular}</div>
+                    {Array.isArray(v.acciones) && v.acciones.length > 0 && (
+                      <div className="filaLeyAcciones">
+                        {v.acciones.slice(0, 3).map(a => <span key={a}>{a}</span>)}
                       </div>
                     )}
-                    <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} alto={5} />
+                    {oficial && oficial !== titular && (
+                      <div className="em filaLeyOficial">{oficial}</div>
+                    )}
+                    <div style={{ marginTop: 8 }}>
+                      <Barra si={v.total_si} no={v.total_no} abs={v.total_abstencion} alto={5} />
+                    </div>
                     <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, display: 'flex', gap: 10 }}>
                       <span style={{ color: C.si }}>Sí {v.total_si}</span>
                       <span style={{ color: C.no }}>No {v.total_no}</span>
@@ -692,8 +760,8 @@ export default function App() {
                         </span>
                       ) : (
                         <span style={{ marginLeft: 'auto', fontWeight: 500,
-                          color: (v.resultado_final ?? v.resultado_ultima ?? v.resultado) === 'aprobada' ? C.si : C.no }}>
-                          {v.resultado_final ?? v.resultado_ultima ?? v.resultado}
+                          color: resultado === 'aprobada' ? C.si : resultado ? C.no : C.tenue }}>
+                          {resultado ?? 'sin resultado'}
                         </span>
                       )}
                     </div>
@@ -720,13 +788,13 @@ export default function App() {
               <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
                 placeholder="Nombre o circunscripción"
                 style={{
-                  width: '100%', padding: '12px 14px', fontSize: 14.5, marginBottom: 12,
+                  width: '100%', padding: '12px 14px', fontSize: 16, marginBottom: 12,
                   border: `1px solid ${C.linea}`, borderRadius: 3, background: C.superficie,
                   boxShadow: 'inset 0 1px 0 rgba(20,22,26,0.02)', outline: 'none'
                 }} />
 
               <div className="rot">Ordenar por</div>
-              <div className="chips" style={{ marginBottom: 12 }}>
+              <div className="tiraChips" style={{ marginBottom: 12 }}>
                 {ORDENES.map(([k, t]) => (
                   <Chip key={k} on={orden === k} onClick={() => setOrden(k)}>{t}</Chip>
                 ))}
@@ -737,11 +805,10 @@ export default function App() {
                   Dinero declarado aproximado: depósitos + valores + planes − deuda.
                   No incluye el valor de inmuebles (el PDF no lo trae).
                   Cifras &gt;10 M o depósitos &gt;5 M se marcan para revisión (errores de coma/punto).
-                  Digitaliza con <code>npm run bienes:auto</code>
-                  {' '}· ahora: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con cifra
+                  Ahora: {diputados.filter(d => d.patrimonio_euros != null || d.bienes_total != null).length} con cifra
                   {diputados.filter(d => d.bienes_outlier).length
                     ? ` · ${diputados.filter(d => d.bienes_outlier).length} en revisión`
-                    : ''}.
+                    : ''}. Ninguna la ha comprobado una persona.
                 </div>
               )}
 
@@ -780,7 +847,7 @@ export default function App() {
                   <div className="rot" style={{ marginBottom: 10 }}>
                     Quien más {ORDENES.find(o => o[0] === orden)?.[1].replace('Más ', '').toLowerCase()} en cada partido
                   </div>
-                  <div style={{ display: 'grid', gap: 7, gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))' }}>
+                  <div style={{ display: 'grid', gap: 7, gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
                     {lideres.map(l => (
                       <div key={l.partido} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                         <span style={{ width: 3, height: 26, background: l.color || '#8E9299', borderRadius: 3, flexShrink: 0 }} />
@@ -799,16 +866,12 @@ export default function App() {
 
               <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 8 }}>
                 {listaDip.length} diputados
-                {encimaDip && (() => {
-                  const d = listaDip.find(x => x.mandato_id === encimaDip);
-                  return d ? <span style={{ color: C.media }}> · {d.nombre_completo}</span> : null;
-                })()}
               </div>
               <div className="listaFilete rejillaDip">
                 {listaDip.slice(0, 200).map((d, i) => {
                   const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
                   const fmtEuro = v => {
-                    if (v == null || v === '\u2014' || Number.isNaN(Number(v))) return '\u2014';
+                    if (v == null || v === '—' || Number.isNaN(Number(v))) return '—';
                     const n = Number(v);
                     if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(1) + ' M';
                     if (Math.abs(n) >= 1000) return Math.round(n / 1000) + ' mil';
@@ -817,20 +880,20 @@ export default function App() {
                   const casas = d.n_casas ?? d.n_inmuebles;
                   const nVeh = d.n_vehiculos ?? ((d.n_coches ?? 0) + (d.n_motos ?? 0) + (d.n_embarcaciones ?? 0) + (d.n_aeronaves ?? 0));
                   const etiquetas = {
-                    nombre: ['min', d.minutos_tribuna],
                     ausencias: ['aus.', d.ausencias],
                     disidencias: ['contra', d.disidencias],
                     tribuna: ['min', d.minutos_tribuna],
                     intervenciones: ['int.', d.intervenciones],
                     abstenciones: ['abs.', d.abstenciones],
                     telematicos: ['tel.', d.telematicos],
-                    patrimonio: ['\u20AC', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
-                    inmuebles: ['bienes', d.n_inmuebles_propios ?? casas ?? '\u2014'],
-                    inmuebles_todos: ['bienes', casas ?? '\u2014'],
-                    vehiculos: ['veh.', nVeh || '\u2014'],
+                    patrimonio: ['€', fmtEuro(d.patrimonio_euros ?? d.bienes_total)],
+                    inmuebles: ['bienes', d.n_inmuebles_propios ?? casas ?? '—'],
+                    inmuebles_todos: ['bienes', casas ?? '—'],
+                    vehiculos: ['veh.', nVeh || '—'],
                   };
-                  const [et, val] = etiquetas[cfg[0]] ?? etiquetas.nombre;
-                  let sub = et;
+                  const par = etiquetas[cfg[0]] ?? null;
+                  let sub = par ? par[0] : null;
+                  const val = par ? par[1] : null;
                   if (cfg[0] === 'inmuebles' && casas != null) sub = 'inmuebles';
                   if (cfg[0] === 'vehiculos') {
                     const partes = [];
@@ -838,18 +901,18 @@ export default function App() {
                     if (d.n_motos) partes.push(`${d.n_motos} moto${d.n_motos === 1 ? '' : 's'}`);
                     if (d.n_embarcaciones) partes.push(`${d.n_embarcaciones} emb.`);
                     if (d.n_aeronaves) partes.push(`${d.n_aeronaves} aer.`);
-                    sub = partes.length ? partes.join(' \u00B7 ') : 'veh\u00EDculos';
+                    sub = partes.length ? partes.join(' · ') : 'vehículos';
                   }
                   if (cfg[0] === 'patrimonio' && casas != null) sub = `${casas} inm.`;
 
                   const trozos = desgloseBienes(d).map(x => x.texto);
                   const patrimonial = cfg[0] === 'inmuebles' || cfg[0] === 'inmuebles_todos' || cfg[0] === 'patrimonio';
                   const linea2 = patrimonial && trozos.length
-                    ? trozos.join(' \u00B7 ')
-                    : `${d.partido_siglas || d.grupo || '\u2014'} \u00B7 ${d.grupo || '\u2014'}`;
+                    ? trozos.join(' · ')
+                    : `${metaDiputado(d)} · ${d.circunscripcion ?? '—'}`;
 
                   return (
-                    <motion.button key={d.mandato_id} className="fila" data-top={i < 3 ? '1' : '0'}
+                    <motion.button key={d.mandato_id} className="fila" data-top={par && i < 3 ? '1' : '0'}
                       onClick={() => setSel(d)}
                       layout={i < 24 ? 'position' : false}
                       transition={{ type: 'spring', stiffness: 260, damping: 30 }}
@@ -859,7 +922,7 @@ export default function App() {
                         background: encimaEscano === d.mandato_id ? 'var(--acentoTenue)' : 'transparent',
                         boxShadow: `inset 3px 0 0 ${d.color || '#8E9299'}`
                       }}>
-                      <span className="puesto">{i + 1}</span>
+                      <span className="puesto">{par ? i + 1 : ''}</span>
                       <AvatarPartido
                         foto={d.foto_url}
                         color={d.color}
@@ -872,10 +935,16 @@ export default function App() {
                         <span className="dipNombre">{d.nombre_completo}</span>
                         <span className="em dipMeta">{linea2}</span>
                       </span>
-                      <span className="em celdaCirc">{d.circunscripcion ?? '\u2014'}</span>
+                      <span className="em celdaCirc">{d.circunscripcion ?? '—'}</span>
                       <span className="celdaDato">
-                        <span className="dato">{val ?? 0}</span>
-                        <span className="datoUnidad">{sub}</span>
+                        {par ? (
+                          <>
+                            <span className="dato">{val ?? 0}</span>
+                            <span className="datoUnidad">{sub}</span>
+                          </>
+                        ) : (
+                          <span className="em" style={{ fontSize: 11, color: C.tenue }}>ver ficha →</span>
+                        )}
                       </span>
                     </motion.button>
                   );

@@ -63,7 +63,6 @@ export default function Hemiciclo({
     [reducido, votos, mapaVotos, diputados.length]
   );
 
-  // Radio visual ≈ 0.062; umbral amplio para que no haya que acertar el centro exacto.
   const r = 0.062;
   const umbral = r * 2.8;
 
@@ -116,7 +115,6 @@ export default function Hemiciclo({
           </filter>
         </defs>
 
-        {/* Zona invisible de captura: el hit-test lo hacemos nosotros con la matriz SVG */}
         <rect x="-2.75" y="-2.82" width="5.5" height="3.05" fill="transparent" />
 
         <style>{`

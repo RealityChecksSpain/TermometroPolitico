@@ -1,5 +1,5 @@
 import { db } from '../../src/lib/supabase.js';
-import { autorizadoPorCron, sinCache } from '../../src/lib/autorizar.js';
+import { autorizadoPorCron, responder, responderTexto } from '../../src/lib/autorizar.js';
 
 export const config = { maxDuration: 30 };
 
@@ -47,8 +47,8 @@ async function enviar(asunto: string, texto: string): Promise<string | null> {
   return null;
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  if (!autorizadoPorCron(req)) return new Response('No autorizado', { status: 401 });
+export default async function handler(req: any, res?: any): Promise<Response | undefined> {
+  if (!autorizadoPorCron(req)) return responderTexto(res, 'No autorizado', 401);
 
   const conCorreo = Boolean(process.env.RESEND_API_KEY && process.env.ALERTA_EMAIL);
 
@@ -64,21 +64,18 @@ export default async function handler(req: Request): Promise<Response> {
           `${detalle}\n\nLa vigilancia diaria esta ciega hasta que se arregle esto.`
         );
       }
-      return sinCache(
-        {
+      return responder(res, {
           ok: false,
           error: 'la comprobacion de salud no puede leer sus propias fuentes',
           rotos: rotos.map(l => ({ objeto: l.objeto, error: plano(l.error) })),
           correo: conCorreo ? 'configurado' : 'sin configurar'
-        },
-        500
-      );
+        }, 500);
     }
 
     const pendientes = caidos.filas.filter(c => !c.notificado_at);
 
     if (pendientes.length === 0) {
-      return sinCache({
+      return responder(res, {
         ok: true,
         caidos: caidos.filas,
         cobertura: cobertura.filas,
@@ -94,16 +91,13 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!conCorreo) {
       console.error(`cron/salud: ${pendientes.length} aviso(s) pendientes y ningun canal de correo`);
-      return sinCache(
-        {
-          ok: false,
-          error: 'hay fuentes caidas y no hay canal para avisar',
-          pendientes: pendientes.length,
-          detalle: resumen.split('\n'),
-          correo: 'sin configurar'
-        },
-        500
-      );
+      return responder(res, {
+        ok: false,
+        error: 'hay fuentes caidas y no hay canal para avisar',
+        pendientes: pendientes.length,
+        detalle: resumen.split('\n'),
+        correo: 'sin configurar'
+      }, 500);
     }
 
     const falloEnvio = await enviar(
@@ -112,16 +106,13 @@ export default async function handler(req: Request): Promise<Response> {
     );
 
     if (falloEnvio) {
-      return sinCache(
-        {
+      return responder(res, {
           ok: false,
           error: 'hay fuentes caidas y el aviso no ha salido',
           pendientes: pendientes.length,
           detalle: resumen.split('\n'),
           envio: falloEnvio
-        },
-        500
-      );
+        }, 500);
     }
 
     const ids = pendientes.map(c => c.id).filter(id => id !== null && id !== undefined);
@@ -139,7 +130,7 @@ export default async function handler(req: Request): Promise<Response> {
       else notificados = ids.length;
     }
 
-    return sinCache({
+    return responder(res, {
       ok: true,
       caidos: caidos.filas,
       cobertura: cobertura.filas,
@@ -149,6 +140,6 @@ export default async function handler(req: Request): Promise<Response> {
     });
   } catch (e) {
     console.error('cron/salud', e);
-    return sinCache({ ok: false, error: 'fallo en la comprobacion de salud' }, 500);
+    return responder(res, { ok: false, error: 'fallo en la comprobacion de salud' }, 500);
   }
 }

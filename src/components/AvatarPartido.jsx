@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-/** Avatar con foto o bloque de color del partido / iniciales. */
 export default function AvatarPartido({ foto, color, siglas, nombre, w = 30, h = 38 }) {
   const [rota, setRota] = useState(false);
   const bg = color || '#8E9299';

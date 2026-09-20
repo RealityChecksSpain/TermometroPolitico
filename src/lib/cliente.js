@@ -6,6 +6,9 @@ import { sanearImporte, patrimonioLiquido } from './euros.js';
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
 const clave = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 
+const MINIMO_PROMESAS_BRECHA = 10;
+const MINIMO_LEYES_BRECHA = 5;
+
 export function diagnosticarConfig() {
   const fallos = [];
 
@@ -186,7 +189,7 @@ export async function traerVotaciones(limite = 200, filtros = {}) {
     if (error) throw error;
     return data ?? [];
   }
-  let q = supabase.from('mv_normas').select('*');
+  let q = supabase.from('v_normas_completas').select('*');
   if (filtros.materia) q = q.eq('materia', filtros.materia);
   if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
   const patron = patronBusqueda(filtros.texto);
@@ -391,7 +394,7 @@ function normalizarFilaMapa(d) {
 export async function traerRelacionadas(norma, limite = 4) {
   if (!norma?.materia) return [];
   const { data, error } = await supabase
-    .from('mv_normas').select('clave_norma, titular, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, votacion_principal')
+    .from('v_normas_completas').select('clave_norma, titular, frase_corta, resumen, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, votacion_principal')
     .eq('materia', norma.materia)
     .neq('clave_norma', norma.clave_norma ?? '')
     .order('fecha', { ascending: false })
@@ -467,10 +470,10 @@ export async function traerSesgo() {
 }
 
 export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
-  let q = supabase.from('mv_normas').select('*');
+  let q = supabase.from('v_normas_completas').select('*');
   if (filtros.materia) q = q.eq('materia', filtros.materia);
   if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
-  if (filtros.soloAprobadas) q = q.not('resumen', 'is', null);
+  if (filtros.soloConResumen) q = q.not('resumen', 'is', null);
   const { data, error } = await q
     .order('fecha', { ascending: false })
     .range(desplazamiento, desplazamiento + limite - 1);
@@ -479,12 +482,40 @@ export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
 }
 
 export async function traerPromesaVsVoto() {
-  const { data, error } = await supabase.from('v_promesa_vs_voto').select('*').order('brecha_gasto');
-  if (error) {
-    console.error(`traerPromesaVsVoto: no se puede leer v_promesa_vs_voto (${error.message}). El grafico de brecha no se pinta.`);
+  let mapa = [];
+  try {
+    mapa = await traerMapaPartidos();
+  } catch {
     return [];
   }
-  return data ?? [];
+
+  const cuenta = v => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
+  const filas = [];
+  for (const p of mapa ?? []) {
+    const prometido = Number(p.prog_economico);
+    const votado = Number(p.voto_economico);
+    if (!Number.isFinite(prometido) || !Number.isFinite(votado)) continue;
+    const promesas = cuenta(p.promesas_codificadas);
+    const leyes = cuenta(p.leyes_valoradas);
+    if (promesas !== null && promesas < MINIMO_PROMESAS_BRECHA) continue;
+    if (leyes !== null && leyes < MINIMO_LEYES_BRECHA) continue;
+    filas.push({
+      partido: p.partido ?? p.siglas,
+      siglas: p.siglas ?? p.partido,
+      color: p.color,
+      prometido_gasto: prometido,
+      votado_gasto: votado,
+      brecha_gasto: votado - prometido,
+      promesas_codificadas: promesas,
+      leyes_valoradas: leyes
+    });
+  }
+
+  return filas.sort((a, b) => a.prometido_gasto - b.prometido_gasto);
 }
 
 export async function traerUltimas(limite = 6) {

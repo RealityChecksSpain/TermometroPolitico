@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
-import { fraseCortaDeNorma, nombreOficialNorma } from '../lib/fraseCorta.js';
+import { titularDeNorma, tituloCorto, vehiculoNorma } from '../lib/fraseCorta.js';
 import { etiquetasDeNorma } from '../lib/etiquetas.js';
 import { cabeza as cabezaDe, figura, limitar, mezcla, pildora, trazo } from '../lib/morfo.js';
 
@@ -41,9 +41,9 @@ const AMPLIO = diseno({
 });
 
 const COMPACTO = diseno({
-  W: 640, H: 640, cx: 320, ny: 185, s: 0.88, base: 610, arco0: 150, arcoPaso: 30,
-  barra: { x1: 20, x2: 620, y1: 494, y2: 574 }, lupaR: 30, alzada: 118,
-  copia: { arr: 0.62, izq: 0.06, ancho: 0.88, escala: 6.4 }
+  W: 640, H: 452, cx: 320, ny: 132, s: 0.62, base: 434, arco0: 118, arcoPaso: 26,
+  barra: { x1: 14, x2: 626, y1: 344, y2: 424 }, lupaR: 30, alzada: 86,
+  copia: { arr: 0.40, izq: 0.05, ancho: 0.90, escala: 6.0 }
 });
 
 const QUIEN = [
@@ -69,13 +69,15 @@ function fechaCorta(f) {
 }
 
 function normalizar(n, i, colectivos) {
-  const oficial = String(nombreOficialNorma(n) ?? '');
+  const oficial = tituloCorto(n, 190);
+  const vehiculo = vehiculoNorma(n);
   return {
     id: n.clave_norma ?? `n${i}`,
     materia: n.materia_nombre ?? '',
     color: n.materia_color ?? '#5A6067',
-    frase: fraseCortaDeNorma(n, 88) || oficial.slice(0, 88),
-    oficial: oficial.length > 190 ? `${oficial.slice(0, 187)}…` : oficial,
+    frase: titularDeNorma(n, 92),
+    oficial,
+    vehiculo,
     etiquetas: etiquetasDeNorma(n, colectivos).slice(0, 3),
     si: n.total_si ?? 0,
     no: n.total_no ?? 0,
@@ -96,6 +98,7 @@ const estilos = `
 .pvTitular{margin:0;font-size:clamp(26px,3.9vw,46px);font-weight:600;letter-spacing:-.03em;line-height:1.05;color:#14161A}
 .pvBajada{margin:6px auto 0;max-width:580px;font-size:clamp(12px,1.25vw,15px);line-height:1.5;color:#4A5057}
 .pvEscena{position:relative;width:100%;max-width:1000px;container-type:inline-size;margin:2px auto 0}
+@media(max-width:700px){.pvEscena{margin-top:-14px}}
 .pvLienzo{position:absolute;inset:0;width:100%;height:100%;display:block}
 .pvCopia{position:absolute;text-align:center;pointer-events:none}
 .pvPregunta{margin:0;font-weight:600;letter-spacing:-.02em;color:#14161A;line-height:1.1}
@@ -129,12 +132,21 @@ const estilos = `
 .pvOficial{font-size:11.5px;line-height:1.55;color:#C6B084}
 .pvChips{display:flex;gap:4px;flex-wrap:wrap}
 .pvChip{font-size:9.5px;padding:2px 7px;border-radius:0;border:1px solid rgba(198,176,132,.38);color:#E2D6BC}
+.pvAviso{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#E8C56A;
+border:1px solid rgba(232,197,106,.4);border-radius:2px;padding:2px 6px;align-self:flex-start}
 @media(max-width:700px){
-.pvPortada{padding:12px 0 14px}
-.pvEncabezado{margin-top:26px}
+.pvPortada{padding:8px 0 12px}
+.pvEncabezado{margin-top:20px;gap:8px}
 .pvCentro{padding:0 14px}
-.pvTarjetas{grid-template-columns:1fr;gap:22px;margin-top:26px}
+.pvTitular{font-size:clamp(23px,7vw,32px)}
+.pvBajada{margin-top:4px}
+.pvTarjetas{grid-template-columns:1fr;gap:12px;margin-top:14px}
+.pvTarjeta{padding:14px}
+.pvSugerencias{margin-top:10px;gap:6px}
 .pvSugerencia{font-size:12px;padding:6px 11px}
+.pvOficial{font-size:11px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pvEncabezadoPie{display:none}
+.pvTodas{margin-left:auto}
 }
 `;
 
@@ -197,7 +209,12 @@ function Ficha({ t, total, expandida }) {
               {t.aprobada ? 'Aprobada' : 'Rechazada'}
             </span>
           </span>
-          <span className="em pvOficial">{t.oficial}</span>
+          <span className="em pvOficial">
+            {t.vehiculo ? `${t.vehiculo.nombre} · ` : ''}{t.oficial}
+          </span>
+          {t.vehiculo && !t.vehiculo.fuerzaDeLey && (
+            <span className="em pvAviso">No tiene fuerza de ley</span>
+          )}
           {t.etiquetas.length ? (
             <span className="pvChips">
               {t.etiquetas.map(e => <span key={e} className="em pvChip">{e}</span>)}
@@ -329,15 +346,15 @@ export default function Portada({
   const tarjetas = useMemo(() => {
     const vistas = new Set();
     const unicas = (ultimas ?? []).filter(n => {
-      const texto = String(fraseCortaDeNorma(n, 88) || nombreOficialNorma(n) || '')
+      const texto = String(titularDeNorma(n, 92) || '')
         .toLowerCase().replace(/[^a-z0-9áéíóúñ ]/g, '').trim();
       const clave = texto || n?.clave_norma;
       if (!clave || vistas.has(clave)) return false;
       vistas.add(clave);
       return true;
     });
-    return unicas.slice(0, 6).map((n, i) => normalizar(n, i, colectivos));
-  }, [ultimas, colectivos]);
+    return unicas.slice(0, estrecho ? 3 : 6).map((n, i) => normalizar(n, i, colectivos));
+  }, [ultimas, colectivos, estrecho]);
 
   const pistas = ejemplos.slice(0, 4);
   const anchoUtil = estrecho ? '100%' : pct(d.barra[7].x - d.barra[2].x, d.W);
@@ -360,7 +377,7 @@ export default function Portada({
           <motion.p className="pvBajada"
             initial={reducido ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38, duration: 0.58 }}>
-            {escanos} escaños{leyes ? `, ${leyes} leyes votadas` : ''}. Cada una, quién la apoyó
+            {escanos} escaños{leyes ? `, ${leyes} votaciones del Pleno` : ''}. Cada una, quién la apoyó
             y a quién afecta.
           </motion.p>
         </div>
