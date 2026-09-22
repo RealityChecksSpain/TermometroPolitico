@@ -1,6 +1,6 @@
-# Escaño
+# Lente Democrática
 
-Transparencia parlamentaria española. Congreso de los Diputados y Asamblea de Madrid.
+Transparencia parlamentaria española. Congreso de los Diputados.
 
 Aplicación independiente. Sin vínculo con ninguna institución pública.
 
@@ -11,8 +11,9 @@ La aplicación no asigna ideología a ninguna ley ni a ningún diputado.
 - Los **votos** salen del registro oficial del Congreso.
 - Las **posiciones de partido** salen de fuentes académicas externas y citadas (CHES, CIS, Manifesto Project).
 - La **posición de una votación** se calcula: es el centro de gravedad de las posiciones externas de los partidos que la apoyaron, ponderado por escaños.
+- Las **cuentas de los partidos** se transcriben de los estados financieros que cada partido publica en su web y del informe de fiscalización del Tribunal de Cuentas. Cada cifra guarda el documento del que sale.
 
-Si un dato no se puede trazar hasta una de esas dos fuentes, no se publica.
+Si un dato no se puede trazar hasta un documento concreto y citable, no se publica.
 
 ## Orden de instalación
 
@@ -37,7 +38,7 @@ y añade `escano` a Settings > API > Exposed schemas.
 
     select id from legislaturas where numero = 'XV';
 
-`CRON_SECRET`: genera uno con `openssl rand -hex 32`.
+`CRON_SECRET`: genera uno con `openssl rand -hex 32`. Menos de 16 caracteres y el cron se rechaza a sí mismo.
 
 ### 3. Cargar el censo
 
@@ -86,6 +87,32 @@ La resolución va en cascada y solo escala cuando el nivel anterior falla:
 
 Cada acierto se graba como alias, así que un nombre nunca se pregunta dos veces.
 
+## Cuentas de partidos
+
+Las cifras se transcriben a mano a `datos/cuentas/<ejercicio>.csv` y se cargan con:
+
+    npm run cuentas:plantilla -- --ejercicio 2025
+    npm run cuentas -- --ejercicio 2025
+    npm run cuentas -- --ejercicio 2025 --publicar
+
+Reglas del fichero:
+
+- Los gastos van en positivo. Solo admiten negativo `resultado_ejercicio`,
+  `patrimonio_neto` e `ingresos_electorales_publicos`.
+- Si un concepto no aparece en el documento, **borra la fila**. No la dejes a
+  cero: un cero declarado y un dato ausente son cosas distintas y la ficha los
+  pinta distinto.
+- `fuente_url` tiene que ser una URL https real. El cargador rechaza huecos de
+  ejemplo, dominios sin extensión y cualquier cosa sin verificar, y si falla una
+  sola fila no escribe nada.
+- La columna `nota` explica cualquier cifra que no se lea tal cual en el
+  documento: un total sumado a mano, una columna comparativa, una medida
+  distinta. Esas notas se publican bajo la ficha.
+
+Los documentos que faltan se dan de alta solos en `documentos` al publicar, con
+el título deducido de los conceptos que alimentan (balance, cuenta de
+resultados, relación de ingresos) y el rango de ejercicios que cubren.
+
 ## Mantenimiento
 
 El único aviso que recibirás es cuando algo se rompa.
@@ -106,12 +133,15 @@ Para ver el estado sin esperar al correo:
 - Vercel Hobby es solo uso no comercial. Este proyecto no monetiza.
 - Supabase gratis: 2 proyectos activos, pausa a los 7 días sin actividad.
   El cron diario actúa de heartbeat, así que este proyecto no se pausa.
+- Los handlers de `api/` corren como funciones Node, no como Edge. `req` es un
+  `IncomingMessage` y `req.headers` es un objeto plano, no un `Headers`. Por eso
+  todo pasa por `src/lib/autorizar.ts`, que sirve para los dos entornos.
 
 ## Fuentes
 
 - Congreso de los Diputados, datos abiertos — https://www.congreso.es/es/datos-abiertos
-- Asamblea de Madrid, datos abiertos — bloquea acceso automatizado por robots.txt.
-  Solo se consumen los datasets publicados, nunca su web.
+- Tribunal de Cuentas, fiscalización de partidos políticos — https://www.tcu.es/es/partidos-politicos/
+- Páginas de transparencia de cada partido, enlazadas dato a dato desde la ficha
 - Chapel Hill Expert Survey — https://www.chesdata.eu
 - Centro de Investigaciones Sociológicas — https://www.cis.es
 - Manifesto Project — https://manifesto-project.wzb.eu
@@ -121,8 +151,9 @@ y a su fecha de actualización.
 
 ## Pendiente
 
-- Cargar valores reales en `src/lib/posiciones.ts` (ahora `provisional: true`)
-- Adapter de la Asamblea de Madrid
+- Adapter de la Asamblea de Madrid. Hoy la aplicación solo cubre el Congreso.
+- Cuentas que los partidos no publican o no hemos transcrito: cuenta de
+  resultados de Podemos, y los ejercicios 2025 de EH Bildu, BNG y Junts.
 - Estimación de puntos ideales (PCA sobre la matriz de votos) para el eje derivado
 - Chat: búsqueda semántica solo para temas, funciones SQL cerradas para todo lo
   que sea contar o comparar. Nunca SQL libre.

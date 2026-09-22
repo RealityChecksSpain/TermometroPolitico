@@ -1,4 +1,104 @@
 partido,ejercicio,concepto,importe,fuente_url,pagina,nota
+bildu,2024,ingresos_publicos_ordinarios,8256455.76,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,subvenciones_funcionamiento,2271910.24,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,aportaciones_grupos_institucionales,5943763.56,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,ingresos_privados,4269093.03,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,cuotas_afiliados,319073.37,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,aportaciones_cargos_publicos,3950019.66,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,donaciones_y_legados,0.00,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,ingresos_electorales_publicos,2202805.46,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,gastos_personal,2694617.45,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,gastos_ordinarios,6274977.88,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,gastos_electorales,2202916.56,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,gastos_financieros,1475.93,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,resultado_ejercicio,5996123.08,https://ehbildu.eus/dokumentuak/gardentasuna/2024_PyG.pdf,,
+bildu,2024,total_activo,12134535.94,https://ehbildu.eus/dokumentuak/gardentasuna/BALANCE%20DE%20SITUACION%202024.pdf,,
+bildu,2024,patrimonio_neto,11601881.00,https://ehbildu.eus/dokumentuak/gardentasuna/BALANCE%20DE%20SITUACION%202024.pdf,,
+bildu,2024,deuda_entidades_credito,13816.46,https://ehbildu.eus/dokumentuak/gardentasuna/BALANCE%20DE%20SITUACION%202024.pdf,,
+bng,2024,ingresos_publicos_ordinarios,2415224.95,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,subvenciones_funcionamiento,2114195.90,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,aportaciones_grupos_institucionales,280817.86,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,ingresos_privados,1489102.52,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,cuotas_afiliados,677980.88,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,aportaciones_cargos_publicos,0.00,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,donaciones_y_legados,795328.45,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,ingresos_electorales_publicos,1619268.57,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,gastos_personal,1450697.73,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,gastos_ordinarios,2594192.47,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,gastos_electorales,1669624.26,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,gastos_financieros,875.44,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,resultado_ejercicio,1425488.15,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bpg_24.pdf,,
+bng,2024,total_activo,6263559.84,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bap_24.pdf,,
+bng,2024,patrimonio_neto,6087413.75,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bap_24.pdf,,
+bng,2024,deuda_entidades_credito,5444.42,https://www.bng.gal/media/bnggaliza/files/2025/07/03/consolidado_bng_bap_24.pdf,,
+erc,2024,ingresos_publicos_ordinarios,4863363.24,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,subvenciones_funcionamiento,2644854.79,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,aportaciones_grupos_institucionales,2164110.94,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,ingresos_privados,2349232.84,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,cuotas_afiliados,960575.80,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,aportaciones_cargos_publicos,1308946.18,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,donaciones_y_legados,43773.10,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,ingresos_electorales_publicos,1889294.55,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,gastos_personal,3287991.03,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,gastos_ordinarios,6617585.24,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,gastos_electorales,2064683.83,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,gastos_financieros,22048.35,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,resultado_ejercicio,428875.38,https://static.esquerra.cat/uploads/20250708/20241231-Perdues-i-Guanys-CONSOLIDAT.pdf,,
+erc,2024,total_activo,9092842.88,https://static.esquerra.cat/uploads/20250708/20241231-Balanc-Situacio-CONSOLIDAT.pdf,,
+erc,2024,patrimonio_neto,8587169.96,https://static.esquerra.cat/uploads/20250708/20241231-Balanc-Situacio-CONSOLIDAT.pdf,,
+erc,2024,deuda_entidades_credito,6673.20,https://static.esquerra.cat/uploads/20250708/20241231-Balanc-Situacio-CONSOLIDAT.pdf,,
+junts,2024,ingresos_publicos_ordinarios,3809214.93,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,subvenciones_funcionamiento,933156.13,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,aportaciones_grupos_institucionales,2828144.03,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,ingresos_privados,1251086.60,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,cuotas_afiliados,757645.61,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,aportaciones_cargos_publicos,403275.02,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,donaciones_y_legados,2099.57,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,ingresos_electorales_publicos,2893418.99,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,gastos_personal,1460410.10,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,gastos_ordinarios,4197842.94,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,gastos_electorales,3931161.64,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,gastos_financieros,160624.40,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,resultado_ejercicio,-216449.12,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,total_activo,4549855.08,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,patrimonio_neto,2167130.38,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+junts,2024,deuda_entidades_credito,355000.00,https://junts.cat/wp-content/uploads/2026/08/EEFF-i-Memoria-2024-JUNTS.pdf,,
+pnv,2024,ingresos_publicos_ordinarios,8058844.13,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,subvenciones_funcionamiento,2402922.76,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,aportaciones_grupos_institucionales,5610061.57,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,ingresos_privados,5168170.36,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,cuotas_afiliados,1020523.66,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,aportaciones_cargos_publicos,2461453.08,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,donaciones_y_legados,12539.36,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,ingresos_electorales_publicos,2465971.45,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,gastos_personal,2842361.80,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,gastos_ordinarios,12706722.44,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,gastos_electorales,3433393.28,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,gastos_financieros,413823.73,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,resultado_ejercicio,-310514.00,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-cuenta-resultados-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,total_activo,112401094.45,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-balance-situacion-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,patrimonio_neto,102644763.80,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-balance-situacion-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+pnv,2024,deuda_entidades_credito,7533098.10,https://www.eaj-pnv.eus/adjuntos/docs_estaticos/2025-balance-situacion-eaj-pnv-es.pdf,,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+podemos,2024,resultado_ejercicio,-2146791.27,https://transparencia.podemos.info/docs/cuentas-anuales-2025/BALANCE-CONSOLIDADO-2025.pdf,1,"Del balance consolidado que Podemos publica con el ejercicio 2025; la cifra de 2024 sale de la columna comparativa. Su cuenta de resultados no esta en ese documento, asi que faltan ingresos y gastos."
+podemos,2024,total_activo,12158352.48,https://transparencia.podemos.info/docs/cuentas-anuales-2025/BALANCE-CONSOLIDADO-2025.pdf,1,"Del balance consolidado que Podemos publica con el ejercicio 2025; la cifra de 2024 sale de la columna comparativa. Su cuenta de resultados no esta en ese documento, asi que faltan ingresos y gastos."
+podemos,2024,patrimonio_neto,11508713.54,https://transparencia.podemos.info/docs/cuentas-anuales-2025/BALANCE-CONSOLIDADO-2025.pdf,1,"Del balance consolidado que Podemos publica con el ejercicio 2025; la cifra de 2024 sale de la columna comparativa. Su cuenta de resultados no esta en ese documento, asi que faltan ingresos y gastos."
+podemos,2024,deuda_entidades_credito,0.00,https://transparencia.podemos.info/docs/cuentas-anuales-2025/BALANCE-CONSOLIDADO-2025.pdf,1,"Del balance consolidado que Podemos publica con el ejercicio 2025; la cifra de 2024 sale de la columna comparativa. Su cuenta de resultados no esta en ese documento, asi que faltan ingresos y gastos."
+pp,2024,ingresos_publicos_ordinarios,43581679.03,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,subvenciones_funcionamiento,21638455.61,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,aportaciones_grupos_institucionales,20973602.64,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,ingresos_privados,8114654.88,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,cuotas_afiliados,3261907.47,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,aportaciones_cargos_publicos,4297795.90,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,donaciones_y_legados,2630.00,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,ingresos_electorales_publicos,15635048.16,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,gastos_personal,15598449.12,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,gastos_ordinarios,38988884.80,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,gastos_electorales,16106509.53,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,gastos_financieros,2300844.76,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,resultado_ejercicio,20434685.69,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,3,
+pp,2024,total_activo,104674245.81,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,2,
+pp,2024,patrimonio_neto,81016927.52,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,2,
+pp,2024,deuda_entidades_credito,18961002.07,https://www.pp.es/wp-content/uploads/2025/07/cuentas_anuales_2024.pdf,2,"Suma de 12.895.215,46 a largo plazo y 6.065.786,61 a corto. El balance no publica ese total: lo calculo yo sumando las dos lineas."
 psoe,2024,ingresos_publicos_ordinarios,54045778.90,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
 psoe,2024,subvenciones_funcionamiento,45248001.00,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
 psoe,2024,aportaciones_grupos_institucionales,8024329.03,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
@@ -12,6 +112,54 @@ psoe,2024,gastos_ordinarios,67540028.56,https://www.psoe.es/media-content/2025/0
 psoe,2024,gastos_electorales,15333886.78,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
 psoe,2024,gastos_financieros,1615046.35,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
 psoe,2024,resultado_ejercicio,7566504.09,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
-psoe,2024,deuda_entidades_credito,11605379.52,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,"Suma de 6.377.022,52 a largo plazo y 5.228.357,00 a corto. El documento no publica ese total: lo calculo yo sumando las dos lineas del balance."
 psoe,2024,total_activo,152168535.52,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
 psoe,2024,patrimonio_neto,115405705.22,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,
+psoe,2024,deuda_entidades_credito,11605379.52,https://www.psoe.es/media-content/2025/07/2024EstadosFinancieros.pdf,,"Suma de 6.377.022,52 a largo plazo y 5.228.357,00 a corto. El documento no publica ese total: lo calculo yo sumando las dos lineas del balance."
+sumar,2024,ingresos_publicos_ordinarios,1747667.49,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,subvenciones_funcionamiento,1445786.78,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,aportaciones_grupos_institucionales,196440.00,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,ingresos_privados,174035.49,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,cuotas_afiliados,53433.00,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,aportaciones_cargos_publicos,120602.49,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,donaciones_y_legados,0.00,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,ingresos_electorales_publicos,65047.03,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,gastos_personal,1060932.35,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,gastos_ordinarios,2240999.47,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,gastos_electorales,406829.66,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,gastos_financieros,0.00,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,resultado_ejercicio,-661079.12,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,total_activo,182661.33,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,patrimonio_neto,-670099.06,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+sumar,2024,deuda_entidades_credito,0.00,https://movimientosumar.es/transparencia/wp-content/uploads/sites/6/2025/07/Cuentas-Anuales-Movimiento-Sumar-2024.pdf,,
+upn,2024,ingresos_publicos_ordinarios,1005629.32,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,subvenciones_funcionamiento,126978.70,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,aportaciones_grupos_institucionales,872130.64,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,ingresos_privados,65682.91,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,cuotas_afiliados,49237.00,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,aportaciones_cargos_publicos,0.00,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,donaciones_y_legados,0.00,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,ingresos_electorales_publicos,0.00,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,gastos_personal,280899.61,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,gastos_ordinarios,946775.38,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,gastos_electorales,0.00,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,gastos_financieros,4452.34,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,resultado_ejercicio,120084.51,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,3,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,total_activo,1567323.45,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,2,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,patrimonio_neto,1307735.07,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,2,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+upn,2024,deuda_entidades_credito,91849.07,https://www.upn.org/wp-content/uploads/2026/06/CUENTAS-ANUALES-2025.pdf,2,"Cifra tomada de la columna comparativa del ejercicio siguiente, que es la que el partido publica como definitiva."
+vox,2024,ingresos_publicos_ordinarios,11038591.47,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,subvenciones_funcionamiento,7217888.87,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,aportaciones_grupos_institucionales,3504703.66,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,ingresos_privados,4063640.52,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,cuotas_afiliados,3761130.61,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,43,"Desglose de la nota 14.2 de la memoria auditada, pagina 43. La cuenta de perdidas y ganancias solo publica el total del epigrafe a)."
+vox,2024,aportaciones_cargos_publicos,56356.19,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,43,"Desglose de la nota 14.2 de la memoria auditada, pagina 43. La cuenta de perdidas y ganancias solo publica el total del epigrafe a)."
+vox,2024,donaciones_y_legados,126766.36,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,ingresos_electorales_publicos,7541536.64,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,gastos_personal,5142125.36,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,gastos_ordinarios,15211486.39,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,gastos_electorales,8200064.84,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,gastos_financieros,1248610.19,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,resultado_ejercicio,-2749171.99,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,total_activo,7925140.60,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,patrimonio_neto,3724834.87,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,,
+vox,2024,deuda_entidades_credito,2055629.00,https://www.voxespana.es/wp-content/uploads/2025/07/CC-2024-COMPLETO.pdf,4,Deudas con entidades de credito del pasivo corriente del balance auditado.

@@ -37,14 +37,7 @@ export function millones(v) {
   return `${m.toLocaleString('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} M€`;
 }
 
-export async function traerCuentas() {
-  if (!supabase) return null;
-
-  const { data, error } = await supabase.from('v_cuentas_partido').select('*');
-  if (error) {
-    console.error('cuentas', error.message);
-    return null;
-  }
+export function resumirCuentas(data) {
   if (!data?.length) return {};
 
   const porPartido = {};
@@ -52,13 +45,20 @@ export async function traerCuentas() {
     if (!f.partido || !f.concepto) continue;
     const ej = Number(f.ejercicio);
     const p = (porPartido[f.partido] ??= {});
-    const e = (p[ej] ??= { ejercicio: ej, cifras: {}, paginas: {}, fuente: null });
+    const e = (p[ej] ??= { ejercicio: ej, cifras: {}, paginas: {}, fuentes: [], notas: [] });
     e.cifras[f.concepto] = Number(f.importe);
     if (f.pagina != null) e.paginas[f.concepto] = Number(f.pagina);
-    if (!e.fuente && f.fuente_url) e.fuente = { url: f.fuente_url, titulo: f.fuente ?? null };
+    if (f.nota && !e.notas.some(x => x.texto === f.nota)) {
+      e.notas.push({ concepto: f.concepto, texto: f.nota });
+    }
+    if (f.fuente_url && !e.fuentes.some(x => x.url === f.fuente_url)) {
+      e.fuentes.push({ url: f.fuente_url, titulo: f.fuente ?? null });
+    }
   }
 
   const salida = {};
+  let masReciente = 0;
+
   for (const [partido, ejercicios] of Object.entries(porPartido)) {
     const ultimo = Object.values(ejercicios).sort((a, b) => b.ejercicio - a.ejercicio)[0];
     const c = ultimo.cifras;
@@ -70,19 +70,50 @@ export async function traerCuentas() {
 
     const publico = suma(PUBLICOS);
     const privado = suma(PRIVADOS);
-    const ingresos = publico != null || privado != null ? (publico ?? 0) + (privado ?? 0) : null;
-    const gastos = suma(GASTOS);
+    const ingresos = publico != null && privado != null ? publico + privado : null;
+    const gastos = Number.isFinite(c.gastos_ordinarios) ? suma(GASTOS) : null;
+    const balance = Number.isFinite(c.total_activo) || Number.isFinite(c.patrimonio_neto);
+
+    const noPublicado = [];
+    if (ingresos == null) noPublicado.push('lo que ingresó');
+    if (gastos == null) noPublicado.push('lo que gastó');
+    if (!balance) noPublicado.push('el balance');
+
+    if (ultimo.ejercicio > masReciente) masReciente = ultimo.ejercicio;
 
     salida[partido] = {
       ...ultimo,
+      fuente: ultimo.fuentes[0] ?? null,
       publico,
       privado,
       ingresos,
       gastos,
+      noPublicado,
+      ejercicios: Object.keys(ejercicios).map(Number).sort((a, b) => b - a),
       saldo: ingresos != null && gastos != null ? ingresos - gastos : null,
-      porcentajePublico: ingresos ? Math.round((publico ?? 0) / ingresos * 100) : null
+      porcentajePublico:
+        ingresos && publico != null && privado != null
+          ? Math.round((publico / ingresos) * 100)
+          : null
     };
   }
 
+  for (const v of Object.values(salida)) {
+    v.masReciente = masReciente;
+    v.desfasado = masReciente > 0 && v.ejercicio < masReciente;
+  }
+
   return salida;
+}
+
+export async function traerCuentas() {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.from('v_cuentas_partido').select('*');
+  if (error) {
+    console.error('cuentas', error.message);
+    return null;
+  }
+
+  return resumirCuentas(data);
 }

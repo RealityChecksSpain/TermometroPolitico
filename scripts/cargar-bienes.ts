@@ -13,16 +13,94 @@ import {
 exigirEnv('SUPABASE_URL');
 exigirEnv('GEMINI_API_KEY');
 
-const args = Object.fromEntries(
-  process.argv.slice(2).filter(a => a.startsWith('--')).map(a => {
+const args: Record<string, string> = {};
+{
+  const crudos = process.argv.slice(2);
+  for (let i = 0; i < crudos.length; i++) {
+    const a = crudos[i];
+    if (!a.startsWith('--')) continue;
     const [k, v] = a.replace(/^--/, '').split('=');
-    return [k, v ?? 'true'];
-  })
-);
+    if (v !== undefined) { args[k] = v; continue; }
+    const siguiente = crudos[i + 1];
+    if (siguiente && !siguiente.startsWith('--')) { args[k] = siguiente; i++; }
+    else args[k] = 'true';
+  }
+}
 
-const LIMITE = Number(args.limite ?? 0) || Infinity;
+const LIMITE = (() => {
+  const bruto = args.limite;
+  if (bruto === undefined) return Infinity;
+  const n = Number(bruto);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.log(`\n--limite="${bruto}" no es un numero positivo.`);
+    console.log('Usa --limite=5 o --limite 5. Abortado para no gastar llamadas de mas.\n');
+    process.exit(1);
+  }
+  return n;
+})();
 const SOLO_OUTLIERS = args['solo-outliers'] === 'true';
 const REESCRIBIR_ALTOS = args['reescribir-altos'] === 'true';
+const REHACER_CADENAS = args['rehacer-cadenas'] === 'true';
+const DESDE = Math.max(0, Number(args.desde ?? 0) || 0);
+const CADENA = args.cadena === 'true' || REHACER_CADENAS;
+
+const ORDEN_CONFIANZA: Record<string, number> = { alta: 3, media: 2, baja: 1 };
+
+const CAMPOS_DINERO = ['depositos', 'valores', 'planes_pensiones', 'deuda_pendiente', 'prestamos_concedido'];
+
+const INTENTOS = 3;
+const ESPERA_BASE = 4000;
+
+function dormir(ms: number) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+async function leerConReintento(url: string) {
+  let ultimo = '';
+  for (let intento = 1; intento <= INTENTOS; intento++) {
+    try {
+      const r = await leerDeclaracion(url);
+      if (r.ok && r.datos) return r;
+      ultimo = String(r.error ?? 'sin datos');
+    } catch (e: any) {
+      ultimo = String(e?.cause?.code ?? e?.message ?? e);
+    }
+    if (intento < INTENTOS) {
+      process.stdout.write(`reintento ${intento}/${INTENTOS - 1} (${ultimo})… `);
+      await dormir(ESPERA_BASE * intento);
+    }
+  }
+  return { ok: false as const, datos: null, error: ultimo };
+}
+
+function peorConfianza(a: any, b: any) {
+  const na = ORDEN_CONFIANZA[String(a)] ?? 0;
+  const nb = ORDEN_CONFIANZA[String(b)] ?? 0;
+  if (!na) return b;
+  if (!nb) return a;
+  return na <= nb ? a : b;
+}
+
+function vacio(v: any) {
+  if (v === null || v === undefined) return true;
+  if (typeof v === 'string') return v.trim() === '';
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
+
+function componer<T extends Record<string, any>>(previo: T | null, nuevo: T): T {
+  if (!previo) return { ...nuevo };
+  const salida: any = { ...previo };
+  for (const clave of Object.keys(nuevo)) {
+    if (!vacio(nuevo[clave])) salida[clave] = nuevo[clave];
+  }
+  salida.confianza = peorConfianza(previo.confianza, nuevo.confianza);
+  const notas = [previo.observaciones, nuevo.observaciones]
+    .filter(t => !vacio(t))
+    .map(t => String(t).trim());
+  salida.observaciones = notas.length ? Array.from(new Set(notas)).join(' | ') : null;
+  return salida as T;
+}
 
 function casasDe(d: Record<string, any>) {
   return contarInmuebles(
@@ -96,7 +174,7 @@ async function pendientes() {
     return false;
   };
 
-  return lista.filter(m => {
+  const seleccion = lista.filter(m => {
     const h: any = mapa.get(m.id);
     if (REESCRIBIR_ALTOS || SOLO_OUTLIERS) {
       if (esAltoSospechoso(h)) return true;
@@ -113,6 +191,46 @@ async function pendientes() {
     if (h.patrimonio_euros == null && (h.depositos != null || h.valores != null)) return false;
     return h.patrimonio_euros == null;
   }).map(m => ({ ...m, previo: mapa.get(m.id) }));
+
+  if (!CADENA) return seleccion;
+
+  const { data: docs, error: eDocs } = await db()
+    .from('declaraciones_bienes')
+    .select('mandato_id, documento_url, fecha_declaracion')
+    .order('fecha_declaracion', { ascending: true });
+
+  if (eDocs) {
+    console.log(`  aviso: no se pudo leer declaraciones_bienes (${eDocs.message}). Sigo con una sola por mandato.`);
+    return seleccion;
+  }
+
+  const cadenas = new Map<string, string[]>();
+  for (const d of docs ?? []) {
+    if (!d.documento_url) continue;
+    const previas = cadenas.get(d.mandato_id) ?? [];
+    if (!previas.includes(d.documento_url)) previas.push(d.documento_url);
+    cadenas.set(d.mandato_id, previas);
+  }
+
+  const base = REHACER_CADENAS
+    ? lista.filter(m => (cadenas.get(m.id) ?? []).length > 1).map(m => ({ ...m, previo: mapa.get(m.id) }))
+    : seleccion;
+
+  if (REHACER_CADENAS) {
+    console.log(`Rehacer cadenas: ${base.length} mandatos con más de una declaración, se reprocesan todos.`);
+  }
+
+  let conCadena = 0, pdfs = 0;
+  const conDocumentos = base.map(m => {
+    const urls = cadenas.get(m.id) ?? [];
+    const finales = urls.length ? urls : [m.url_bienes];
+    if (finales.length > 1) conCadena++;
+    pdfs += finales.length;
+    return { ...m, documentos: finales };
+  });
+
+  console.log(`Cadena: ${conCadena} mandatos con más de una declaración · ${pdfs} PDF a leer`);
+  return conDocumentos;
 }
 
 console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
@@ -215,7 +333,13 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
   if (filled) console.log(`Backfill vehículos: ${filled} filas\n`);
 }
 
-const cola = (await pendientes()).slice(0, LIMITE === Infinity ? undefined : LIMITE);
+const todos = await pendientes();
+if (DESDE >= todos.length && todos.length > 0) {
+  console.log(`\n--desde=${DESDE} deja la cola vacía: solo hay ${todos.length}.\n`);
+  process.exit(1);
+}
+const cola = todos.slice(DESDE).slice(0, LIMITE === Infinity ? undefined : LIMITE);
+if (DESDE) console.log(`Saltando los primeros ${DESDE}; quedan ${cola.length}.`);
 console.log(`Pendientes: ${cola.length}${SOLO_OUTLIERS || REESCRIBIR_ALTOS ? ' (outliers/altos)' : ''}\n`);
 
 if (cola.length === 0) {
@@ -225,27 +349,64 @@ if (cola.length === 0) {
   process.exit(0);
 }
 
-let ok = 0, fallos = 0, revisita = 0, corregidos = 0;
+let ok = 0, fallos = 0, revisita = 0, corregidos = 0, conArrastre = 0;
 
 for (let i = 0; i < cola.length; i++) {
   const m = cola[i];
   process.stdout.write(`[${i + 1}/${cola.length}] ${m.nombre_completo}… `);
 
-  const primera = await leerDeclaracion(m.url_bienes);
-  if (!primera.ok || !primera.datos) {
-    console.log(`ERROR ${primera.error}`);
+  const cadena: string[] = CADENA && Array.isArray((m as any).documentos) && (m as any).documentos.length
+    ? (m as any).documentos
+    : [m.url_bienes];
+
+  let compuesto: any = null;
+  let leidos = 0;
+  let ultimoError = '';
+  const origen: Record<string, number> = {};
+  let ultimoLeido = -1;
+  let ultimoDatos: any = null;
+
+  for (let k = 0; k < cadena.length; k++) {
+    const lectura = await leerConReintento(cadena[k]);
+    if (!lectura.ok || !lectura.datos) { ultimoError = String(lectura.error ?? 'sin datos'); continue; }
+    const saneado: any = sanearDeclaracion(lectura.datos);
+    for (const clave of Object.keys(saneado)) {
+      if (!vacio(saneado[clave])) origen[clave] = k;
+    }
+    compuesto = componer(compuesto, saneado);
+    leidos++;
+    ultimoLeido = k;
+    ultimoDatos = saneado;
+  }
+
+  const heredables = CAMPOS_DINERO.filter(c => origen[c] !== undefined && origen[c] < ultimoLeido);
+  if (heredables.length && compuesto && ultimoDatos) {
+    for (const c of CAMPOS_DINERO) {
+      compuesto[c] = vacio(ultimoDatos[c]) ? null : ultimoDatos[c];
+    }
+    conArrastre++;
+  }
+
+  if (!compuesto) {
+    console.log(`ERROR ${ultimoError}`);
     fallos++;
     continue;
   }
 
-  let datos = sanearDeclaracion(primera.datos);
+  if (cadena.length > 1) {
+    process.stdout.write(`${leidos}/${cadena.length} declaraciones… `);
+    if (heredables.length) process.stdout.write(`dinero solo de la última (se descartan ${heredables.join(', ')} de años previos)… `);
+  }
+
+  const ultimoDoc = cadena[cadena.length - 1];
+  let datos = compuesto;
   let motivo = esAbsurdo(datos);
   let corregido = false;
 
   if (motivo) {
     process.stdout.write(`dudoso (${motivo}) → revalidar… `);
     revisita++;
-    const rev = await revalidarCifrasAnomalas(m.url_bienes, datos, motivo);
+    const rev = await revalidarCifrasAnomalas(ultimoDoc, datos, motivo);
     if (rev.ok && rev.datos) {
       datos = sanearDeclaracion(rev.datos);
       const m2 = esAbsurdo(datos);
@@ -257,7 +418,7 @@ for (let i = 0; i < cola.length; i++) {
         motivo = m2;
       }
     } else {
-      const segunda = await leerDeclaracion(m.url_bienes);
+      const segunda = await leerDeclaracion(ultimoDoc);
       if (segunda.ok && segunda.datos) {
         datos = sanearDeclaracion(segunda.datos);
         const m2 = esAbsurdo(datos);
@@ -283,7 +444,7 @@ for (let i = 0; i < cola.length; i++) {
 
   const fila = {
     mandato_id: m.id,
-    url_declaracion: m.url_bienes,
+    url_declaracion: ultimoDoc,
     fecha_declaracion: d.fecha_declaracion,
     rendimientos_trabajo: d.rendimientos_trabajo,
     rendimientos_capital: d.rendimientos_capital,
@@ -361,6 +522,11 @@ for (let i = 0; i < cola.length; i++) {
   ok++;
 }
 
-console.log(`\nListo: ${ok} guardados, ${fallos} fallos, ${revisita} revalidaciones, ${corregidos} corregidos.\n`);
+console.log(`\nListo: ${ok} guardados, ${fallos} fallos, ${revisita} revalidaciones, ${corregidos} corregidos.`);
+if (CADENA) {
+  console.log(`${conArrastre} tenían cifras de dinero solo en declaraciones antiguas. No se heredan: el patrimonio sale únicamente de la declaración más reciente, aunque quede vacío.`);
+  console.log('Los recuentos de inmuebles y vehículos sí se heredan: no se restan entre sí, así que mezclar años no inventa una cifra.');
+}
+console.log('');
 console.log('Para rehacer los >10 M: npm run bienes:auto -- --reescribir-altos\n');
 console.log('Antes de la primera pasada con desglose: sql/2026-08-inmuebles-desglose.sql\n');

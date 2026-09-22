@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { db, exigirEnv } from '../src/lib/supabase';
+import { motivoUrlInvalida } from '../src/lib/fuenteUrl';
+import { anfitrion, tituloDocumento } from '../src/lib/documentoCuentas';
 
 exigirEnv('SUPABASE_URL');
 
@@ -22,6 +24,8 @@ const CONCEPTOS = [
   'total_activo',
   'patrimonio_neto'
 ];
+
+const ADMITE_NEGATIVO = new Set(['resultado_ejercicio', 'patrimonio_neto', 'ingresos_electorales_publicos']);
 
 const CABECERA = ['partido', 'ejercicio', 'concepto', 'importe', 'fuente_url', 'pagina', 'nota'];
 const CARPETA = 'datos/cuentas';
@@ -150,9 +154,13 @@ for (let i = 1; i < crudo.length; i++) {
   if (bruto === '') { problemas.push(`fila ${n}: importe vacio en ${p.slug}/${concepto}. Rellenalo o borra la fila`); continue; }
   const importe = Number(bruto.replace(/\s/g, ''));
   if (!Number.isFinite(importe)) { problemas.push(`fila ${n}: importe "${bruto}" no es un numero`); continue; }
-  if (importe < 0) { problemas.push(`fila ${n}: importe negativo en ${concepto}. Los gastos van en positivo`); continue; }
+  if (importe < 0 && !ADMITE_NEGATIVO.has(concepto)) {
+    problemas.push(`fila ${n}: importe negativo en ${concepto}. Los gastos van en positivo`);
+    continue;
+  }
 
-  if (!/^https:\/\//.test(url)) { problemas.push(`fila ${n}: fuente_url debe empezar por https://`); continue; }
+  const urlMal = motivoUrlInvalida(url);
+  if (urlMal) { problemas.push(`fila ${n}: fuente_url ${urlMal}`); continue; }
   if (pagina !== '' && !Number.isInteger(Number(pagina))) { problemas.push(`fila ${n}: pagina "${pagina}" no es entero`); continue; }
 
   const llave = `${p.id}:${ejercicio}:${concepto}`;
@@ -161,6 +169,8 @@ for (let i = 1; i < crudo.length; i++) {
 
   filas.push({
     partido_id: p.id,
+    slug: p.slug,
+    siglas: p.siglas ?? p.slug,
     ejercicio,
     concepto,
     importe,
@@ -183,14 +193,98 @@ if (filas.length === 0) {
 }
 
 const urls = Array.from(new Set(filas.map(f => f.fuente_url)));
+
+const uso = new Map<string, { conceptos: Set<string>; slugs: Set<string>; siglas: Set<string> }>();
+for (const f of filas) {
+  let u = uso.get(f.fuente_url);
+  if (!u) { u = { conceptos: new Set(), slugs: new Set(), siglas: new Set() }; uso.set(f.fuente_url, u); }
+  u.conceptos.add(f.concepto);
+  u.slugs.add(f.slug);
+  u.siglas.add(f.siglas);
+}
+
+function documentoNuevo(url: string) {
+  const u = uso.get(url)!;
+  if (u.slugs.size > 1) {
+    return {
+      tipo: 'informe_fiscalizacion',
+      organismo: anfitrion(url) || 'desconocido',
+      titulo: tituloDocumento(u.conceptos, '', ejercicio, true),
+      ejercicio_desde: ejercicio,
+      ejercicio_hasta: ejercicio,
+      url
+    };
+  }
+  return {
+    tipo: 'cuentas_anuales',
+    organismo: [...u.slugs][0],
+    titulo: tituloDocumento(u.conceptos, [...u.siglas][0], ejercicio),
+    ejercicio_desde: ejercicio,
+    ejercicio_hasta: ejercicio,
+    url
+  };
+}
+
 const { data: docs, error: eDocs } = await db()
   .from('documentos')
-  .select('id, url')
+  .select('id, url, ejercicio_desde, ejercicio_hasta')
   .in('url', urls);
 if (eDocs) throw eDocs;
 
 const porUrl = new Map((docs ?? []).map(d => [d.url, d.id]));
 const sinDoc = urls.filter(u => !porUrl.has(u));
+
+const aEnsanchar = (docs ?? []).filter(d =>
+  (d.ejercicio_desde != null && ejercicio < d.ejercicio_desde) ||
+  (d.ejercicio_hasta != null && ejercicio > d.ejercicio_hasta)
+);
+
+console.log(`\n${ruta}: ${filas.length} filas validas, ${vistas.size} combinaciones`);
+
+if (sinDoc.length) {
+  console.log(`\n${sinDoc.length} documento(s) que faltan en la tabla documentos:`);
+  for (const u of sinDoc) console.log(`  ${documentoNuevo(u).titulo}\n    ${u}`);
+}
+if (aEnsanchar.length) {
+  console.log(`\n${aEnsanchar.length} documento(s) que pasan a cubrir tambien ${ejercicio}:`);
+  for (const d of aEnsanchar) console.log(`  ${d.url}`);
+}
+
+if (!publicar) {
+  console.log('\nNo se ha escrito nada. Anade --publicar para cargar.\n');
+  process.exit(0);
+}
+
+if (sinDoc.length) {
+  const { data: creados, error: eCrear } = await db()
+    .from('documentos')
+    .insert(sinDoc.map(documentoNuevo))
+    .select('id, url');
+  if (eCrear) {
+    console.log(`\nERROR al crear documentos: ${eCrear.message}`);
+    console.log('No se ha cargado nada. Corrige y vuelve a lanzar.\n');
+    process.exit(1);
+  }
+  for (const d of creados ?? []) porUrl.set(d.url, d.id);
+  console.log(`\n${creados?.length ?? 0} documento(s) creados.`);
+}
+
+for (const d of aEnsanchar) {
+  const desde = Math.min(d.ejercicio_desde ?? ejercicio, ejercicio);
+  const hasta = Math.max(d.ejercicio_hasta ?? ejercicio, ejercicio);
+  const u = uso.get(d.url);
+  const cambios: Record<string, unknown> = { ejercicio_desde: desde, ejercicio_hasta: hasta };
+  if (u) cambios.titulo = tituloDocumento(u.conceptos, [...u.siglas][0], desde, u.slugs.size > 1, hasta);
+  const { error: eAncho } = await db().from('documentos').update(cambios).eq('id', d.id);
+  if (eAncho) console.log(`  aviso: no se pudo ensanchar ${d.url}: ${eAncho.message}`);
+  else console.log(`  ${d.url}\n    ahora cubre ${desde}-${hasta}`);
+}
+
+const sigueSinDoc = urls.filter(u => !porUrl.has(u));
+if (sigueSinDoc.length) {
+  console.log(`\n${sigueSinDoc.length} URL siguen sin documento_id:`);
+  for (const u of sigueSinDoc) console.log(`  ${u}`);
+}
 
 const aEscribir = filas.map(f => ({
   partido_id: f.partido_id,
@@ -199,19 +293,9 @@ const aEscribir = filas.map(f => ({
   importe: f.importe,
   pagina: f.pagina,
   documento_id: porUrl.get(f.fuente_url) ?? null,
-  confianza: 'transcrito'
+  confianza: 'transcrito',
+  nota: f.nota
 }));
-
-console.log(`\n${ruta}: ${aEscribir.length} filas validas, ${vistas.size} combinaciones`);
-if (sinDoc.length) {
-  console.log(`\n${sinDoc.length} URL sin fila en documentos (quedan sin documento_id):`);
-  for (const u of sinDoc) console.log(`  ${u}`);
-}
-
-if (!publicar) {
-  console.log('\nNo se ha escrito nada. Anade --publicar para cargar.\n');
-  process.exit(0);
-}
 
 const { error: eBorrar } = await db().from('cuenta_partido').delete().eq('ejercicio', ejercicio);
 if (eBorrar) throw eBorrar;
