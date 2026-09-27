@@ -38,7 +38,9 @@ const ESQUEMA = {
 function prompt(i: any): string {
   const fuente = i.texto_extraido
     ? `TEXTO OFICIAL (BOCG):\n---\n${String(i.texto_extraido).slice(0, Number(process.env.MAX_CHARS_PROMPT ?? 25000))}\n---`
-    : `RESUMEN DISPONIBLE: ${i.resumen ?? '(ninguno)'}`;
+    : i.resumen_ia
+      ? `RESUMEN DISPONIBLE:\n${String(i.resumen_ia).slice(0, 2000)}`
+      : 'SIN TEXTO NI RESUMEN. Clasifica a partir del titulo: en las normas del Congreso el titulo describe el objeto de la norma. Si aun asi no puedes decidir la materia principal, no inventes ninguna.';
 
   return `Clasificas normas del Congreso de los Diputados para una herramienta ciudadana.
 
@@ -73,14 +75,31 @@ const yaHechas = await traerTodo<any>((a, b) =>
     .eq('version_prompt', VERSION).order('iniciativa_id').range(a, b));
 const hechas = new Set(yaHechas.map((r: any) => r.iniciativa_id));
 
-const todas = await traerTodo<any>((a, b) =>
+const filasResumen = await traerTodo<any>((a, b) =>
+  db().from('resumenes_ia').select('iniciativa_id, resumen, frase_corta').order('iniciativa_id').range(a, b));
+
+const resumenPorId = new Map<string, string>();
+for (const r of filasResumen) {
+  const texto = String(r.resumen ?? r.frase_corta ?? '').trim();
+  if (texto && !resumenPorId.has(r.iniciativa_id)) resumenPorId.set(r.iniciativa_id, texto);
+}
+
+const crudas = await traerTodo<any>((a, b) =>
   db().from('iniciativas').select('id, titulo, texto_extraido, texto_chars').order('id').range(a, b));
+
+const todas = crudas.map((i: any) => ({ ...i, resumen_ia: resumenPorId.get(i.id) ?? null }));
 
 const pendientes = todas.filter((i: any) => !hechas.has(i.id));
 
+const sinNada = pendientes.filter((i: any) => !i.texto_extraido && !i.resumen_ia).length;
+const soloResumen = pendientes.filter((i: any) => !i.texto_extraido && i.resumen_ia).length;
+
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Materias: ${materias?.length ?? 0} · Colectivos: ${colectivos?.length ?? 0}`);
-console.log(`Pendientes: ${pendientes.length}\n`);
+console.log(`Pendientes: ${pendientes.length}`);
+console.log(`  con texto del BOCG: ${pendientes.length - sinNada - soloResumen}`);
+console.log(`  solo con resumen:   ${soloResumen}`);
+console.log(`  solo con el titulo: ${sinNada}\n`);
 
 if (!pendientes.length) {
   console.log(
@@ -88,7 +107,11 @@ if (!pendientes.length) {
       ? 'No hay iniciativas cargadas. Ejecuta antes: npm run iniciativas\n'
       : `Nada pendiente: las ${hechas.size} iniciativas ya estan clasificadas (${VERSION}).\n`
   );
-  console.log('Comprueba el estado global con: npm run estado:ia\n');
+  if ((todas ?? []).length > 0) {
+    console.log('Refrescando por si cambio algo aguas arriba...');
+    await refrescarMetricas();
+  }
+  console.log('\nComprueba el estado global con: npm run estado:ia\n');
   process.exit(0);
 }
 

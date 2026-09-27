@@ -1,8 +1,9 @@
-import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Hemiciclo, { LeyendaVoto } from './components/Hemiciclo.jsx';
 import Marca from './components/Marca.jsx';
 import { desgloseBienes } from './lib/inmuebles.js';
+import Explica from './components/Explica.jsx';
 import Detalle, { DetalleLey } from './components/Detalle.jsx';
 import FichaDiputado from './components/FichaDiputado.jsx';
 const Mapa = lazy(() => import('./components/Mapa.jsx'));
@@ -154,24 +155,26 @@ font-size:10.5px;color:#A9AEB2;width:22px;flex-shrink:0;text-align:right}
 border-radius:0 var(--radio) var(--radio) 0;padding:10px 13px;margin-bottom:var(--s3);
 font-size:11.5px;line-height:1.55;color:#4A4F55}
 
-.hallazgos{background:linear-gradient(135deg,#16211D 0%,#1E2A26 60%,#1A2F28 100%);
-border-radius:var(--radioG);padding:var(--s3) var(--s3) var(--s4);margin-bottom:var(--s4);position:relative}
+.hallazgos{background:linear-gradient(135deg,#4A2117 0%,#6B3122 60%,#7C3A24 100%);
+border-radius:var(--radioG);padding:var(--s3) var(--s3) var(--s4);
+margin-top:var(--s4);margin-bottom:var(--s4);position:relative}
 @media(min-width:701px){.hallazgos{padding:var(--s3) var(--s4) var(--s4)}}
 .hallazgosCab{display:flex;align-items:center;gap:var(--s2);
-padding-bottom:var(--s2);border-bottom:1px solid #333941;margin-bottom:var(--s3);flex-wrap:wrap}
+padding-bottom:var(--s2);border-bottom:1px solid #8A4A31;margin-bottom:var(--s3);flex-wrap:wrap}
 .hallazgos .rotulo{color:#E8C56A;letter-spacing:.12em}
 .hallazgosNav{display:flex;align-items:center;gap:var(--s2);margin-left:auto}
 .hallazgosNav button{width:26px;height:26px;border-radius:2px;cursor:pointer;line-height:1;font-size:15px;
-background:transparent;color:#8E959C;border:1px solid #3A4048;padding:0}
-.hallazgosNav .contador{font-size:10.5px;color:#6C737B;min-width:26px;text-align:center}
+background:transparent;color:#E3CDB8;border:1px solid #8A4A31;padding:0}
+.hallazgosNav .contador{font-size:10.5px;color:#C9A98F;min-width:26px;text-align:center}
 .hallazgoCuerpo{display:block;width:100%;text-align:left;background:none;border:none;padding:0;
-cursor:pointer;color:inherit;min-height:104px}
+cursor:pointer;color:inherit;min-height:104px;font:inherit;
+user-select:text;-webkit-user-select:text}
 @media(min-width:900px){.hallazgoCuerpo{min-height:76px}}
-.hallazgoTitular{display:block;color:#F7F8F5;font-size:clamp(16px,2.1vw,22px);font-weight:600;
+.hallazgoTitular{display:block;color:#F7F1E8;font-size:clamp(16px,2.1vw,22px);font-weight:600;
 line-height:1.28;letter-spacing:-0.016em;animation:entra 380ms cubic-bezier(.2,.7,.3,1)}
-.hallazgoDetalle{display:block;color:#BFC9C2;font-size:13px;line-height:1.6;margin-top:var(--s2);
+.hallazgoDetalle{display:block;color:#E3CDB8;font-size:13.5px;line-height:1.6;margin-top:var(--s2);
 max-width:none;overflow-wrap:anywhere}
-.hallazgoBase{display:block;color:#7F8A84;font-size:10.5px;line-height:1.5;margin-top:var(--s2)}
+.hallazgoBase{display:block;color:#C9A98F;font-size:10.5px;line-height:1.5;margin-top:var(--s2)}
 @keyframes entra{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .hallazgosPuntos{display:flex;gap:5px;margin-top:var(--s3);flex-wrap:wrap}
 .hallazgosPuntos button{width:16px;height:3px;border-radius:3px;border:none;padding:0;cursor:pointer;
@@ -234,6 +237,40 @@ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hi
 .filaLeyAcciones{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
 .filaLeyAcciones span{font-size:11px;font-weight:600;padding:3px 8px;border-radius:2px;
 background:#F1EFE4;color:#3A3F45;border:1px solid ${C.linea}}
+
+@media(hover:none){
+.chip{min-height:44px;font-size:12px;padding:8px 14px}
+.grupoChip{min-height:44px;padding:9px 12px}
+.chipsCcaaTitulo{min-height:44px;font-size:10.5px;display:flex;align-items:center;width:100%}
+.chipsCcaaLista button{min-height:40px}
+.rot{font-size:11px}
+.filaLey{padding:14px 12px}
+.filaLeyOficial{font-size:11px}
+.hallazgosNav button{width:44px;height:44px;font-size:18px}
+.hallazgosNav .contador{min-width:36px;font-size:11.5px}
+.hallazgosPuntos{gap:2px;margin-top:var(--s2)}
+.hallazgosPuntos button{width:28px;height:34px;background:none;display:flex;
+align-items:center;justify-content:center}
+.hallazgosPuntos button::before{content:'';display:block;width:16px;height:3px;border-radius:3px;
+background:#3A4048;transition:width 220ms ease,background 220ms ease}
+.hallazgosPuntos button[data-on="1"]{width:38px;background:none}
+.hallazgosPuntos button[data-on="1"]::before{width:26px;background:#E8C56A}
+.hallazgoBase{font-size:11.5px}
+.rejillaDip .dipNombre{font-size:14px}
+.rejillaDip .dipMeta{font-size:11px}
+.mapaTabs>button{min-height:44px}
+.panelGrupos button{min-height:44px}
+}
+
+@media(max-width:899px){
+.nav{position:sticky;top:0;bottom:auto;border-top:none;
+border-bottom:1px solid ${C.linea};background:rgba(243,241,232,.96);
+margin:4px -14px 6px;padding:0 14px}
+.navb{border-top:none;border-bottom:2px solid transparent;padding:11px 2px 10px}
+.navb[data-on="1"]{border-top-color:transparent;border-bottom-color:${C.tinta}}
+.navb .senal{top:5px}
+body{padding-bottom:28px}
+}
 `;
 
 const DIFERIDAS = ['siguiendo', 'partidos', 'ejes', 'metodo', 'datos'];
@@ -409,6 +446,43 @@ export default function App() {
   const [cargandoLista, setCargandoLista] = useState(false);
   const [siguiendo, setSiguiendo] = useState(0);
 
+  const navClave = `${seccion}|${votacionSel?.clave_norma ?? votacionSel?.id ?? ''}|${sel?.mandato_id ?? ''}`;
+  const volviendo = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (volviendo.current) { volviendo.current = false; return; }
+    if (window.history.state?.clave === navClave) return;
+    const estado = {
+      lente: true,
+      clave: navClave,
+      seccion,
+      ley: votacionSel?.clave_norma ?? votacionSel?.id ?? null,
+      dip: sel?.mandato_id ?? null
+    };
+    if (window.history.state?.lente) window.history.pushState(estado, '');
+    else window.history.replaceState(estado, '');
+  }, [navClave]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const alVolver = e => {
+      volviendo.current = true;
+      const s = e.state;
+      if (!s?.lente) {
+        setSel(null);
+        setVotacionSel(null);
+        setSeccion('inicio');
+        return;
+      }
+      if (!s.dip) setSel(null);
+      if (!s.ley) setVotacionSel(null);
+      setSeccion(s.seccion ?? 'inicio');
+    };
+    window.addEventListener('popstate', alVolver);
+    return () => window.removeEventListener('popstate', alVolver);
+  }, []);
+
   useEffect(() => {
     if (faltaConfig) {
       setError('Configuracion en .env:\n\n' + problemasConfig.map(p => '  - ' + p).join('\n'));
@@ -564,6 +638,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div className="em" style={{ fontSize: 10.5, color: '#A0A6AC', textTransform: 'uppercase', letterSpacing: '.07em' }}>
                 {enHemiciclo.length} escaños{fCcaa ? ` · ${ccaa.find(c => c.slug === fCcaa)?.nombre}` : ''}
+                <Explica termino="hemiciclo" titulo="El hemiciclo" tono="claro" />
               </div>
               {votacionSel && votos && <LeyendaVoto totales={{
                 si: votacionSel.total_si, no: votacionSel.total_no,
@@ -650,7 +725,7 @@ export default function App() {
           {seccion === 'leyes' && !votacionSel && (
             <>
               <div>
-                <div className="rot">Leyes que te afectan</div>
+                <div className="rot">Leyes que te afectan<Explica termino="filtroColectivo" titulo="Leyes que te afectan" /></div>
                 <div className="tiraChips">
                   {facetas.colectivos.filter(c => c.destacado).map(c => (
                     <Chip key={c.slug} on={fColectivo === c.slug} titulo={c.descripcion}
@@ -985,17 +1060,17 @@ export default function App() {
         </motion.div>
         </AnimatePresence>
 
-        <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 10, color: C.tenue, lineHeight: 1.6 }}>
+        <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 12, color: C.tenue, lineHeight: 1.9 }}>
           Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.
           Aplicación independiente, sin vínculo con ninguna institución.{' '}
           <button onClick={() => { setSeccion('metodo'); setVotacionSel(null); }} style={{
-            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-            color: C.tinta, fontSize: 10, textDecoration: 'underline', fontFamily: 'inherit'
+            background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',
+            color: C.tinta, fontSize: 12, textDecoration: 'underline', fontFamily: 'inherit'
           }}>Cómo se hace esto</button>
           {' · '}
           <button onClick={() => { setSeccion('datos'); setVotacionSel(null); }} style={{
-            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-            color: C.tinta, fontSize: 10, textDecoration: 'underline', fontFamily: 'inherit'
+            background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',
+            color: C.tinta, fontSize: 12, textDecoration: 'underline', fontFamily: 'inherit'
           }}>Descargar los datos</button>
         </div>
       </div>

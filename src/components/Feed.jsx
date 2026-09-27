@@ -5,8 +5,9 @@ import { traerFeed, traerMaterias } from '../lib/cliente.js';
 import { estaSeguido } from '../lib/seguimientos.js';
 import BotonSeguir from './BotonSeguir.jsx';
 import { nombreCompletoNorma, resumenBreve, titularDeNorma, vehiculoNorma } from '../lib/fraseCorta.js';
-import { useTelefono } from '../lib/pantalla.js';
+import { useConsulta, useTelefono } from '../lib/pantalla.js';
 import { VOTO } from '../lib/paleta.js';
+import Explica from './Explica.jsx';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -17,17 +18,18 @@ const C = {
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 const estilos = `
-.feedPista{position:relative}
+.feedPista{position:relative;max-width:100%}
 .feedTarjeta{background:${C.superficie};border:1px solid ${C.linea};border-radius:2px;
 cursor:pointer;position:relative;border-left:4px solid var(--materia,${C.linea})}
 .feedCab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.feedTitular{font-weight:600;line-height:1.24;letter-spacing:-0.015em;margin:0;color:${C.tinta}}
-.feedResumen{color:${C.media};line-height:1.5;margin-top:8px}
-.feedOficial{color:${C.tenue};line-height:1.45;margin-top:8px}
+.feedTitular{font-weight:600;line-height:1.24;letter-spacing:-0.015em;margin:0;color:${C.tinta};
+overflow-wrap:anywhere}
+.feedResumen{color:${C.media};line-height:1.5;margin-top:8px;overflow-wrap:anywhere}
+.feedOficial{color:${C.tenue};line-height:1.45;margin-top:8px;overflow-wrap:anywhere}
 .feedTipo{display:block;color:${C.media};font-weight:700;letter-spacing:.05em;
 text-transform:uppercase;font-size:9.5px;margin-bottom:3px}
 .feedLeyenda{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap}
-.feedEfectos{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px}
+.feedEfectos{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px;align-items:center}
 .feedAcciones{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
 .feedAccion{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:2px;
 background:#F1EFE4;color:#3A3F45;border:1px solid #DFD9C6;font-weight:600;letter-spacing:.01em}
@@ -36,16 +38,17 @@ background:#F1EFE4;color:#3A3F45;border:1px solid #DFD9C6;font-weight:600;letter
 padding:2px 7px;margin-top:8px;border-radius:2px;font-size:10px}
 .feedQueEs{color:${C.tenue};line-height:1.5;margin:8px 0 0;padding-left:9px;
 border-left:2px solid ${C.linea}}
-@media(max-width:700px){.feedQueEs{font-size:12px}}
+@media(max-width:700px){.feedQueEs{font-size:12.5px}}
 @media(min-width:701px){.feedQueEs{font-size:12.5px}}
-@media(max-width:700px){.feedAccion{font-size:11.5px;padding:4px 9px}}
+@media(max-width:700px){.feedAccion{font-size:12px;padding:6px 11px}}
 @media(min-width:701px){.feedAccion{font-size:12px}}
 @media(max-width:700px){
-.feedTarjeta{padding:13px 13px 15px;border-left-width:3px}
-.feedTitular{font-size:17px}
-.feedResumen{font-size:13px}
-.feedOficial{font-size:11px}
-.feedLeyenda{gap:10px}
+.feedTarjeta{padding:14px 14px 16px;border-left-width:4px}
+.feedTitular{font-size:17.5px}
+.feedResumen{font-size:13.5px}
+.feedOficial{font-size:11.5px}
+.feedLeyenda{gap:10px;margin-top:8px}
+.feedEfectos{gap:6px;margin-top:14px}
 }
 @media(min-width:701px){
 .feedTarjeta{padding:15px 16px}
@@ -104,7 +107,7 @@ function Franja({ si, no, abs, gana, destacada, estrecho }) {
     ['En contra', n, C.no, gana === 'no'],
     ['Abstención', a, C.abs, false]
   ];
-  const alto = destacada && !estrecho ? 26 : 20;
+  const alto = destacada && !estrecho ? 26 : estrecho ? 22 : 20;
   const resalte = 7;
   return (
     <div style={{ marginTop: 14 }}>
@@ -128,7 +131,7 @@ function Franja({ si, no, abs, gana, destacada, estrecho }) {
             )}
             {(v / t) > (estrecho ? 0.16 : 0.09) && (
               <span className="em" style={{
-                fontSize: lidera ? 11 : 10, fontWeight: 700, color: '#F3F1E8',
+                fontSize: lidera ? 11.5 : 10.5, fontWeight: 700, color: '#F3F1E8',
                 whiteSpace: 'nowrap', padding: '0 4px'
               }}>
                 <Cifra valor={v} />
@@ -138,9 +141,15 @@ function Franja({ si, no, abs, gana, destacada, estrecho }) {
         ))}
       </div>
       <div className="feedLeyenda">
+        {destacada && (
+          <span onClick={e => e.stopPropagation()} style={{ display: 'inline-flex', color: C.media }}>
+            <Explica termino="franjaVotos" titulo="El reparto de votos" />
+          </span>
+        )}
         {segs.map(([et, v, col, lidera]) => v > 0 && (
           <span key={et} className="em" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 9.5,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            fontSize: estrecho ? 10.5 : 9.5,
             color: lidera ? C.tinta : C.media, fontWeight: lidera ? 700 : 400,
             letterSpacing: '.06em', textTransform: 'uppercase'
           }}>
@@ -231,7 +240,7 @@ function Tarjeta({ n, onAbrir, destacada, materiaId, estrecho }) {
         gana={resultado.gana} destacada={destacada} estrecho={estrecho} />
 
       {resultado.dudoso && (
-        <div className="em" style={{ fontSize: 10, color: '#8A6D1F', marginTop: 8, lineHeight: 1.5 }}>
+        <div className="em" style={{ fontSize: 10.5, color: '#8A6D1F', marginTop: 8, lineHeight: 1.5 }}>
           Esta norma tiene {votaciones} votaciones y los datos abiertos no permiten saber cuál fue la
           final. Se muestra la última registrada.
         </div>
@@ -241,7 +250,7 @@ function Tarjeta({ n, onAbrir, destacada, materiaId, estrecho }) {
         <div className="feedEfectos">
           {efectos.slice(0, destacada && !estrecho ? 4 : 3).map(e => (
             <span key={e.slug} className="em" style={{
-              fontSize: 10, padding: '3px 8px', borderRadius: 2,
+              fontSize: estrecho ? 10.5 : 10, padding: estrecho ? '4px 9px' : '3px 8px', borderRadius: 2,
               background: C.superficie, color: C.media, border: `1px solid ${C.linea}`
             }}>{e.nombre}</span>
           ))}
@@ -265,10 +274,12 @@ const CARRILES = 7;
 const SALIENTE = 58;
 const DESFASE = 130;
 const HUECO = CARRILES * 13 + 12;
+const CORTE_FRANJAS = 1200;
 
 export default function Feed({ filtros, onAbrir, cabecera }) {
   const reducido = useReducedMotion();
   const estrecho = useTelefono();
+  const hayMargen = useConsulta(`(min-width: ${CORTE_FRANJAS}px)`);
   const [items, setItems] = useState([]);
   const [materias, setMaterias] = useState(new Map());
   const [cargando, setCargando] = useState(true);
@@ -279,7 +290,7 @@ export default function Feed({ filtros, onAbrir, cabecera }) {
   const pista = useRef(null);
   const pagina = useRef(0);
   const clave = JSON.stringify(filtros ?? {});
-  const conFranjas = !reducido && !estrecho;
+  const conFranjas = !reducido && !estrecho && hayMargen;
 
   const valorDe = i => {
     if (!valores.current[i]) valores.current[i] = motionValue(0);
@@ -401,9 +412,9 @@ export default function Feed({ filtros, onAbrir, cabecera }) {
           background: '#FFF8E6', border: '1px solid #E8D9A8', color: '#6B5518'
         }}>
           <strong>No se han podido cargar las leyes.</strong>
-          <div className="em" style={{ fontSize: 11, marginTop: 6, color: '#8A6D1F' }}>{fallo}</div>
+          <div className="em" style={{ fontSize: 11.5, marginTop: 6, color: '#8A6D1F' }}>{fallo}</div>
           <button onClick={() => { pagina.current = 0; setFin(false); cargar(true); }} className="em" style={{
-            marginTop: 12, padding: '6px 12px', fontSize: 11.5, cursor: 'pointer',
+            marginTop: 12, padding: '10px 16px', fontSize: 12.5, cursor: 'pointer', minHeight: 44,
             background: 'transparent', border: '1px solid #C8A85A', borderRadius: 2, color: '#6B5518'
           }}>Reintentar</button>
         </div>
@@ -412,7 +423,7 @@ export default function Feed({ filtros, onAbrir, cabecera }) {
       <div ref={centinela} style={{ height: 1 }} />
 
       {fin && items.length > 0 && (
-        <div className="em" style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 11 }}>
+        <div className="em" style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 11.5 }}>
           Has llegado al final · <Cifra valor={items.length} /> normas
         </div>
       )}

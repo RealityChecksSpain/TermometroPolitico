@@ -106,6 +106,14 @@ if (ignoradas.length) {
   ignoradas.forEach(f => console.log('  ' + f));
 }
 
+const huerfanos = PATRONES.filter(p => !disponibles.some(f => p.test(f)));
+if (huerfanos.length) {
+  console.log('\nPATRONES QUE NO ENCAJAN CON NINGUNA FAMILIA PUBLICADA');
+  huerfanos.forEach(p => console.log('  ' + String(p)));
+  console.log('  El portal no publica esos ficheros. Lo que cubrian no entra en la base');
+  console.log('  y quedara sin materia, sin colectivos y sin resumen.');
+}
+
 const vistos = new Set<string>();
 const lote: any[] = [];
 

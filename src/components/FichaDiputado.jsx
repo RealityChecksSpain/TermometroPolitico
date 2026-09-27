@@ -6,6 +6,7 @@ import { traerVotosDeDiputado, traerResumenDiputado, traerActividades, traerPoli
 import { estaSeguido } from '../lib/seguimientos.js';
 import BotonSeguir from './BotonSeguir.jsx';
 import AvatarPartido from './AvatarPartido.jsx';
+import Explica from './Explica.jsx';
 import { useBloqueoScroll, useTelefono } from '../lib/pantalla.js';
 import { tituloCorto, vehiculoNorma } from '../lib/fraseCorta.js';
 import { VOTO } from '../lib/paleta.js';
@@ -291,7 +292,10 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                   <div className="ed" style={{ fontSize: 16, fontWeight: 600 }}>
                     {Number(d.patrimonio_euros).toLocaleString('es-ES', { maximumFractionDigits: 0 })} €
                   </div>
-                  <div style={{ fontSize: 10, color: C.tenue }}>patrimonio líquido est.</div>
+                  <div style={{ fontSize: 11, color: C.tenue }}>
+                    patrimonio líquido est.
+                    <Explica termino="patrimonioLiquido" titulo="Patrimonio líquido" />
+                  </div>
                 </div>
               )}
               {(d.n_casas ?? d.n_inmuebles) != null && (
@@ -300,7 +304,8 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                   <div style={{ fontSize: 10, color: C.tenue }}>
                     {desgloseBienes(d).map(x => x.texto).join(' · ') || 'unidades declaradas'}
                     {d.n_inmuebles_equivalentes != null && Number(d.n_inmuebles_equivalentes) < Number(d.n_casas ?? d.n_inmuebles) * 0.9 && (
-                      <> · equivalen a {Number(d.n_inmuebles_equivalentes).toLocaleString('es-ES', { maximumFractionDigits: 1 })} en propiedad plena</>
+                      <> · equivalen a {Number(d.n_inmuebles_equivalentes).toLocaleString('es-ES', { maximumFractionDigits: 1 })} en propiedad plena
+                        <Explica termino="inmueblesEquivalentes" titulo="Inmuebles equivalentes" /></>
                     )}
                   </div>
                 </div>
@@ -336,14 +341,8 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                 <div style={{ display: 'flex', gap: 9, alignItems: 'baseline' }}>
                   <span className="ed" style={{ fontSize: 13, fontWeight: 600 }}>{d.n_inmuebles_sociedad ?? 0}</span>
                   <span style={{ fontSize: 11.5, color: C.media }}>
-                    a nombre de una sociedad no cotizada{' '}
-                    <span
-                      title="El inmueble figura a nombre de una empresa de la que el diputado tiene acciones o participaciones. El porcentaje declarado aparece en cada línea del detalle."
-                      style={{
-                        display: 'inline-block', width: 13, height: 13, lineHeight: '13px',
-                        textAlign: 'center', borderRadius: 13, border: `1px solid ${C.linea}`,
-                        fontSize: 9, color: C.tenue, cursor: 'help', verticalAlign: 'middle'
-                      }}>i</span>
+                    a nombre de una sociedad no cotizada
+                    <Explica termino="viaSociedad" titulo="Vía sociedad" />
                   </span>
                 </div>
 
@@ -352,14 +351,23 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                     {d.inmuebles_items.map((it, i) => (
                       <li key={i}>
                         {it.qty > 1 ? `${it.qty} × ` : ''}{it.texto}
-                        <span className="em" style={{
-                          marginLeft: 6, fontSize: 9.5, padding: '1px 5px', borderRadius: 2,
-                          background: it.sociedad ? '#F3EEE2' : '#E7EEF8',
-                          color: it.sociedad ? '#6B5518' : '#083A79'
+                        <span className="em" title={
+                          it.sociedad === true
+                            ? 'La línea nombra una sociedad no cotizada.'
+                            : it.sociedad === false
+                            ? 'Figura en el bloque de bienes propios de la declaración.'
+                            : 'La declaración no separa bienes propios de bienes de sociedad, así que no consta a qué bloque pertenece esta línea.'
+                        } style={{
+                          marginLeft: 6, fontSize: 10.5, padding: '1px 5px', borderRadius: 2,
+                          background: it.sociedad === true ? '#F3EEE2' : it.sociedad === false ? '#E7EEF8' : '#EFEFE9',
+                          color: it.sociedad === true ? '#6B5518' : it.sociedad === false ? '#083A79' : '#5A6067',
+                          cursor: 'help'
                         }}>
-                          {it.sociedad
+                          {it.sociedad === true
                             ? `vía sociedad${it.porcentaje != null ? ` · ${it.porcentaje}%` : ''}`
-                            : 'propio'}
+                            : it.sociedad === false
+                            ? `propio${it.porcentaje != null && it.porcentaje < 100 ? ` · ${it.porcentaje}%` : ''}`
+                            : `origen sin desglosar${it.porcentaje != null ? ` · ${it.porcentaje}%` : ''}`}
                         </span>
                       </li>
                     ))}

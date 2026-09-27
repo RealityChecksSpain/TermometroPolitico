@@ -2,7 +2,7 @@ export interface InmuebleItem {
   qty: number;
   texto: string;
   porcentaje: number | null;
-  sociedad: boolean;
+  sociedad: boolean | null;
   categoria: 'vivienda' | 'suelo' | 'anejo' | 'productivo' | 'otro';
   esVivienda: boolean;
 }
@@ -13,6 +13,7 @@ export interface ConteoInmuebles {
   n_inmuebles_sociedad: number | null;
   n_inmuebles_equivalentes: number | null;
   n_viviendas: number | null;
+  n_viviendas_propias: number | null;
   n_suelo: number | null;
   n_anejos: number | null;
   n_productivos: number | null;

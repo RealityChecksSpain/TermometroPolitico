@@ -11,7 +11,7 @@ const CIERRE_ABREVIATURA = new RegExp(
   'i'
 );
 
-const QUE_ES = {
+export const QUE_ES = {
   decretoLey: 'El Gobierno la aprobó por urgencia y ya estaba en vigor al votarse. El Congreso solo decide si la mantiene o la deroga.',
   legislativo: 'Texto refundido que el Gobierno aprueba por delegación de las Cortes.',
   proyecto: 'Ley propuesta por el Gobierno.',
@@ -196,7 +196,8 @@ export function tituloCorto(n, max = 120) {
 
 export function fraseCortaDeNorma(n, max = 48) {
   const propia = n?.frase_corta || n?.en_una_frase || n?.titular_corto;
-  const limpia = limpiarFrase(propia, max);
+  const holgura = Number.isFinite(max) ? Math.round(max * 1.35) : max;
+  const limpia = limpiarFrase(propia, holgura);
   if (limpia) return limpia;
 
   const frases = partirFrases(n?.resumen);

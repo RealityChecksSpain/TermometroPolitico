@@ -7,6 +7,7 @@ import { Cifra, Rotulo } from './Movimiento.jsx';
 import Transparencia from './Transparencia.jsx';
 import Cuentas from './Cuentas.jsx';
 import { siglasPartido } from '../lib/etiquetas.js';
+import Explica from './Explica.jsx';
 
 const ESTADO = {
   cumplida: { icono: '✓', color: '#2E7D5B', fondo: '#E6F2EB', texto: 'cumplida' },
@@ -214,6 +215,7 @@ export default function Partidos({ onDiputados }) {
           <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <i style={{ width: 9, height: 9, borderRadius: 2, background: k === 'pendiente' ? '#DCD9CE' : ESTADO[k].color }} />
             {ESTADO[k].texto}
+            {k === 'contradicha' && <Explica termino="promesaContradicha" titulo="Votó lo contrario" />}
           </span>
         ))}
       </div>

@@ -12,6 +12,7 @@ import { traerAuditoriaFiabilidad, indiceKappa, UMBRAL_KAPPA } from '../lib/audi
 import { marcaDe } from '../lib/regimenes-marca.js';
 import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 import { useTactil, useTelefono } from '../lib/pantalla.js';
+import Explica from './Explica.jsx';
 
 const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
@@ -847,6 +848,16 @@ export default function Mapa({ onDiputados }) {
           }}>{t}</button>
         ))}
       </div>
+
+      {fuente !== 'democracia' && (
+        <div className="em" style={{
+          display: 'flex', alignItems: 'center', fontSize: 10.5, color: C.media,
+          letterSpacing: '.06em', textTransform: 'uppercase', margin: '0 0 12px'
+        }}>
+          de dónde sale cada posición
+          <Explica termino="ejes" titulo="Cómo se sitúa a cada partido" />
+        </div>
+      )}
 
       {fuente === 'democracia' ? <MapaDemocracia /> : puntos.length === 0 ? (
         <div style={{ padding: 24, background: '#FFF8E6', border: '1px solid #E8D9A8', borderRadius: 3, fontSize: 13, color: '#6B5518', lineHeight: 1.6 }}>

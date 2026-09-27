@@ -2,12 +2,12 @@ const TIPO =
   /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|plaza(?:s)?(?:\s+de\s+(?:garaje(?:s)?|aparcamiento(?:s)?))?|garaje(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
 
 const MARCA_SOCIEDAD =
-  /sociedad|s\.\s?l\.|s\.\s?a\.|s\.l\.u|mercantil|participacion|participación|acciones|cotiza/i;
+  /\b(?:s\.?\s?l\.?\s?u|s\.?\s?l|s\.?\s?a)\b\.?|sociedad(?!\s+(?:de\s+)?gananciales)|mercantil|participaciones?\s+sociales|acciones|cotiza/i;
 
 function normalizar(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -39,10 +39,8 @@ function porcentajeDe(trozo) {
   return Number.isFinite(v) && v > 0 && v <= 100 ? v : null;
 }
 
-function esDeSociedad(trozo) {
-  const pct = porcentajeDe(trozo);
-  if (pct != null && pct < 100) return true;
-  return MARCA_SOCIEDAD.test(trozo);
+function origenDe(trozo) {
+  return MARCA_SOCIEDAD.test(trozo) ? true : null;
 }
 
 export function parsearInmueblesDetalle(detalle) {
@@ -56,7 +54,7 @@ export function parsearInmueblesDetalle(detalle) {
   const out = [];
   for (const trozo of trozos) {
     const pct = porcentajeDe(trozo);
-    const sociedad = esDeSociedad(trozo);
+    const sociedad = origenDe(trozo);
 
     const conNum = trozo.match(new RegExp(`^(\\d{1,3})\\s+(${TIPO.source})\\b`, 'i'));
     if (conNum) {
@@ -111,13 +109,13 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
 
   let propios = 0;
   let sociedad = 0;
-  let viviendas = 0;
+  let viviendasPropias = 0;
   let equivalentes = 0;
   const cats = { vivienda: 0, suelo: 0, anejo: 0, productivo: 0, otro: 0 };
   for (const it of items) {
-    if (it.sociedad) sociedad += it.qty;
+    if (it.sociedad === true) sociedad += it.qty;
     else propios += it.qty;
-    if (it.esVivienda && !it.sociedad) viviendas += it.qty;
+    if (it.esVivienda && it.sociedad === false) viviendasPropias += it.qty;
     equivalentes += it.qty * ((it.porcentaje ?? 100) / 100);
     cats[it.categoria ?? 'otro'] = (cats[it.categoria ?? 'otro'] ?? 0) + it.qty;
   }
@@ -131,6 +129,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       n_inmuebles_sociedad: desgloseFiable ? sociedad : null,
       n_inmuebles_equivalentes: equivalentes,
       n_viviendas: cats.vivienda,
+      n_viviendas_propias: desgloseFiable ? viviendasPropias : null,
       n_suelo: cats.suelo,
       n_anejos: cats.anejo,
       n_productivos: cats.productivo,
@@ -152,6 +151,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       n_inmuebles_sociedad: null,
       n_inmuebles_equivalentes: null,
       n_viviendas: null,
+      n_viviendas_propias: null,
       n_suelo: null, n_anejos: null, n_productivos: null, n_otros_bienes: null,
       fuente: 'filas',
       items
@@ -164,6 +164,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
     n_inmuebles_sociedad: null,
     n_inmuebles_equivalentes: null,
     n_viviendas: null,
+    n_viviendas_propias: null,
     n_suelo: null, n_anejos: null, n_productivos: null, n_otros_bienes: null,
     fuente: null,
     items

@@ -13,17 +13,26 @@ const FORMA = { si: 'relleno', no: 'anillo', abstencion: 'punto', no_vota: 'tenu
 const ETIQUETA = { si: 'Sí', no: 'No', abstencion: 'Abstención', no_vota: 'No votó' };
 
 function calcularAsientos(total, filas) {
-  const radios = [];
-  for (let i = 0; i < filas; i++) radios.push(1 + (i * 1.5) / (filas - 1));
-  const suma = radios.reduce((a, b) => a + b, 0);
-  const porFila = radios.map(r => Math.round((r / suma) * total));
+  const cuantos = Number.isFinite(total) ? Math.max(0, Math.trunc(total)) : 0;
+  if (cuantos === 0) return [];
+  const nFilas = Math.max(1, Math.min(cuantos, Number.isFinite(filas) ? Math.trunc(filas) : 1));
 
-  let dif = total - porFila.reduce((a, b) => a + b, 0);
-  let idx = filas - 1;
+  const radios = [];
+  for (let i = 0; i < nFilas; i++) radios.push(nFilas === 1 ? 1 : 1 + (i * 1.5) / (nFilas - 1));
+  const suma = radios.reduce((a, b) => a + b, 0);
+  const porFila = radios.map(r => Math.round((r / suma) * cuantos));
+
+  let dif = cuantos - porFila.reduce((a, b) => a + b, 0);
+  let idx = nFilas - 1;
   while (dif !== 0) {
-    porFila[idx] += dif > 0 ? 1 : -1;
-    dif += dif > 0 ? -1 : 1;
-    idx = (idx - 1 + filas) % filas;
+    if (dif > 0) {
+      porFila[idx] += 1;
+      dif -= 1;
+    } else if (porFila[idx] > 0) {
+      porFila[idx] -= 1;
+      dif += 1;
+    }
+    idx = (idx - 1 + nFilas) % nFilas;
   }
 
   const puntos = [];

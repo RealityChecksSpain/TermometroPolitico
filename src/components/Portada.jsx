@@ -3,11 +3,14 @@ import { AnimatePresence, motion, useMotionValue, useSpring, useTransform, useRe
 import { titularDeNorma, tituloCorto, vehiculoNorma } from '../lib/fraseCorta.js';
 import { etiquetasDeNorma } from '../lib/etiquetas.js';
 import { cabeza as cabezaDe, figura, limitar, mezcla, pildora, trazo } from '../lib/morfo.js';
+import { useTactil, useTelefono } from '../lib/pantalla.js';
+import Explica from './Explica.jsx';
 
 const TINTA = '#15171A';
 const PAPEL = '#F3F1E8';
 const ROJO = '#B4552F';
 const HUESO = '#EFE1C4';
+const VERDE = '#1B2A24';
 
 function diseno(cfg) {
   const { W, H, cx, ny, s, base, arco0, arcoPaso, barra, lupaR, alzada, copia } = cfg;
@@ -92,7 +95,7 @@ export function pulsoEscanos() {
 }
 
 const estilos = `
-.pvPortada{position:relative;width:100vw;margin-left:calc(50% - 50vw);background:${PAPEL};padding:18px 0 18px;margin-bottom:var(--s4,20px);overflow-x:clip;overflow-y:visible}
+.pvPortada{position:relative;width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);background:${PAPEL};padding:18px 0 18px;margin-bottom:var(--s4,20px);overflow-x:clip;overflow-y:visible}
 .pvCentro{max-width:1120px;margin:0 auto;padding:0 20px}
 .pvCabecera{text-align:center;max-width:900px;margin:0 auto}
 .pvTitular{margin:0;font-size:clamp(26px,3.9vw,46px);font-weight:600;letter-spacing:-.03em;line-height:1.05;color:#14161A}
@@ -101,6 +104,7 @@ const estilos = `
 @media(max-width:700px){.pvEscena{margin-top:-14px}}
 .pvLienzo{position:absolute;inset:0;width:100%;height:100%;display:block}
 .pvCopia{position:absolute;text-align:center;pointer-events:none}
+.pvCopia .explicaCaja{pointer-events:auto}
 .pvPregunta{margin:0;font-weight:600;letter-spacing:-.02em;color:#14161A;line-height:1.1}
 .pvGiro{color:${ROJO};font-style:normal}
 .pvInvita{margin:.66em auto 0;max-width:34em;line-height:1.45;color:#4A5057}
@@ -108,7 +112,7 @@ const estilos = `
 .pvCampo::placeholder{color:#8B8474}
 .pvLupa{position:absolute;background:none;border:0;padding:0;cursor:pointer}
 .pvSugerencias{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;max-width:760px;margin:12px auto 0}
-.pvSugerencia{background:none;border:1px solid #D6CFBB;border-radius:20px;color:#5C5442;font:inherit;font-size:12.5px;padding:6px 13px;cursor:pointer;transition:border-color 140ms ease,color 140ms ease}
+.pvSugerencia{display:inline-flex;align-items:center;background:none;border:1px solid #D6CFBB;border-radius:22px;color:#5C5442;font:inherit;font-size:12.5px;padding:6px 13px;cursor:pointer;transition:border-color 140ms ease,color 140ms ease}
 .pvSugerencia:hover{border-color:${TINTA};color:${TINTA}}
 .pvEncabezado{display:flex;align-items:baseline;gap:12px;margin:22px auto 10px;flex-wrap:wrap}
 .pvEncabezadoTitulo{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7A6132;margin:0}
@@ -117,7 +121,7 @@ const estilos = `
 .pvTodas:hover{color:${TINTA}}
 .pvTarjetas{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 auto}
 .pvCelda{position:relative}
-.pvTarjeta{position:relative;width:100%;text-align:left;background:${TINTA};border:0;border-radius:2px;padding:15px;cursor:pointer;color:${HUESO};font:inherit;display:flex;flex-direction:column;gap:9px;min-height:100px}
+.pvTarjeta{position:relative;width:100%;text-align:left;background:${VERDE};border:0;border-radius:2px;padding:15px;cursor:pointer;color:${HUESO};font:inherit;display:flex;flex-direction:column;gap:9px;min-height:100px}
 .pvTarjeta:focus-visible{outline:2px solid ${ROJO};outline-offset:2px}
 .pvPunto{position:absolute;top:13px;right:13px;width:9px;height:9px;opacity:.9}
 .pvAncla{position:absolute;left:-12px;right:-12px;top:0;z-index:20;pointer-events:none}
@@ -125,28 +129,38 @@ const estilos = `
 .pvFraseGrande{font-size:15px;line-height:1.3;font-weight:600;color:#F7F3EA}
 .pvEtiqueta{align-self:flex-start;padding:4px 9px;border-radius:0;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:${PAPEL}}
 .pvFrase{font-size:13.5px;line-height:1.34;color:#F2E9D6;font-weight:500}
-.pvVoto{display:flex;height:5px;border-radius:0;overflow:hidden;background:#2B2F34;margin-top:auto}
+.pvVoto{display:flex;height:5px;border-radius:0;overflow:hidden;background:#31423A;margin-top:auto}
 .pvVoto i{display:block;height:100%}
 .pvPanel{display:flex;flex-direction:column;gap:9px;margin-top:2px;position:relative}
 .pvMeta{display:flex;gap:9px;align-items:center;font-size:10px;letter-spacing:.05em;text-transform:uppercase}
-.pvOficial{font-size:11.5px;line-height:1.55;color:#C6B084}
+.pvOficial{font-size:11.5px;line-height:1.55;color:#C6B084;overflow-wrap:anywhere}
 .pvChips{display:flex;gap:4px;flex-wrap:wrap}
 .pvChip{font-size:9.5px;padding:2px 7px;border-radius:0;border:1px solid rgba(198,176,132,.38);color:#E2D6BC}
 .pvAviso{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#E8C56A;
 border:1px solid rgba(232,197,106,.4);border-radius:2px;padding:2px 6px;align-self:flex-start}
 @media(max-width:700px){
 .pvPortada{padding:8px 0 12px}
-.pvEncabezado{margin-top:20px;gap:8px}
+.pvEncabezado{margin-top:20px;gap:8px;align-items:center}
 .pvCentro{padding:0 14px}
 .pvTitular{font-size:clamp(23px,7vw,32px)}
-.pvBajada{margin-top:4px}
+.pvBajada{margin-top:4px;font-size:13.5px}
 .pvTarjetas{grid-template-columns:1fr;gap:12px;margin-top:14px}
-.pvTarjeta{padding:14px}
-.pvSugerencias{margin-top:10px;gap:6px}
-.pvSugerencia{font-size:12px;padding:6px 11px}
-.pvOficial{font-size:11px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pvTarjeta{padding:15px;gap:10px}
+.pvSugerencias{margin-top:12px;gap:8px}
+.pvOficial{font-size:11.5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pvChip{font-size:10.5px;padding:3px 8px}
+.pvAviso{font-size:10.5px}
+.pvMeta{font-size:10.5px}
+.pvFrase{font-size:14px;line-height:1.38}
 .pvEncabezadoPie{display:none}
-.pvTodas{margin-left:auto}
+.pvEncabezadoTitulo{font-size:11px}
+}
+@media(hover:none){
+.pvSugerencias{margin-top:12px;gap:8px}
+.pvSugerencia{font-size:13.5px;padding:11px 15px;min-height:44px}
+.pvLupa{min-width:46px;min-height:46px}
+.pvEncabezado{align-items:center}
+.pvTodas{margin-left:auto;font-size:13px;padding:11px 0 11px 12px;min-height:44px;display:inline-flex;align-items:center}
 }
 `;
 
@@ -291,7 +305,8 @@ export default function Portada({
   valor = '', onValor, onEnviar, pensando = false, ejemplos = []
 }) {
   const reducido = useReducedMotion();
-  const [estrecho, setEstrecho] = useState(false);
+  const estrecho = useTelefono();
+  const tactil = useTactil();
   const d = estrecho ? COMPACTO : AMPLIO;
 
   const avance = useMotionValue(reducido ? 1 : 0);
@@ -316,14 +331,6 @@ export default function Portada({
   const lupaY = useTransform(cabezaY, v => v - d.destino.y);
 
   const disparar = useCallback(() => setOnda(n => n + 1), []);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 700px)');
-    const leer = () => setEstrecho(mq.matches);
-    leer();
-    mq.addEventListener('change', leer);
-    return () => mq.removeEventListener('change', leer);
-  }, []);
 
   useEffect(() => {
     if (reducido) return;
@@ -358,6 +365,9 @@ export default function Portada({
 
   const pistas = ejemplos.slice(0, 4);
   const anchoUtil = estrecho ? '100%' : pct(d.barra[7].x - d.barra[2].x, d.W);
+  const fuenteCampo = estrecho || tactil
+    ? '16px'
+    : `clamp(13px, ${(d.campo.alto / d.W) * 100 * 0.27}cqw, 18px)`;
 
   function enviar() {
     disparar();
@@ -377,8 +387,8 @@ export default function Portada({
           <motion.p className="pvBajada"
             initial={reducido ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38, duration: 0.58 }}>
-            {escanos} escaños{leyes ? `, ${leyes} votaciones del Pleno` : ''}. Cada una, quién la apoyó
-            y a quién afecta.
+            Escribe abajo tu situación, o entra por las pestañas: leyes, diputados, partidos
+            y lo que prometieron.
           </motion.p>
         </div>
 
@@ -451,8 +461,9 @@ export default function Portada({
                 </motion.span>
               </AnimatePresence>
             </p>
-            <p className="pvInvita" style={{ fontSize: `clamp(11px, ${d.copia.escala * 0.46}cqw, 16px)` }}>
+            <p className="pvInvita" style={{ fontSize: `clamp(12.5px, ${d.copia.escala * 0.46}cqw, 16px)` }}>
               Escribe tu situación y te enseño solo las leyes que te tocan a ti.
+              <Explica termino="buscador" titulo="El buscador" />
             </p>
           </motion.div>
 
@@ -468,7 +479,7 @@ export default function Portada({
               width: pct(d.campo.der - d.campo.izq, d.W),
               top: pct(d.campo.arr, d.H),
               height: pct(d.campo.alto, d.H),
-              fontSize: `clamp(13px, ${(d.campo.alto / d.W) * 100 * 0.27}cqw, 18px)`
+              fontSize: fuenteCampo
             }} />
 
           <motion.button className="pvLupa" onClick={enviar} aria-label="Ver mis leyes"
@@ -500,7 +511,7 @@ export default function Portada({
           initial={reducido ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: reducido ? 0 : 1.55, duration: 0.45 }}>
-          <p className="em pvEncabezadoTitulo">Lo último votado en el pleno</p>
+          <p className="em pvEncabezadoTitulo">Lo último votado en el pleno<Explica termino="ultimasLeyes" titulo="Lo último votado" /></p>
           <p className="pvEncabezadoPie">
             Pasa por encima para ver el texto oficial y a quién afecta.
           </p>
@@ -520,7 +531,7 @@ export default function Portada({
         ) : (
           <div style={{
             width: anchoUtil, border: '1px solid #D6CFBB', borderRadius: 2,
-            padding: '18px 16px', fontSize: 13, lineHeight: 1.55, color: '#5C5442'
+            padding: '18px 16px', fontSize: 13.5, lineHeight: 1.55, color: '#5C5442'
           }}>
             {estadoUltimas === 'cargando'
               ? 'Cargando las últimas votaciones del pleno…'

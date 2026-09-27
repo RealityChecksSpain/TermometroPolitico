@@ -6,6 +6,7 @@ import { estaSeguido } from '../lib/seguimientos.js';
 import BotonSeguir from './BotonSeguir.jsx';
 import HistorialNorma from './HistorialNorma.jsx';
 import Posturas from './Posturas.jsx';
+import Explica from './Explica.jsx';
 import {
   nombreCompletoNorma, procedenciaResumen, resumenBreve, restoResumen, titularDeNorma, vehiculoNorma
 } from '../lib/fraseCorta.js';
@@ -117,7 +118,7 @@ export function DetalleLey({ votacion, onVolver }) {
   const mayoria = mayoriaRequerida(votacion);
   const umbral = umbralDe(mayoria);
   const enlaces = String(votacion.enlaces_bocg ?? '').split(/[\s·]+/).filter(u => u.startsWith('http')).slice(0, 3);
-  const frase = titularDeNorma(votacion, 110);
+  const frase = titularDeNorma(votacion, Infinity);
   const oficial = nombreCompletoNorma(votacion);
   const vehiculo = vehiculoNorma(votacion);
   const cabeza = resumenBreve(votacion, 2);
@@ -194,15 +195,25 @@ export function DetalleLey({ votacion, onVolver }) {
           <span>{votacion.fecha} · Sesión {votacion.sesion}</span>
         </div>
         {frase && (
-          <div className="ed" style={{ fontSize: 'clamp(19px,4.6vw,23px)', fontWeight: 600, lineHeight: 1.25, marginBottom: 8 }}>
+          <div className="ed" style={{
+            fontSize: frase.length > 190
+              ? 'clamp(16px,3.4vw,19px)'
+              : frase.length > 120
+              ? 'clamp(17.5px,4vw,21px)'
+              : 'clamp(19px,4.6vw,23px)',
+            fontWeight: 600, lineHeight: 1.3, marginBottom: 8
+          }}>
             {frase}
           </div>
         )}
         {vehiculo && (
           <div className="em" style={{
-            fontSize: 9.5, color: C.media, fontWeight: 700, letterSpacing: '.06em',
+            fontSize: 10.5, color: C.media, fontWeight: 700, letterSpacing: '.06em',
             textTransform: 'uppercase', marginBottom: 4
-          }}>{vehiculo.nombre}</div>
+          }}>
+            {vehiculo.nombre}
+            <Explica texto={vehiculo.queEs} titulo={vehiculo.nombre} />
+          </div>
         )}
         <div className="em" style={{ fontSize: 11.5, color: C.media, lineHeight: 1.5 }}>
           {oficial}

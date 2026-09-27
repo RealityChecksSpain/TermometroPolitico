@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { traerHallazgos } from '../lib/cliente.js';
 import { Entrada, SALIDA } from './Movimiento.jsx';
+import Explica from './Explica.jsx';
 
 const TEMAS = {
   promesas: { nombre: 'Promesas', color: '#C88A1E' },
@@ -17,6 +18,15 @@ const TEMAS = {
 };
 
 const MAXIMO = 8;
+
+const estilos = `
+.hallazgoVerTodos{margin-left:auto;margin-top:12px;background:none;border:1px solid #3A4048;
+border-radius:2px;color:#9AA4AC;font-size:10.5px;padding:4px 9px;cursor:pointer;
+display:inline-flex;align-items:center;justify-content:center}
+@media(hover:none){
+.hallazgoVerTodos{min-height:44px;font-size:12px;padding:8px 14px}
+}
+`;
 
 function baseDe(h) {
   if (h.base_texto) return String(h.base_texto);
@@ -59,6 +69,19 @@ export default function Hallazgos({ onIr }) {
     return () => clearInterval(t);
   }, [pausa, manual, reducido, lista.length]);
 
+  const hayTextoElegido = () => {
+    try {
+      return String(window.getSelection?.() ?? '').trim().length > 2;
+    } catch {
+      return false;
+    }
+  };
+
+  const abrir = destino => () => {
+    if (hayTextoElegido()) return;
+    if (destino) onIr?.(destino);
+  };
+
   const ir = useCallback(n => {
     setManual(true);
     setSentido(n);
@@ -83,8 +106,9 @@ export default function Hallazgos({ onIr }) {
         onMouseEnter={() => setPausa(true)}
         onMouseLeave={() => setPausa(false)}
         aria-live="polite">
+        <style>{estilos}</style>
         <div className="hallazgosCab">
-          <span className="em rotulo">Hallazgos</span>
+          <span className="em rotulo">Hallazgos<Explica termino="hallazgos" titulo="Hallazgos" tono="claro" /></span>
           {tema && (
             <motion.span key={tema.nombre} className="em"
               initial={reducido ? false : { opacity: 0, scale: 0.9 }}
@@ -106,7 +130,7 @@ export default function Hallazgos({ onIr }) {
           <div>
             {lista.map((x, n) => (
               <button key={x.titular} className="hallazgoCuerpo"
-                onClick={() => x.seccion && onIr?.(x.seccion)}
+                onClick={abrir(x.seccion)}
                 style={{
                   minHeight: 0, padding: '11px 0',
                   borderTop: n ? '1px solid #2C3339' : 'none'
@@ -118,7 +142,7 @@ export default function Hallazgos({ onIr }) {
             ))}
           </div>
         ) : (
-          <button className="hallazgoCuerpo" onClick={() => h.seccion && onIr?.(h.seccion)}
+          <button className="hallazgoCuerpo" onClick={abrir(h.seccion)}
             style={{ display: 'grid' }}>
             <AnimatePresence mode="wait" custom={sentido} initial={false}>
               <motion.span key={h.titular} custom={sentido} variants={variantes}
@@ -141,10 +165,7 @@ export default function Hallazgos({ onIr }) {
               ))}
             </div>
           )}
-          <button onClick={() => setVerTodos(v => !v)} className="em" style={{
-            marginLeft: 'auto', marginTop: 12, background: 'none', border: '1px solid #3A4048',
-            borderRadius: 2, color: '#9AA4AC', fontSize: 10.5, padding: '4px 9px', cursor: 'pointer'
-          }}>
+          <button onClick={() => setVerTodos(v => !v)} className="em hallazgoVerTodos">
             {verTodos ? 'ver de uno en uno' : `ver los ${lista.length}`}
           </button>
         </div>
