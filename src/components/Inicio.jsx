@@ -211,7 +211,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
         </div>
       )}
 
-      <Hallazgos onIr={onIr} />
+      <Hallazgos onIr={onIr} onLey={onVotacion} />
       {novedades.length > 0 && (
         <div style={{
           marginBottom: 18, padding: 14, borderRadius: 3,

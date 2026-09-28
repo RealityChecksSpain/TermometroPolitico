@@ -17,7 +17,7 @@ const TEMAS = {
   vivienda: { nombre: 'Vivienda', color: '#C88A1E' }
 };
 
-const MAXIMO = 8;
+const MAXIMO = 10;
 
 const estilos = `
 .hallazgoVerTodos{margin-left:auto;margin-top:12px;background:none;border:1px solid #3A4048;
@@ -25,6 +25,19 @@ border-radius:2px;color:#9AA4AC;font-size:10.5px;padding:4px 9px;cursor:pointer;
 display:inline-flex;align-items:center;justify-content:center}
 @media(hover:none){
 .hallazgoVerTodos{min-height:44px;font-size:12px;padding:8px 14px}
+}
+.hallazgoEnlaces{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;max-width:100%}
+.hallazgoEnlace{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid #A5603F;
+color:#F3D9A4;font-size:11px;line-height:1.3;padding:5px 9px;border-radius:2px;cursor:pointer;max-width:100%;
+text-align:left;font-family:inherit}
+.hallazgoEnlaceTitulo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hallazgoEnlaceFecha{flex-shrink:0;white-space:nowrap;color:#E8C56A}
+.hallazgoEnlace:hover{background:#7C3A24;border-color:#E8C56A}
+.hallazgoAviso{display:block;background:#E8C56A;color:#2A1E0C;font-size:11px;line-height:1.45;
+padding:6px 9px;border-radius:2px;margin-bottom:10px;font-weight:500}
+@media(hover:none){
+.hallazgoAviso{font-size:12px}
+.hallazgoEnlace{font-size:12px;min-height:40px;padding:8px 11px}
 }
 `;
 
@@ -37,13 +50,31 @@ function baseDe(h) {
   return `Calculado sobre ${Number(n).toLocaleString('es')} ${que}.`;
 }
 
+function Enlaces({ h, onLey }) {
+  const lista = Array.isArray(h?.enlaces) ? h.enlaces.filter(e => e?.votacion_principal) : [];
+  if (!lista.length || !onLey) return null;
+  return (
+    <div className="hallazgoEnlaces">
+      {lista.map(e => (
+        <button key={e.votacion_principal} className="em hallazgoEnlace"
+          title={e.titulo}
+          aria-label={`Abrir la votación: ${e.titulo}${e.fecha ? `, ${e.fecha}` : ''}`}
+          onClick={() => onLey({ votacion_principal: e.votacion_principal, clave_norma: e.clave_norma })}>
+          <span className="hallazgoEnlaceTitulo">{e.titulo}</span>
+          <span className="hallazgoEnlaceFecha">{e.fecha ? `${e.fecha} →` : '→'}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function utilizable(h) {
   if (!h?.titular) return false;
   if (!h.detalle || String(h.detalle).trim().length < 20) return false;
   return true;
 }
 
-export default function Hallazgos({ onIr }) {
+export default function Hallazgos({ onIr, onLey }) {
   const reducido = useReducedMotion();
   const [lista, setLista] = useState([]);
   const [i, setI] = useState(0);
@@ -129,16 +160,17 @@ export default function Hallazgos({ onIr }) {
         {verTodos ? (
           <div>
             {lista.map((x, n) => (
-              <button key={x.titular} className="hallazgoCuerpo"
+              <div key={x.titular} style={{ borderTop: n ? '1px solid #2C3339' : 'none', padding: '11px 0' }}>
+              <button className="hallazgoCuerpo"
                 onClick={abrir(x.seccion)}
-                style={{
-                  minHeight: 0, padding: '11px 0',
-                  borderTop: n ? '1px solid #2C3339' : 'none'
-                }}>
+                style={{ minHeight: 0, padding: 0 }}>
+                {x.aviso && <span className="hallazgoAviso">{x.aviso}</span>}
                 <span className="ed hallazgoTitular" style={{ fontSize: 15.5 }}>{x.titular}</span>
                 <span className="hallazgoDetalle" style={{ fontSize: 12.5 }}>{x.detalle}</span>
                 {baseDe(x) && <span className="hallazgoBase">{baseDe(x)}</span>}
               </button>
+              <Enlaces h={x} onLey={onLey} />
+              </div>
             ))}
           </div>
         ) : (
@@ -148,6 +180,7 @@ export default function Hallazgos({ onIr }) {
               <motion.span key={h.titular} custom={sentido} variants={variantes}
                 initial={reducido ? false : 'entra'} animate="centro" exit={reducido ? undefined : 'sale'}
                 transition={SALIDA} style={{ display: 'block' }}>
+                {h.aviso && <span className="hallazgoAviso">{h.aviso}</span>}
                 <span className="ed hallazgoTitular" style={{ display: 'block' }}>{h.titular}</span>
                 <span className="hallazgoDetalle" style={{ display: 'block' }}>{h.detalle}</span>
                 {base && <span className="hallazgoBase">{base}</span>}
@@ -155,6 +188,8 @@ export default function Hallazgos({ onIr }) {
             </AnimatePresence>
           </button>
         )}
+
+        {!verTodos && <Enlaces key={h.titular} h={h} onLey={onLey} />}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {!verTodos && (

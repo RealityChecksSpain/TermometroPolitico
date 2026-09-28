@@ -16,6 +16,7 @@ import AvatarPartido from './components/AvatarPartido.jsx';
 import { titularDeNorma, tituloCorto, vehiculoNorma } from './lib/fraseCorta.js';
 import { totalSeguimientos } from './lib/seguimientos.js';
 import { useTelefono } from './lib/pantalla.js';
+import { tieneCargo, avisoAusencia } from './lib/cargos.js';
 import {
   faltaConfig, problemasConfig, traerDiputados, traerVotaciones, traerVotos,
   traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
@@ -151,6 +152,9 @@ color:#8E9299;margin-top:3px;font-weight:600}
 .puesto{font-family:'DM Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
 font-size:10.5px;color:#A9AEB2;width:22px;flex-shrink:0;text-align:right}
 .fila[data-top="1"] .dato{font-size:clamp(21px,2.6vw,32px)}
+.avisoCargo{background:#F6E7B0;border-left:3px solid #C9A227;border-radius:0 var(--radio) var(--radio) 0;
+padding:8px 12px;margin-bottom:var(--s2);font-size:11px;line-height:1.5;color:#3D3418}
+@media(hover:none){.avisoCargo{font-size:12px}}
 .nota{background:var(--acentoTenue,#F5F3EA);border:0;border-left:2px solid var(--acentoClaro,#B58A22);
 border-radius:0 var(--radio) var(--radio) 0;padding:10px 13px;margin-bottom:var(--s3);
 font-size:11.5px;line-height:1.55;color:#4A4F55}
@@ -552,6 +556,7 @@ export default function App() {
       const q = busqueda.toLowerCase();
       l = l.filter(d => d.nombre_completo.toLowerCase().includes(q) || (d.circunscripcion ?? '').toLowerCase().includes(q));
     }
+    if (orden === 'ausencias') l = l.filter(d => !tieneCargo(d));
     const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
     const [, , clave, desc] = cfg;
     return [...l].sort((a, b) => {
@@ -559,6 +564,17 @@ export default function App() {
       if (typeof va === 'string') return va.localeCompare(vb, 'es');
       return desc ? vb - va : va - vb;
     });
+  }, [enHemiciclo, fPartido, busqueda, orden]);
+
+  const ausentesConCargo = useMemo(() => {
+    if (orden !== 'ausencias') return [];
+    let l = enHemiciclo.filter(d => tieneCargo(d) && Number(d.ausencias ?? 0) > 0);
+    if (fPartido) l = l.filter(d => (d.partido_siglas || d.grupo) === fPartido);
+    if (busqueda.trim()) {
+      const q = busqueda.toLowerCase();
+      l = l.filter(d => d.nombre_completo.toLowerCase().includes(q) || (d.circunscripcion ?? '').toLowerCase().includes(q));
+    }
+    return [...l].sort((a, b) => Number(b.ausencias ?? 0) - Number(a.ausencias ?? 0));
   }, [enHemiciclo, fPartido, busqueda, orden]);
 
   useEffect(() => {
@@ -909,11 +925,21 @@ export default function App() {
                 </div>
               )}
 
+              {orden === 'ausencias' && ausentesConCargo.length > 0 && (
+                <div className="avisoCargo">
+                  {ausentesConCargo.map(d => (
+                    <span key={d.mandato_id} style={{ display: 'block' }}>{avisoAusencia(d)}</span>
+                  ))}
+                  <span style={{ display: 'block', marginTop: 4, opacity: 0.8 }}>
+                    Tienen cargo en el Gobierno o en la Mesa del Congreso y no entran en el ranking.
+                  </span>
+                </div>
+              )}
+
               {orden === 'ausencias' && (
                 <div className="nota">
-                  Ministros, presidencia del Gobierno y líderes de la oposición acumulan ausencias por
-                  obligaciones institucionales. Una cifra alta no implica dejadez: es el número de
-                  votaciones en las que esa persona no emitió voto.
+                  Una ausencia es una votación en la que el diputado no emitió voto. El voto a distancia
+                  cuenta como emitido.
                 </div>
               )}
 
