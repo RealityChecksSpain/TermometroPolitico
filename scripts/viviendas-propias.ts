@@ -1,6 +1,7 @@
 import { db } from '../src/lib/supabase';
 import { traerTodo } from '../src/lib/paginar';
 import { contarInmuebles } from '../src/lib/inmuebles.js';
+import { refrescarMetricas } from '../src/lib/metricas';
 
 const SIMULAR = process.argv.includes('--simular');
 const LOTE = 200;
@@ -16,23 +17,37 @@ type Fila = {
   inmuebles_urbanos: number | null;
   inmuebles_rusticos: number | null;
   confianza: string | null;
+  inmuebles_revisado?: string | null;
 };
 
-const filas = await traerTodo<Fila>((a, b) =>
-  db().from('bienes_declarados')
-    .select('mandato_id, n_viviendas, n_viviendas_propias, n_inmuebles, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, inmuebles_urbanos, inmuebles_rusticos, confianza')
-    .order('mandato_id')
-    .range(a, b));
+const COLUMNAS = 'mandato_id, n_viviendas, n_viviendas_propias, n_inmuebles, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, inmuebles_urbanos, inmuebles_rusticos, confianza';
+
+function leer(columnas: string) {
+  return traerTodo<Fila>((a, b) =>
+    db().from('bienes_declarados')
+      .select(columnas)
+      .order('mandato_id')
+      .range(a, b));
+}
+
+let filas: Fila[];
+try {
+  filas = await leer(`${COLUMNAS}, inmuebles_revisado`);
+} catch {
+  filas = await leer(COLUMNAS);
+}
 
 console.log(`\n${filas.length} declaraciones leidas de bienes_declarados`);
 
 const cambios: { mandato_id: string; n_viviendas_propias: number }[] = [];
 let sinDesglose = 0;
+let revisados = 0;
 let sinCambio = 0;
 let cruzaUmbral = 0;
 let discrepaTotal = 0;
 
 for (const f of filas) {
+  if (f.inmuebles_revisado) { revisados++; continue; }
   const hayDesglose = Boolean(f.inmuebles_detalle_propios || f.inmuebles_detalle_sociedad);
   if (!hayDesglose) { sinDesglose++; continue; }
 
@@ -55,6 +70,7 @@ for (const f of filas) {
   cambios.push({ mandato_id: f.mandato_id, n_viviendas_propias: ahora });
 }
 
+console.log(`  revisados a mano, sin tocar:         ${revisados}`);
 console.log(`  sin desglose, no se puede separar:   ${sinDesglose}`);
 console.log(`  ya estaban al dia:                   ${sinCambio}`);
 console.log(`  a escribir:                          ${cambios.length}`);
@@ -82,7 +98,6 @@ for (let i = 0; i < cambios.length; i += LOTE) {
   console.log(`  ${escritas}/${cambios.length}`);
 }
 
-const { error: eRefresco } = await db().rpc('refrescar_metricas');
-if (eRefresco) console.log(`aviso: refrescar_metricas fallo (${eRefresco.message})`);
+await refrescarMetricas();
 
 console.log(`\n${escritas} filas actualizadas.\n`);

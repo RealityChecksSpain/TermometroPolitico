@@ -24,7 +24,9 @@ const PROPIOS = {
   hallazgos: 'Cifras sacadas de cruzar votos, declaraciones de bienes y programas. Debajo pone sobre cuántos casos se calcula cada una.',
   filtroColectivo: 'Haz clic en una etiqueta y la lista se queda con las leyes que afectan a ese colectivo. El número es cuántas hay.',
   hemiciclo: 'Los 350 escaños colocados como en la sala, por partido. En una votación abierta cada escaño muestra su voto.',
-  franjaVotos: 'El reparto del voto: verde a favor, rojo en contra, amarillo abstención. El tramo ganador sobresale.'
+  franjaVotos: 'El reparto del voto: verde a favor, rojo en contra, amarillo abstención. El tramo ganador sobresale.',
+  salvedad: 'Un error de las cuentas lo bastante grande como para que el Tribunal de Cuentas lo señale en su opinión.',
+  posibleInfraccion: 'El Tribunal de Cuentas dice que podría ser una infracción de la ley de financiación de los partidos, que se castiga con multa. Para multar abre un procedimiento aparte.'
 };
 
 export const GLOSARIO = { ...QUE_ES, ...PROPIOS };

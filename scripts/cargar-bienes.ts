@@ -151,9 +151,10 @@ async function pendientes() {
     .select('id', { count: 'exact', head: true })
     .not('url_bienes', 'is', null);
 
-  const { data: hechos } = await db()
+  const { data: hechos, error: eHechos } = await db()
     .from('bienes_declarados')
-    .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, confianza, verificado, depositos, valores, introducido_por');
+    .select('*');
+  if (eHechos) throw eHechos;
 
   const mapa = new Map<any, any>((hechos ?? []).map((h: any) => [h.mandato_id, h]));
   const conPat = (hechos ?? []).filter(h => h.patrimonio_euros != null).length;
@@ -232,6 +233,12 @@ async function pendientes() {
   console.log(`Cadena: ${conCadena} mandatos con más de una declaración · ${pdfs} PDF a leer`);
   return conDocumentos;
 }
+
+const CAMPOS_INMUEBLES = [
+  'inmuebles_urbanos', 'inmuebles_rusticos', 'inmuebles_detalle', 'inmuebles_detalle_propios', 'inmuebles_detalle_sociedad',
+  'n_inmuebles', 'n_inmuebles_propios', 'n_inmuebles_sociedad', 'n_inmuebles_equivalentes',
+  'n_viviendas', 'n_viviendas_propias', 'n_suelo', 'n_anejos', 'n_productivos', 'n_otros_bienes'
+];
 
 console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
 
@@ -442,7 +449,7 @@ for (let i = 0; i < cola.length; i++) {
   );
   const pat = patrimonioLiquido(d);
 
-  const fila = {
+  const fila: Record<string, any> = {
     mandato_id: m.id,
     url_declaracion: ultimoDoc,
     fecha_declaracion: d.fecha_declaracion,
@@ -485,6 +492,11 @@ for (let i = 0; i < cola.length; i++) {
     verificado: false
   };
 
+  const revisadoAMano = Boolean((m as any).previo?.inmuebles_revisado);
+  if (revisadoAMano) {
+    for (const campo of CAMPOS_INMUEBLES) delete fila[campo];
+  }
+
   const { error } = await db().from('bienes_declarados').upsert(fila, { onConflict: 'mandato_id' });
   if (error) {
     if (/patrimonio_euros|n_inmuebles|n_coches|confianza|dudas|inmuebles_detalle_/i.test(error.message)) {
@@ -513,7 +525,7 @@ for (let i = 0; i < cola.length; i++) {
     }
   } else {
     console.log(
-      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${fila.n_inmuebles ?? '—'}` +
+      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${revisadoAMano ? 'revisados a mano, sin tocar' : (fila.n_inmuebles ?? '—')}` +
       `${inm.n_inmuebles_propios != null ? ` (${inm.n_inmuebles_propios} propios + ${inm.n_inmuebles_sociedad} soc. · eq ${inm.n_inmuebles_equivalentes})` : ''} · ` +
       `coches ${veh.n_coches} motos ${veh.n_motos} · ${d.confianza}` +
       `${corregido ? ' · corregido' : ''}${motivo ? ' · revisar' : ''}`

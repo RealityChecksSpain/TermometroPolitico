@@ -4,6 +4,12 @@ const TIPO =
 const MARCA_SOCIEDAD =
   /\b(?:s\.?\s?l\.?\s?u|s\.?\s?l|s\.?\s?a)\b\.?|sociedad(?!\s+(?:de\s+)?gananciales)|mercantil|participaciones?\s+sociales|acciones|cotiza/i;
 
+const CORTE = /[;\n|]+|(?<![\d.,])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|terreno|bodega|cochera))/i;
+
+function legible(s) {
+  return String(s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+}
+
 function normalizar(s) {
   return String(s || '')
     .normalize('NFD')
@@ -45,14 +51,14 @@ function origenDe(trozo) {
 
 export function parsearInmueblesDetalle(detalle) {
   if (!detalle) return [];
-  const texto = normalizar(detalle);
-  const trozos = texto
-    .split(/[;\n|]+|(?<![\d.,])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|aparcamiento|local|nave|almacen|oficina|edificio|piso|apartamento|estudio|trastero|solar|terreno|bodega|cochera))/i)
+  const trozos = legible(detalle)
+    .split(CORTE)
     .map(t => t.trim())
     .filter(Boolean);
 
   const out = [];
-  for (const trozo of trozos) {
+  for (const original of trozos) {
+    const trozo = normalizar(original);
     const pct = porcentajeDe(trozo);
     const sociedad = origenDe(trozo);
 
@@ -62,7 +68,7 @@ export function parsearInmueblesDetalle(detalle) {
       const tipo = conNum[2];
       out.push({
         qty,
-        texto: trozo,
+        texto: original,
         porcentaje: pct,
         sociedad,
         categoria: categoriaDe(trozo),
@@ -74,14 +80,14 @@ export function parsearInmueblesDetalle(detalle) {
     const menciones = [...trozo.matchAll(new RegExp(`\\b(${TIPO.source})\\b`, 'gi'))];
     if (menciones.length === 0) {
       if (/propiedad|herencia|%|provincia|madrid|barcelona|leon|almeria|coruna|sevilla|valencia/i.test(trozo) && trozo.length > 12) {
-        out.push({ qty: 1, texto: trozo, porcentaje: pct, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
+        out.push({ qty: 1, texto: original, porcentaje: pct, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
       }
       continue;
     }
     for (const m of menciones) {
       out.push({
         qty: 1,
-        texto: menciones.length > 1 ? `${m[1]} — ${trozo}` : trozo,
+        texto: menciones.length > 1 ? `${m[1]} — ${original}` : original,
         porcentaje: pct,
         sociedad,
         categoria: categoriaDe(m[1]),

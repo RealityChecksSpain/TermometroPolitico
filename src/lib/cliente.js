@@ -42,7 +42,45 @@ export const supabase = faltaConfig
   ? null
   : createClient(url.replace(/\/$/, ''), clave, { auth: { persistSession: false } });
 
-export async function traerDiputados() {
+const DIEZ_MINUTOS = 10 * 60 * 1000;
+const recuerdos = new Map();
+
+function recordar(claveRecuerdo, fn, ms = DIEZ_MINUTOS) {
+  const ahora = Date.now();
+  const previo = recuerdos.get(claveRecuerdo);
+  if (previo && ahora - previo.cuando < ms) return previo.promesa;
+  const promesa = fn();
+  recuerdos.set(claveRecuerdo, { cuando: ahora, promesa });
+  promesa.catch(() => {
+    if (recuerdos.get(claveRecuerdo)?.promesa === promesa) recuerdos.delete(claveRecuerdo);
+  });
+  return promesa;
+}
+
+export async function leerConRespaldo(cache, vista, armar) {
+  const r = await armar(supabase.from(cache)).order('cache_fila');
+  if (!r.error) return r;
+  const vivo = await armar(supabase.from(vista));
+  if (vivo.error) console.error(`${vista}: ${vivo.error.message} (tampoco se pudo leer ${cache}: ${r.error.message})`);
+  return vivo;
+}
+
+const COLUMNAS_BIENES = 'mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza';
+
+async function leerBienes(ids) {
+  const conRevision = await supabase
+    .from('bienes_declarados')
+    .select(`${COLUMNAS_BIENES}, inmuebles_revisado, inmuebles_nota`)
+    .in('mandato_id', ids);
+  if (!conRevision.error) return conRevision;
+  return supabase.from('bienes_declarados').select(COLUMNAS_BIENES).in('mandato_id', ids);
+}
+
+export function traerDiputados() {
+  return recordar('diputados', leerDiputados);
+}
+
+async function leerDiputados() {
   const { data, error } = await supabase
     .from('mv_diputados')
     .select('*')
@@ -87,10 +125,7 @@ export async function traerDiputados() {
   const bienes = [];
   for (let i = 0; i < ids.length; i += 200) {
     const chunk = ids.slice(i, i + 200);
-    const { data: filas, error } = await supabase
-      .from('bienes_declarados')
-      .select('mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza')
-      .in('mandato_id', chunk);
+    const { data: filas, error } = await leerBienes(chunk);
     if (error) {
       console.error(`traerDiputados: no se pueden leer los bienes declarados (${error.message}). Se muestran los diputados sin patrimonio.`);
       break;
@@ -167,7 +202,10 @@ export async function traerDiputados() {
         inmuebles_detalle_propios: b.inmuebles_detalle_propios ?? null,
         inmuebles_detalle_sociedad: b.inmuebles_detalle_sociedad ?? null,
         bienes_outlier: outlier,
-        bienes_confianza: b.confianza ?? null
+        bienes_confianza: b.confianza ?? null,
+        bienes_origen: b.introducido_por ?? null,
+        inmuebles_revisado: b.inmuebles_revisado ?? null,
+        inmuebles_nota: b.inmuebles_nota ?? null
       };
     });
   }
@@ -189,14 +227,14 @@ export async function traerVotaciones(limite = 200, filtros = {}) {
     if (error) throw error;
     return data ?? [];
   }
-  let q = supabase.from('v_normas_completas').select('*');
-  if (filtros.materia) q = q.eq('materia', filtros.materia);
-  if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
   const patron = patronBusqueda(filtros.texto);
-  if (patron) {
-    q = q.or(`titular.ilike.*${patron}*,resumen.ilike.*${patron}*`);
-  }
-  const { data, error } = await q.order('fecha', { ascending: false }).limit(limite);
+  const { data, error } = await leerConRespaldo('mv_normas_completas', 'v_normas_completas', base => {
+    let q = base.select('*');
+    if (filtros.materia) q = q.eq('materia', filtros.materia);
+    if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
+    if (patron) q = q.or(`titular.ilike.*${patron}*,resumen.ilike.*${patron}*`);
+    return q.order('fecha', { ascending: false }).limit(limite);
+  });
   if (error) throw error;
   return data ?? [];
 }
@@ -207,7 +245,11 @@ export async function traerVotacionesDeNorma(clave) {
   return data ?? [];
 }
 
-export async function traerFacetas() {
+export function traerFacetas() {
+  return recordar('facetas', leerFacetas);
+}
+
+async function leerFacetas() {
   const [m, c] = await Promise.all([
     supabase.from('mv_facetas_materia').select('*').order('orden').order('votaciones', { ascending: false }),
     supabase.from('mv_facetas_colectivo').select('*').order('orden').order('votaciones', { ascending: false })
@@ -246,19 +288,23 @@ export async function traerVotos(votacionId) {
   return salida;
 }
 
-export async function traerEjes() {
-  const { data, error } = await supabase
-    .from('ejes_calculados')
-    .select('*')
-    .order('numero');
-  if (error) throw error;
-  return data ?? [];
+export function traerEjes() {
+  return recordar('ejes', async () => {
+    const { data, error } = await supabase
+      .from('ejes_calculados')
+      .select('*')
+      .order('numero');
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
-export async function traerCobertura() {
-  const { data, error } = await supabase.from('mv_cobertura').select('*').limit(1);
-  if (error) throw error;
-  return data?.[0] ?? null;
+export function traerCobertura() {
+  return recordar('cobertura', async () => {
+    const { data, error } = await supabase.from('mv_cobertura').select('*').limit(1);
+    if (error) throw error;
+    return data?.[0] ?? null;
+  });
 }
 
 export async function traerVotosDeDiputado(mandatoId, limite = 60, desde = 0) {
@@ -288,53 +334,71 @@ export async function traerCcaa() {
   return data ?? [];
 }
 
-export async function traerProgramas() {
-  const { data, error } = await supabase.from('v_programas').select('*').order('promesas', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+export function traerProgramas() {
+  return recordar('programas', async () => {
+    const { data, error } = await supabase.from('v_programas').select('*').order('promesas', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
-export async function traerPromesas(partido, soloVerificables = false, limite = 200) {
-  let q = supabase.from('v_promesa_estado').select('*').eq('partido', partido);
-  if (soloVerificables) q = q.eq('verificable', true);
-  const { data, error } = await q.order('orden').limit(limite);
-  if (error) throw error;
-  return data ?? [];
+export function traerPromesas(partido, soloVerificables = false, limite = 200) {
+  return recordar(`promesas:${partido}:${soloVerificables}:${limite}`, async () => {
+    const { data, error } = await leerConRespaldo('mv_promesa_estado', 'v_promesa_estado', base => {
+      let q = base.select('*').eq('partido', partido);
+      if (soloVerificables) q = q.eq('verificable', true);
+      return q.order('orden').limit(limite);
+    });
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
-export async function traerResumenPromesas() {
-  const { data, error } = await supabase.from('v_promesa_resumen').select('*');
-  if (error) return null;
-  const m = {};
-  for (const f of data ?? []) m[String(f.siglas ?? '').trim().toUpperCase()] = f;
-  return m;
+export function traerResumenPromesas() {
+  return recordar('resumenPromesas', async () => {
+    const { data, error } = await leerConRespaldo('mv_promesa_resumen', 'v_promesa_resumen', q => q.select('*'));
+    if (error) throw error;
+    const m = {};
+    for (const f of data ?? []) m[String(f.siglas ?? '').trim().toUpperCase()] = f;
+    return m;
+  }).catch(() => null);
 }
 
-export async function traerCoherencia() {
-  const { data, error } = await supabase
-    .from('mv_coherencia').select('*').order('pct_coherencia', { ascending: false, nullsFirst: false });
-  if (error) return [];
-  return data ?? [];
+export function traerCoherencia() {
+  return recordar('coherencia', async () => {
+    const { data, error } = await supabase
+      .from('mv_coherencia').select('*').order('pct_coherencia', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data ?? [];
+  }).catch(() => []);
 }
 
-export async function traerDestacadas(limite = 5) {
-  const { data, error } = await supabase
-    .from('mv_destacadas').select('*').order('relevancia', { ascending: false }).limit(limite);
-  if (error) return [];
-  return data ?? [];
+export function traerDestacadas(limite = 5) {
+  return recordar(`destacadas:${limite}`, async () => {
+    const { data, error } = await supabase
+      .from('mv_destacadas').select('*').order('relevancia', { ascending: false }).limit(limite);
+    if (error) throw error;
+    return data ?? [];
+  }).catch(() => []);
 }
 
-export async function traerLideres(metrica) {
-  const { data, error } = await supabase
-    .from('mv_lider_partido').select('*').eq('metrica', metrica).order('valor', { ascending: false });
-  if (error) return [];
-  return data ?? [];
+export function traerLideres(metrica) {
+  return recordar(`lideres:${metrica}`, async () => {
+    const { data, error } = await supabase
+      .from('mv_lider_partido').select('*').eq('metrica', metrica).order('valor', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  }).catch(() => []);
 }
 
-export async function traerMapaPartidos() {
-  const { data, error } = await supabase.from('v_mapa_partidos').select('*');
+export function traerMapaPartidos() {
+  return recordar('mapa', leerMapaPartidos);
+}
+
+async function leerMapaPartidos() {
+  const { data, error } = await leerConRespaldo('mv_mapa_partidos', 'v_mapa_partidos', q => q.select('*'));
   if (error) {
-    console.error(`traerMapaPartidos: no se puede leer v_mapa_partidos (${error.message})`);
+    console.error(`traerMapaPartidos: no se puede leer el mapa (${error.message})`);
     throw error;
   }
   if (!data?.length) return [];
@@ -393,12 +457,12 @@ function normalizarFilaMapa(d) {
 
 export async function traerRelacionadas(norma, limite = 4) {
   if (!norma?.materia) return [];
-  const { data, error } = await supabase
-    .from('v_normas_completas').select('clave_norma, titular, frase_corta, resumen, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, votacion_principal')
+  const { data, error } = await leerConRespaldo('mv_normas_completas', 'v_normas_completas', q => q
+    .select('clave_norma, titular, frase_corta, resumen, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, votacion_principal')
     .eq('materia', norma.materia)
     .neq('clave_norma', norma.clave_norma ?? '')
     .order('fecha', { ascending: false })
-    .limit(30);
+    .limit(30));
   if (error) return [];
   return (data ?? [])
     .filter(n => (n.resultado_final ?? n.resultado_ultima) === 'aprobada')
@@ -411,72 +475,86 @@ export async function traerActividades(mandatoId) {
   return data ?? [];
 }
 
-export async function traerIniciativasPartido() {
-  const { data, error } = await supabase.from('v_partido_iniciativas').select('*');
-  if (error) return null;
-  const m = {};
-  for (const f of data ?? []) m[String(f.siglas ?? '').trim().toUpperCase()] = f;
-  return m;
+export function traerIniciativasPartido() {
+  return recordar('iniciativasPartido', async () => {
+    const { data, error } = await leerConRespaldo('mv_partido_iniciativas', 'v_partido_iniciativas', q => q.select('*'));
+    if (error) throw error;
+    const m = {};
+    for (const f of data ?? []) m[String(f.siglas ?? '').trim().toUpperCase()] = f;
+    return m;
+  }).catch(() => null);
 }
 
-export async function traerVotosPorClase() {
-  const { data, error } = await supabase.from('v_partido_votos').select('*');
-  if (error) return null;
-  const m = {};
-  for (const f of data ?? []) {
-    const k = String(f.siglas ?? '').trim().toUpperCase();
-    (m[k] ??= []).push(f);
-  }
-  return m;
+export function traerVotosPorClase() {
+  return recordar('votosPorClase', async () => {
+    const { data, error } = await leerConRespaldo('mv_partido_votos', 'v_partido_votos', q => q.select('*'));
+    if (error) throw error;
+    const m = {};
+    for (const f of data ?? []) {
+      const k = String(f.siglas ?? '').trim().toUpperCase();
+      (m[k] ??= []).push(f);
+    }
+    return m;
+  }).catch(() => null);
 }
 
-export async function traerSubejes() {
-  const { data, error } = await supabase.from('v_subejes_partido').select('*');
-  if (error) return null;
-  const m = {};
-  for (const f of data ?? []) {
-    const k = String(f.siglas ?? '').trim().toUpperCase();
-    (m[k] ??= []).push(f);
-  }
-  return m;
+export function traerSubejes() {
+  return recordar('subejes', async () => {
+    const { data, error } = await leerConRespaldo('mv_subejes_partido', 'v_subejes_partido', q => q.select('*'));
+    if (error) throw error;
+    const m = {};
+    for (const f of data ?? []) {
+      const k = String(f.siglas ?? '').trim().toUpperCase();
+      (m[k] ??= []).push(f);
+    }
+    return m;
+  }).catch(() => null);
 }
 
-export async function traerBaseComun() {
-  const { data, error } = await supabase.from('v_base_comun').select('*').eq('comun', true);
-  if (error) return null;
-  return new Set((data ?? []).map(f => `${f.eje}|${f.dim}`));
+export function traerBaseComun() {
+  return recordar('baseComun', async () => {
+    const { data, error } = await leerConRespaldo('mv_base_comun', 'v_base_comun', q => q.select('*').eq('comun', true));
+    if (error) throw error;
+    return new Set((data ?? []).map(f => `${f.eje}|${f.dim}`));
+  }).catch(() => null);
 }
 
-export async function traerAuditoriaEjeVotos() {
-  const { data, error } = await supabase.from('v_auditoria_eje_votos').select('*').limit(1);
-  if (error) return null;
-  return data?.[0] ?? null;
+export function traerAuditoriaEjeVotos() {
+  return recordar('auditoriaEjeVotos', async () => {
+    const { data, error } = await leerConRespaldo('mv_auditoria_eje_votos', 'v_auditoria_eje_votos', q => q.select('*').limit(1));
+    if (error) throw error;
+    return data?.[0] ?? null;
+  }).catch(() => null);
 }
 
-export async function traerHallazgos() {
-  const { data, error } = await supabase.from('v_hallazgos_publicos')
-    .select('*').order('relevancia', { ascending: false, nullsFirst: false }).order('orden');
-  if (error) {
-    console.error(`traerHallazgos: no se puede leer v_hallazgos_publicos (${error.message}). No se enseña ningun hallazgo.`);
+export function traerHallazgos() {
+  return recordar('hallazgos', async () => {
+    const { data, error } = await leerConRespaldo('mv_hallazgos_publicos', 'v_hallazgos_publicos', q => q
+      .select('*').order('relevancia', { ascending: false, nullsFirst: false }).order('orden'));
+    if (error) throw error;
+    return (data ?? []).filter(h => h.titular);
+  }).catch(e => {
+    console.error(`traerHallazgos: no se pueden leer los hallazgos (${e?.message ?? e}). No se enseña ninguno.`);
     return [];
-  }
-  return (data ?? []).filter(h => h.titular);
+  });
 }
 
-export async function traerSesgo() {
-  const { data, error } = await supabase.from('v_sesgo_programas').select('*').limit(1);
-  if (error) return null;
-  return data?.[0] ?? null;
+export function traerSesgo() {
+  return recordar('sesgo', async () => {
+    const { data, error } = await leerConRespaldo('mv_sesgo_programas', 'v_sesgo_programas', q => q.select('*').limit(1));
+    if (error) throw error;
+    return data?.[0] ?? null;
+  }).catch(() => null);
 }
 
 export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
-  let q = supabase.from('v_normas_completas').select('*');
-  if (filtros.materia) q = q.eq('materia', filtros.materia);
-  if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
-  if (filtros.soloConResumen) q = q.not('resumen', 'is', null);
-  const { data, error } = await q
-    .order('fecha', { ascending: false })
-    .range(desplazamiento, desplazamiento + limite - 1);
+  const { data, error } = await leerConRespaldo('mv_normas_completas', 'v_normas_completas', base => {
+    let q = base.select('*');
+    if (filtros.materia) q = q.eq('materia', filtros.materia);
+    if (filtros.colectivo) q = q.contains('colectivos', [filtros.colectivo]);
+    if (filtros.soloConResumen) q = q.not('resumen', 'is', null);
+    return q.order('fecha', { ascending: false }).range(desplazamiento, desplazamiento + limite - 1);
+  });
   if (error) throw error;
   return data ?? [];
 }
@@ -518,15 +596,16 @@ export async function traerPromesaVsVoto() {
   return filas.sort((a, b) => a.prometido_gasto - b.prometido_gasto);
 }
 
-export async function traerUltimas(limite = 6) {
-  const { data, error } = await supabase
-    .from('v_normas_completas').select('*')
-    .order('fecha', { ascending: false }).limit(limite);
-  if (error) {
-    console.error(`traerUltimas: no se puede leer v_normas_completas (${error.message})`);
-    throw error;
-  }
-  return data ?? [];
+export function traerUltimas(limite = 6) {
+  return recordar(`ultimas:${limite}`, async () => {
+    const { data, error } = await leerConRespaldo('mv_normas_completas', 'v_normas_completas', q => q
+      .select('*').order('fecha', { ascending: false }).limit(limite));
+    if (error) {
+      console.error(`traerUltimas: no se pueden leer las normas (${error.message})`);
+      throw error;
+    }
+    return data ?? [];
+  });
 }
 export async function traerPerfilActual() {
   const { data } = await supabase.auth.getUser();

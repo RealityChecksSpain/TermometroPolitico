@@ -350,7 +350,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                   <ul style={{ margin: '9px 0 0', paddingLeft: 15, fontSize: 11.5, color: C.media, lineHeight: 1.55 }}>
                     {d.inmuebles_items.map((it, i) => (
                       <li key={i}>
-                        {it.qty > 1 ? `${it.qty} × ` : ''}{it.texto}
+                        {it.qty > 1 && !String(it.texto).trim().startsWith(String(it.qty)) ? `${it.qty} × ` : ''}{it.texto}
                         <span className="em" title={
                           it.sociedad === true
                             ? 'La línea nombra una sociedad no cotizada.'
@@ -372,6 +372,12 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                       </li>
                     ))}
                   </ul>
+                )}
+
+                {d.inmuebles_nota && (
+                  <div style={{ fontSize: 11, color: C.media, marginTop: 8, lineHeight: 1.5, paddingLeft: 8, borderLeft: `2px solid ${C.linea}` }}>
+                    {d.inmuebles_nota}
+                  </div>
                 )}
 
                 <div className="em" style={{ fontSize: 9.5, color: C.tenue, marginTop: 8, lineHeight: 1.5 }}>
@@ -401,9 +407,13 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
               </div>
             )}
             <div className="em" style={{ fontSize: 9.5, color: C.tenue, marginTop: 8, lineHeight: 1.5 }}>
-              Cifras extraídas del PDF oficial por un modelo de lenguaje, sin revisión humana
-              {d.bienes_confianza ? ` (confianza declarada: ${d.bienes_confianza})` : ''}. El patrimonio
-              no valora los inmuebles. Abre la declaración para comprobarla.
+              {d.bienes_origen === 'revision_humana'
+                ? 'Cifras revisadas a mano contra el PDF oficial.'
+                : `Cifras extraídas del PDF oficial por un modelo de lenguaje, sin revisión humana${d.bienes_confianza ? ` (confianza declarada: ${d.bienes_confianza})` : ''}.`}
+              {d.inmuebles_revisado && d.bienes_origen !== 'revision_humana'
+                ? ` Los inmuebles los ha vuelto a leer otro modelo de lenguaje, declaración por declaración (${String(d.inmuebles_revisado).split('-').reverse().join('/')}).`
+                : ''}
+              {' '}El patrimonio no valora los inmuebles. Abre la declaración para comprobarla.
               {d.url_bienes && (
                 <>{' '}<a href={d.url_bienes} target="_blank" rel="noreferrer" style={{ color: C.media }}>PDF →</a></>
               )}

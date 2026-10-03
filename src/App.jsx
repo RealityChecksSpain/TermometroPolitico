@@ -52,7 +52,7 @@ body{padding-bottom:calc(58px + env(safe-area-inset-bottom))}
 .ficha{display:grid;grid-template-columns:1fr;gap:16px}
 .ficha>aside{order:-1}
 @media(min-width:900px){.ficha{grid-template-columns:minmax(0,1fr) 262px;gap:24px;align-items:start}
-.ficha>aside{order:0;position:sticky;top:14px}}
+.ficha>aside{order:0;position:sticky;top:14px;max-height:calc(100vh - 28px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
 @media(min-width:900px){.nav{position:static;background:none;backdrop-filter:none;border-top:none;
 border-bottom:none;margin-bottom:0;gap:2px}}
 .navb{flex:1;padding:9px 2px 8px;background:none;border:none;cursor:pointer;
