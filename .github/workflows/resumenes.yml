@@ -1,0 +1,64 @@
+name: Resúmenes de leyes nuevas
+
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: resumenes
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  resumir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      LEGISLATURA_ACTIVA_ID: ${{ secrets.LEGISLATURA_ACTIVA_ID }}
+      MODELO_IA: ${{ vars.MODELO_IA }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar que estan los secretos
+        run: |
+          faltan=""
+          for v in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY GEMINI_API_KEY LEGISLATURA_ACTIVA_ID; do
+            if [ -z "${!v}" ]; then faltan="$faltan $v"; fi
+          done
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos del repositorio:$faltan"
+            exit 1
+          fi
+
+      - name: Cargar iniciativas nuevas del Congreso
+        run: node --import tsx scripts/cargar-iniciativas.ts
+        timeout-minutes: 20
+        continue-on-error: true
+
+      - name: Enlazar votaciones con sus iniciativas
+        run: node --import tsx scripts/enlazar.ts
+        timeout-minutes: 30
+        continue-on-error: true
+
+      - name: Descargar textos del BOCG
+        run: node --import tsx scripts/descargar-textos.ts
+        timeout-minutes: 60
+        continue-on-error: true
+
+      - name: Resumir lo que tiene texto y no tiene resumen
+        run: node --import tsx scripts/resumir.ts
+        timeout-minutes: 120
