@@ -65,6 +65,28 @@ export async function leerConRespaldo(cache, vista, armar) {
   return vivo;
 }
 
+const PAGINA = 1000;
+
+async function leerPaginado(origen, armar, conOrden) {
+  const filas = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    const q = armar(supabase.from(origen));
+    const r = await (conOrden ? q.order('cache_fila') : q).range(desde, desde + PAGINA - 1);
+    if (r.error) return r;
+    const lote = r.data ?? [];
+    filas.push(...lote);
+    if (lote.length < PAGINA) return { data: filas, error: null };
+  }
+}
+
+export async function leerTodoConRespaldo(cache, vista, armar) {
+  const r = await leerPaginado(cache, armar, true);
+  if (!r.error) return r;
+  const vivo = await leerPaginado(vista, armar, false);
+  if (vivo.error) console.error(`${vista}: ${vivo.error.message} (tampoco se pudo leer ${cache}: ${r.error.message})`);
+  return vivo;
+}
+
 const COLUMNAS_BIENES = 'mandato_id, patrimonio_euros, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_urbanos, inmuebles_rusticos, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, depositos, valores, planes_pensiones, deuda_pendiente, vehiculos, vehiculos_detalle, n_coches, n_motos, n_embarcaciones, n_aeronaves, introducido_por, confianza';
 
 async function leerBienes(ids) {

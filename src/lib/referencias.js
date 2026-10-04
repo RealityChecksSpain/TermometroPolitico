@@ -1,8 +1,8 @@
-import { supabase, leerConRespaldo } from './cliente.js';
+import { supabase, leerTodoConRespaldo } from './cliente.js';
 
 export async function traerReferencias() {
   if (!supabase) return [];
-  const { data, error } = await leerConRespaldo('mv_referencias_mapa', 'v_referencias_mapa', q => q
+  const { data, error } = await leerTodoConRespaldo('mv_referencias_mapa', 'v_referencias_mapa', q => q
     .select('clave, tipo, nombre, nombre_corto, pais_codigo, pais_nombre, partido_slug, x, y, ex, ey, n_x, n_y, anio, fuentes, territorial, democracia, democracia_desde, democracia_hasta'));
   if (error || !data) return [];
   return data
@@ -75,7 +75,7 @@ export const NOMBRE_DIMENSION = {
 
 export async function traerDimensionesRegimen() {
   if (!supabase) return {};
-  const { data, error } = await leerConRespaldo('mv_regimen_dimensiones', 'v_regimen_dimensiones', q => q
+  const { data, error } = await leerTodoConRespaldo('mv_regimen_dimensiones', 'v_regimen_dimensiones', q => q
     .select('entidad_clave, clave_mapa, dimension, valor, votantes, acuerdo, cita, respuestas_distintas'));
   if (error || !data) return {};
   const salida = {};

@@ -35,6 +35,8 @@ const CAMPOS: [string, string, string, string][] = [
   ['observaciones', 'Observaciones', 'texto', 'Recuadro OBSERVACIONES, si tiene algo']
 ];
 
+const CAMPOS_INMUEBLES = ['inmuebles_urbanos', 'inmuebles_rusticos', 'inmuebles_detalle'];
+
 const PAGINA = `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>Entrada de bienes declarados</title>
 <style>
@@ -85,6 +87,7 @@ declaración: solo rellénalo si lo consultas en la web de retribuciones, y qued
 </div></div>
 <script>
 const CAMPOS = ${JSON.stringify(CAMPOS)};
+const INMUEBLES = ${JSON.stringify(CAMPOS_INMUEBLES)};
 let dips = [], actual = null;
 
 async function cargar() {
@@ -124,6 +127,17 @@ async function elegir(d) {
     const el = document.getElementById('f_' + k);
     if (el && previo && previo[k] !== null && previo[k] !== undefined) el.value = previo[k];
   });
+  const aviso = document.getElementById('aviso');
+  aviso.innerHTML = '';
+  if (previo && previo.inmuebles_revisado) {
+    INMUEBLES.forEach(k => {
+      const el = document.getElementById('f_' + k);
+      if (el) { el.readOnly = true; el.style.background = '#F0F0EA'; }
+    });
+    aviso.innerHTML = '<div class="regla" style="margin-top:14px"><strong>Inmuebles revisados el ' +
+      String(previo.inmuebles_revisado).split('-').reverse().join('/') + '.</strong> ' +
+      'Aquí no se editan ni se guardan: se cambian en datos/bienes/inmuebles-revisados.csv. El resto de campos sí.</div>';
+  }
   document.getElementById('msg').textContent = '';
 }
 
@@ -137,7 +151,9 @@ async function guardar() {
   if (!actual) return;
   const cuerpo = { mandato_id: actual.mandato_id };
   CAMPOS.forEach(([k, , tipo]) => {
-    const v = document.getElementById('f_' + k)?.value;
+    const el = document.getElementById('f_' + k);
+    if (el && el.readOnly) return;
+    const v = el?.value;
     cuerpo[k] = (tipo === 'euros' || tipo === 'entero') ? numero(v) : (v || null);
   });
   const r = await fetch('/api/guardar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
@@ -164,16 +180,18 @@ async function leerPdf() {
   const aviso = document.getElementById('aviso');
   if (!url) { msg.className = 'err'; msg.textContent = 'pega antes la URL del PDF'; return; }
 
-  msg.className = ''; msg.textContent = 'leyendo el PDF…'; aviso.innerHTML = '';
+  msg.className = ''; msg.textContent = 'leyendo el PDF…';
   const r = await fetch('/api/leer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
   const j = await r.json();
 
   if (!j.ok) { msg.className = 'err'; msg.textContent = j.error || 'no se pudo leer'; return; }
 
+  const bloqueados = INMUEBLES.some(k => document.getElementById('f_' + k)?.readOnly);
   let rellenados = 0;
   CAMPOS.forEach(([k]) => {
     if (k === 'url_declaracion') return;
     const el = document.getElementById('f_' + k);
+    if (el && el.readOnly) return;
     const v = j.datos[k];
     if (el && v !== null && v !== undefined && String(v) !== '') {
       el.value = typeof v === 'number' ? String(v).replace('.', ',') : v;
@@ -188,6 +206,7 @@ async function leerPdf() {
     '<strong>Leído automáticamente · confianza ' + j.datos.confianza + '.</strong> ' +
     'Los campos en amarillo los ha rellenado la máquina. <strong>Compruébalos uno a uno contra el PDF</strong> ' +
     'antes de guardar.' +
+    (bloqueados ? ' Los inmuebles están revisados y no se han tocado.' : '') +
     (j.datos.dudas && j.datos.dudas.length
       ? '<br><br>No ha podido leer con seguridad:<ul style="margin:6px 0 0 16px"><li>' +
         j.datos.dudas.join('</li><li>') + '</li></ul>'
@@ -269,8 +288,12 @@ createServer(async (req, res) => {
     for await (const c of req) cuerpo += c;
     const enviado = JSON.parse(cuerpo);
     if (!enviado?.mandato_id) { res.writeHead(400); return res.end('falta mandato_id'); }
+    const { data: existente } = await db().from('bienes_declarados').select('inmuebles_revisado')
+      .eq('mandato_id', enviado.mandato_id).maybeSingle();
+    const inmueblesRevisados = Boolean((existente as any)?.inmuebles_revisado);
     const fila: Record<string, unknown> = { mandato_id: enviado.mandato_id };
     for (const [campo] of CAMPOS) {
+      if (inmueblesRevisados && CAMPOS_INMUEBLES.includes(campo)) continue;
       if (Object.prototype.hasOwnProperty.call(enviado, campo)) fila[campo] = enviado[campo];
     }
     fila.introducido_por = 'revision_humana';

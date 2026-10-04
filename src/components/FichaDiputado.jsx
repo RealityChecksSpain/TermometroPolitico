@@ -410,7 +410,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
               {d.bienes_origen === 'revision_humana'
                 ? 'Cifras revisadas a mano contra el PDF oficial.'
                 : `Cifras extraídas del PDF oficial por un modelo de lenguaje, sin revisión humana${d.bienes_confianza ? ` (confianza declarada: ${d.bienes_confianza})` : ''}.`}
-              {d.inmuebles_revisado && d.bienes_origen !== 'revision_humana'
+              {d.inmuebles_revisado
                 ? ` Los inmuebles los ha vuelto a leer otro modelo de lenguaje, declaración por declaración (${String(d.inmuebles_revisado).split('-').reverse().join('/')}).`
                 : ''}
               {' '}El patrimonio no valora los inmuebles. Abre la declaración para comprobarla.

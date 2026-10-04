@@ -81,6 +81,11 @@ function peorConfianza(a: any, b: any) {
   return na <= nb ? a : b;
 }
 
+function fechaDeUrl(url: unknown): string | null {
+  const m = String(url ?? '').match(/_(\d{4})(\d{2})(\d{2})\.pdf$/i);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
 function vacio(v: any) {
   if (v === null || v === undefined) return true;
   if (typeof v === 'string') return v.trim() === '';
@@ -245,7 +250,7 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
 {
   const { data: filas } = await db()
     .from('bienes_declarados')
-    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, patrimonio_euros, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes');
+    .select('mandato_id, depositos, valores, planes_pensiones, deuda_pendiente, patrimonio_euros, inmuebles_detalle, inmuebles_detalle_propios, inmuebles_detalle_sociedad, inmuebles_urbanos, inmuebles_rusticos, n_inmuebles, n_inmuebles_propios, n_inmuebles_sociedad, n_inmuebles_equivalentes, n_viviendas, n_suelo, n_anejos, n_productivos, n_otros_bienes, inmuebles_revisado');
 
   let filled = 0;
   for (const h of filas ?? []) {
@@ -270,6 +275,7 @@ console.log('\n=== Carga automática de bienes (Gemini + PDF) ===\n');
       (pat != null && h.patrimonio_euros != null && Math.abs(pat - Number(h.patrimonio_euros)) > 0.02);
 
     const cambioInm =
+      !h.inmuebles_revisado &&
       inm.n_inmuebles != null &&
       (h.n_inmuebles == null ||
         inm.n_inmuebles !== Number(h.n_inmuebles) ||
@@ -357,6 +363,7 @@ if (cola.length === 0) {
 }
 
 let ok = 0, fallos = 0, revisita = 0, corregidos = 0, conArrastre = 0;
+const posterioresARevision: string[] = [];
 
 for (let i = 0; i < cola.length; i++) {
   const m = cola[i];
@@ -492,10 +499,14 @@ for (let i = 0; i < cola.length; i++) {
     verificado: false
   };
 
-  const revisadoAMano = Boolean((m as any).previo?.inmuebles_revisado);
-  if (revisadoAMano) {
+  const revisadoEl: string | null = (m as any).previo?.inmuebles_revisado ?? null;
+  const revisados = Boolean(revisadoEl);
+  const fechaUltimo = fechaDeUrl(ultimoDoc);
+  const nuevaTrasRevision = Boolean(revisadoEl && fechaUltimo && fechaUltimo > revisadoEl);
+  if (revisados) {
     for (const campo of CAMPOS_INMUEBLES) delete fila[campo];
   }
+  if (nuevaTrasRevision) posterioresARevision.push(`${m.nombre_completo}: declaración del ${fechaUltimo}, inmuebles revisados el ${revisadoEl}`);
 
   const { error } = await db().from('bienes_declarados').upsert(fila, { onConflict: 'mandato_id' });
   if (error) {
@@ -525,7 +536,7 @@ for (let i = 0; i < cola.length; i++) {
     }
   } else {
     console.log(
-      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${revisadoAMano ? 'revisados a mano, sin tocar' : (fila.n_inmuebles ?? '—')}` +
+      `ok · € ${fila.patrimonio_euros ?? '—'} · inm ${revisados ? (nuevaTrasRevision ? 'revisados, sin tocar, pero hay declaración posterior' : 'revisados, sin tocar') : (fila.n_inmuebles ?? '—')}` +
       `${inm.n_inmuebles_propios != null ? ` (${inm.n_inmuebles_propios} propios + ${inm.n_inmuebles_sociedad} soc. · eq ${inm.n_inmuebles_equivalentes})` : ''} · ` +
       `coches ${veh.n_coches} motos ${veh.n_motos} · ${d.confianza}` +
       `${corregido ? ' · corregido' : ''}${motivo ? ' · revisar' : ''}`
@@ -535,6 +546,10 @@ for (let i = 0; i < cola.length; i++) {
 }
 
 console.log(`\nListo: ${ok} guardados, ${fallos} fallos, ${revisita} revalidaciones, ${corregidos} corregidos.`);
+if (posterioresARevision.length) {
+  console.log(`\n${posterioresARevision.length} con inmuebles revisados tienen una declaración posterior a la revisión. Sus inmuebles no se han tocado; vuelve a leerlos y actualiza datos/bienes/inmuebles-revisados.csv:`);
+  for (const linea of posterioresARevision) console.log(`  ${linea}`);
+}
 if (CADENA) {
   console.log(`${conArrastre} tenían cifras de dinero solo en declaraciones antiguas. No se heredan: el patrimonio sale únicamente de la declaración más reciente, aunque quede vacío.`);
   console.log('Los recuentos de inmuebles y vehículos sí se heredan: no se restan entre sí, así que mezclar años no inventa una cifra.');
