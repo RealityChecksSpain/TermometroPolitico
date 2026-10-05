@@ -5,6 +5,12 @@ import { refrescarMetricas } from '../src/lib/metricas';
 
 exigirEnv('GEMINI_API_KEY');
 const VERSION = process.env.VERSION_CLASIF ?? 'clasif-v1-2026-08';
+const LIMITE = (() => {
+  const i = process.argv.indexOf('--limite');
+  if (i < 0) return null;
+  const n = Number(process.argv[i + 1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+})();
 
 const { data: materias } = await db().from('materias').select('id, slug, nombre, descripcion').order('codigo_cap');
 const { data: colectivos } = await db().from('colectivos').select('id, slug, nombre, descripcion').order('orden');
@@ -85,18 +91,21 @@ for (const r of filasResumen) {
 }
 
 const crudas = await traerTodo<any>((a, b) =>
-  db().from('iniciativas').select('id, titulo, texto_extraido, texto_chars').order('id').range(a, b));
+  db().from('iniciativas').select('id, titulo, texto_extraido, texto_chars, fecha_presentacion').order('id').range(a, b));
 
 const todas = crudas.map((i: any) => ({ ...i, resumen_ia: resumenPorId.get(i.id) ?? null }));
 
-const pendientes = todas.filter((i: any) => !hechas.has(i.id));
+const todasPendientes = todas
+  .filter((i: any) => !hechas.has(i.id))
+  .sort((a: any, b: any) => String(b.fecha_presentacion ?? '').localeCompare(String(a.fecha_presentacion ?? '')));
+const pendientes = LIMITE ? todasPendientes.slice(0, LIMITE) : todasPendientes;
 
 const sinNada = pendientes.filter((i: any) => !i.texto_extraido && !i.resumen_ia).length;
 const soloResumen = pendientes.filter((i: any) => !i.texto_extraido && i.resumen_ia).length;
 
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Materias: ${materias?.length ?? 0} · Colectivos: ${colectivos?.length ?? 0}`);
-console.log(`Pendientes: ${pendientes.length}`);
+console.log(`Pendientes: ${todasPendientes.length}${LIMITE ? ` (se procesan ${pendientes.length} por --limite, las mas recientes)` : ', de la mas reciente a la mas antigua'}`);
 console.log(`  con texto del BOCG: ${pendientes.length - sinNada - soloResumen}`);
 console.log(`  solo con resumen:   ${soloResumen}`);
 console.log(`  solo con el titulo: ${sinNada}\n`);
@@ -181,6 +190,9 @@ console.log(`  clasificadas:      ${progreso.procesados}`);
 console.log(`  sin afectados:     ${sinAfectados}`);
 console.log(`  fallidas:          ${progreso.fallidos}`);
 console.log(`  omitidas:          ${progreso.omitidos}`);
+if (todasPendientes.length > progreso.procesados) {
+  console.log(`  quedan sin clasificar: ${todasPendientes.length - progreso.procesados}${progreso.cuotaAgotada ? ' (cuota diaria agotada: sigue en la proxima pasada)' : ''}`);
+}
 
 if (inventados.size > 0) {
   console.log('\nIDENTIFICADORES INVENTADOS POR EL MODELO (descartados)');

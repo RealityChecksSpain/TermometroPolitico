@@ -1,4 +1,4 @@
-name: Resúmenes de leyes nuevas
+name: Leyes nuevas - carga, materias y resúmenes
 
 on:
   schedule:
@@ -13,9 +13,9 @@ permissions:
   contents: read
 
 jobs:
-  resumir:
+  leyes:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 350
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -45,20 +45,90 @@ jobs:
           fi
 
       - name: Cargar iniciativas nuevas del Congreso
+        id: iniciativas
         run: node --import tsx scripts/cargar-iniciativas.ts
-        timeout-minutes: 20
+        timeout-minutes: 15
         continue-on-error: true
 
       - name: Enlazar votaciones con sus iniciativas
+        id: enlazar
         run: node --import tsx scripts/enlazar.ts
-        timeout-minutes: 30
+        timeout-minutes: 20
+        continue-on-error: true
+
+      - name: Dar ficha a las votaciones sin iniciativa (mociones, PNL, tratados, decretos)
+        id: huerfanas
+        run: node --import tsx scripts/normas-sin-iniciativa.ts --escribir
+        timeout-minutes: 15
         continue-on-error: true
 
       - name: Descargar textos del BOCG
+        id: textos
         run: node --import tsx scripts/descargar-textos.ts
+        timeout-minutes: 45
+        continue-on-error: true
+
+      - name: Asignar materia y colectivos afectados
+        id: clasificar
+        run: node --import tsx scripts/clasificar.ts
         timeout-minutes: 60
         continue-on-error: true
 
-      - name: Resumir lo que tiene texto y no tiene resumen
+      - name: Resumir lo que tiene texto
+        id: resumir
         run: node --import tsx scripts/resumir.ts
-        timeout-minutes: 120
+        timeout-minutes: 90
+        continue-on-error: true
+
+      - name: Resumir desde el titulo lo que no tiene texto
+        id: actas
+        run: node --import tsx scripts/resumir-actas.ts
+        timeout-minutes: 45
+        continue-on-error: true
+
+      - name: Codificar las acciones de las leyes nuevas
+        id: codificar
+        if: ${{ vars.VERSION_CODIGO_LEY != '' && vars.MODELO_CODIGO_LEY != '' }}
+        env:
+          MODELO_IA: ${{ vars.MODELO_CODIGO_LEY }}
+          VERSION_CODIGO_LEY: ${{ vars.VERSION_CODIGO_LEY }}
+        run: node --import tsx scripts/codificar-leyes.ts
+        timeout-minutes: 45
+        continue-on-error: true
+
+      - name: Avisar si la codificacion esta apagada
+        if: ${{ vars.VERSION_CODIGO_LEY == '' || vars.MODELO_CODIGO_LEY == '' }}
+        run: echo "::notice::Las leyes nuevas no se codifican porque faltan las variables VERSION_CODIGO_LEY y MODELO_CODIGO_LEY. Sin ellas no salen sus acciones en las tarjetas."
+
+      - name: Refrescar metricas y cache de la web
+        id: refrescar
+        if: ${{ !cancelled() }}
+        run: node --import tsx scripts/refrescar.ts
+        timeout-minutes: 15
+
+      - name: Comprobar el resultado
+        if: ${{ !cancelled() }}
+        run: |
+          fallos=""
+          for par in \
+            "cargar iniciativas=${{ steps.iniciativas.outcome }}" \
+            "enlazar=${{ steps.enlazar.outcome }}" \
+            "votaciones sin iniciativa=${{ steps.huerfanas.outcome }}" \
+            "textos=${{ steps.textos.outcome }}" \
+            "materias=${{ steps.clasificar.outcome }}" \
+            "resumenes con texto=${{ steps.resumir.outcome }}" \
+            "resumenes desde el titulo=${{ steps.actas.outcome }}" \
+            "codificacion=${{ steps.codificar.outcome }}" \
+            "refresco=${{ steps.refrescar.outcome }}"
+          do
+            nombre="${par%%=*}"
+            resultado="${par##*=}"
+            if [ "$resultado" != "success" ] && [ "$resultado" != "skipped" ]; then
+              fallos="$fallos, $nombre"
+            fi
+          done
+          if [ -n "$fallos" ]; then
+            echo "::error::Ha fallado:${fallos#,}. Los demas pasos se han hecho; abre el paso que falla para ver por que."
+            exit 1
+          fi
+          echo "Todo en orden."

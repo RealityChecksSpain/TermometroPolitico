@@ -15,9 +15,10 @@ const FORMAS: { patron: RegExp; tipo: string; tipoTexto: string; origen: string 
   { patron: /^\s*proposici[oó]n\s+no\s+de\s+ley/i, tipo: 'otro', tipoTexto: 'Proposición no de Ley', origen: 'grupo_parlamentario' },
   { patron: /^\s*moci[oó]n/i, tipo: 'otro', tipoTexto: 'Moción', origen: 'grupo_parlamentario' },
   { patron: /^\s*interpelaci[oó]n/i, tipo: 'otro', tipoTexto: 'Interpelación', origen: 'grupo_parlamentario' },
-  { patron: /^\s*(tratado|convenio|convenci[oó]n|protocolo|acuerdo\s+entre\s+el\s+reino)/i, tipo: 'otro', tipoTexto: 'Tratado internacional', origen: 'gobierno' },
+  { patron: /^\s*(tratado|convenio|convenci[oó]n|protocolo|canje\s+de\s+notas|acuerdo\s+entre\s+el\s+reino)/i, tipo: 'otro', tipoTexto: 'Tratado internacional', origen: 'gobierno' },
   { patron: /^\s*acuerdo\s+del\s+gobierno/i, tipo: 'otro', tipoTexto: 'Acuerdo del Gobierno', origen: 'gobierno' },
-  { patron: /^\s*(proposici[oó]n|propuesta)\s+de\s+reforma\s+del\s+reglamento/i, tipo: 'otro', tipoTexto: 'Reforma del Reglamento', origen: 'grupo_parlamentario' }
+  { patron: /^\s*(proposici[oó]n|propuesta)\s+de\s+reforma\s+del\s+reglamento/i, tipo: 'otro', tipoTexto: 'Reforma del Reglamento', origen: 'grupo_parlamentario' },
+  { patron: /entre\s+el\s+reino\s+de\s+espa[nñ]a\s+y\s|,\s*hech[oa]s?\s+en\s+[^,]{2,60}?\s+el\s+\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4}/i, tipo: 'otro', tipoTexto: 'Tratado internacional', origen: 'gobierno' }
 ];
 
 function formaDe(titular: string) {

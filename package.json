@@ -62,6 +62,7 @@
     "bienes:auto": "node --env-file=.env --import tsx scripts/cargar-bienes.ts",
     "bienes:manual": "node --env-file=.env --import tsx scripts/servidor-bienes.ts",
     "inmuebles:revisados": "node --env-file=.env --import tsx scripts/inmuebles-revisados.ts",
+    "bienes:pdfs": "node --env-file=.env --import tsx scripts/descargar-declaraciones.ts",
     "refrescar": "node --env-file=.env --import tsx scripts/refrescar.ts",
     "viviendas:propias": "node --env-file=.env --import tsx scripts/viviendas-propias.ts",
     "viviendas:propias:simular": "node --env-file=.env --import tsx scripts/viviendas-propias.ts --simular",
