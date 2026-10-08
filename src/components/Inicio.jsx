@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Feed from './Feed.jsx';
-import GraficoBrecha from './GraficoBrecha.jsx';
+import Contraste from './Contraste.jsx';
 import Hallazgos from './Hallazgos.jsx';
 import Portada from './Portada.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
@@ -10,7 +10,7 @@ import {
   cargarPerfilGuardado, guardarPerfil, borrarPerfilGuardado,
   marcarVistoAhora, ultimaVista, filtrarNovedades
 } from '../lib/alertas.js';
-import { traerUltimas, traerLideres } from '../lib/cliente.js';
+import { traerUltimas, traerLideres, traerMapaPartidos } from '../lib/cliente.js';
 import { titularDeNorma } from '../lib/fraseCorta.js';
 import { useTelefono } from '../lib/pantalla.js';
 import { VOTO } from '../lib/paleta.js';
@@ -59,6 +59,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   const [ultimas, setUltimas] = useState([]);
   const [estadoUltimas, setEstadoUltimas] = useState('cargando');
   const [ausentes, setAusentes] = useState([]);
+  const [mapa, setMapa] = useState([]);
   const [guardado, setGuardado] = useState(() => cargarPerfilGuardado());
   const [novedades, setNovedades] = useState([]);
 
@@ -78,6 +79,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
       setEstadoUltimas('error');
     });
     traerLideres('ausencias').then(setAusentes).catch(() => setAusentes([]));
+    traerMapaPartidos().then(d => setMapa(d ?? [])).catch(() => setMapa([]));
 
     const g = cargarPerfilGuardado();
     if (g?.texto) {
@@ -296,9 +298,11 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
         </div>
       )}
 
-      <div style={{ marginTop: 28 }}>
-        <GraficoBrecha />
-      </div>
+      {mapa.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <Contraste datos={mapa} />
+        </div>
+      )}
 
       <div style={{ marginTop: 20, display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
         <Seccion titulo="Tu diputado"

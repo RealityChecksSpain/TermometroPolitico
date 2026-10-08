@@ -642,8 +642,9 @@ export default function Metodologia({ cobertura }) {
             afirmamos un resultado final: mostramos la última votación registrada.
           </li>
           <li style={{ marginBottom: 6 }}>
-            Las ausencias son el número de votaciones en las que un diputado no emitió voto. Ministros,
-            presidencia y líderes de la oposición acumulan ausencias por obligaciones institucionales.
+            Las ausencias son el número de votaciones en las que un diputado no emitió voto. Quien tiene
+            cargo en el Gobierno o en la Mesa del Congreso acumula ausencias por las obligaciones del
+            cargo, y por eso no entra en el ranking de ausencias.
           </li>
           <li>
             El emparejamiento entre norma y expediente se hace por similitud de título y se muestra

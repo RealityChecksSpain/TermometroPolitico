@@ -91,17 +91,18 @@ for (const r of filasResumen) {
 }
 
 const crudas = await traerTodo<any>((a, b) =>
-  db().from('iniciativas').select('id, titulo, texto_extraido, texto_chars, fecha_presentacion').order('id').range(a, b));
+  db().from('iniciativas').select('id, titulo, texto_chars, fecha_presentacion').order('id').range(a, b));
 
 const todas = crudas.map((i: any) => ({ ...i, resumen_ia: resumenPorId.get(i.id) ?? null }));
+const conTexto = (i: any) => Number(i.texto_chars ?? 0) > 0;
 
 const todasPendientes = todas
   .filter((i: any) => !hechas.has(i.id))
   .sort((a: any, b: any) => String(b.fecha_presentacion ?? '').localeCompare(String(a.fecha_presentacion ?? '')));
 const pendientes = LIMITE ? todasPendientes.slice(0, LIMITE) : todasPendientes;
 
-const sinNada = pendientes.filter((i: any) => !i.texto_extraido && !i.resumen_ia).length;
-const soloResumen = pendientes.filter((i: any) => !i.texto_extraido && i.resumen_ia).length;
+const sinNada = pendientes.filter((i: any) => !conTexto(i) && !i.resumen_ia).length;
+const soloResumen = pendientes.filter((i: any) => !conTexto(i) && i.resumen_ia).length;
 
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Materias: ${materias?.length ?? 0} · Colectivos: ${colectivos?.length ?? 0}`);
@@ -128,55 +129,83 @@ const errores = new Map<string, number>();
 const inventados = new Set<string>();
 let sinAfectados = 0;
 
+function anotarError(e: string) {
+  errores.set(e, (errores.get(e) ?? 0) + 1);
+}
+
+async function clasificarUna(i: any, cadencia: Cadencia): Promise<true | null> {
+  const { data: fila, error: eLectura } = await db().from('iniciativas').select('texto_extraido').eq('id', i.id).single();
+  if (eLectura) {
+    anotarError(`lectura: ${eLectura.message}`);
+    return null;
+  }
+  i.texto_extraido = fila?.texto_extraido ?? null;
+
+  const r = await preguntar<any>(prompt(i), cadencia, { esquema: ESQUEMA });
+  if (!r.ok || !r.datos) {
+    anotarError(r.error ?? 'sin detalle');
+    return null;
+  }
+
+  const principal = idMateria.get(r.datos.materia_principal);
+  if (!principal) {
+    inventados.add(`materia:${r.datos.materia_principal}`);
+    return null;
+  }
+
+  const filasMateria: any[] = [
+    { iniciativa_id: i.id, materia_id: principal, principal: true, modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION }
+  ];
+
+  (r.datos.materias_secundarias ?? []).slice(0, 3).forEach((s: string) => {
+    const id = idMateria.get(s);
+    if (!id) { inventados.add(`materia:${s}`); return; }
+    if (id === principal) return;
+    filasMateria.push({ iniciativa_id: i.id, materia_id: id, principal: false, modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION });
+  });
+
+  const filasColectivo = (r.datos.afectados ?? [])
+    .slice(0, 5)
+    .map((a: any) => {
+      const id = idColectivo.get(a.colectivo);
+      if (!id) { inventados.add(`colectivo:${a.colectivo}`); return null; }
+      if (!a.efecto || String(a.efecto).length < 20) return null;
+      return {
+        iniciativa_id: i.id,
+        colectivo_id: id,
+        efecto: String(a.efecto).slice(0, 300),
+        modelo: r.modelo ?? modeloActivo(),
+        version_prompt: VERSION
+      };
+    })
+    .filter(Boolean);
+
+  if (filasColectivo.length === 0) sinAfectados++;
+  else {
+    const { error: eColectivo } = await db().from('iniciativa_colectivo').upsert(filasColectivo, { onConflict: 'iniciativa_id,colectivo_id' });
+    if (eColectivo) {
+      anotarError(`escritura de colectivos: ${eColectivo.message}`);
+      return null;
+    }
+  }
+
+  const { error: eMateria } = await db().from('iniciativa_materia').upsert(filasMateria, { onConflict: 'iniciativa_id,materia_id' });
+  if (eMateria) {
+    anotarError(`escritura de materias: ${eMateria.message}`);
+    return null;
+  }
+
+  return true;
+}
+
 const progreso = await procesarLote(
   pendientes,
   async (i: any, cadencia: Cadencia) => {
-    const r = await preguntar<any>(prompt(i), cadencia, { esquema: ESQUEMA });
-    if (!r.ok || !r.datos) {
-      const e = r.error ?? 'sin detalle';
-      errores.set(e, (errores.get(e) ?? 0) + 1);
-      return null;
+    try {
+      return await clasificarUna(i, cadencia);
+    } finally {
+      delete i.texto_extraido;
     }
-
-    const principal = idMateria.get(r.datos.materia_principal);
-    if (!principal) {
-      inventados.add(`materia:${r.datos.materia_principal}`);
-      return null;
-    }
-
-    const filasMateria: any[] = [
-      { iniciativa_id: i.id, materia_id: principal, principal: true, modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION }
-    ];
-
-    (r.datos.materias_secundarias ?? []).slice(0, 3).forEach((s: string) => {
-      const id = idMateria.get(s);
-      if (!id) { inventados.add(`materia:${s}`); return; }
-      if (id === principal) return;
-      filasMateria.push({ iniciativa_id: i.id, materia_id: id, principal: false, modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION });
-    });
-
-    await db().from('iniciativa_materia').upsert(filasMateria, { onConflict: 'iniciativa_id,materia_id' });
-
-    const filasColectivo = (r.datos.afectados ?? [])
-      .slice(0, 5)
-      .map((a: any) => {
-        const id = idColectivo.get(a.colectivo);
-        if (!id) { inventados.add(`colectivo:${a.colectivo}`); return null; }
-        if (!a.efecto || String(a.efecto).length < 20) return null;
-        return {
-          iniciativa_id: i.id,
-          colectivo_id: id,
-          efecto: String(a.efecto).slice(0, 300),
-          modelo: r.modelo ?? modeloActivo(),
-          version_prompt: VERSION
-        };
-      })
-      .filter(Boolean);
-
-    if (filasColectivo.length === 0) sinAfectados++;
-    else await db().from('iniciativa_colectivo').upsert(filasColectivo, { onConflict: 'iniciativa_id,colectivo_id' });
-
-    return true;
   },
   {
     alProgreso: (n, total, i: any, ok) => {

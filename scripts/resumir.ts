@@ -17,6 +17,7 @@ const LIMITE = (() => {
 })();
 
 const MAX_FRASE = 75;
+const TANDA_TEXTOS = 25;
 
 const ESQUEMA = {
   type: 'object',
@@ -132,29 +133,51 @@ function validarFrase(frase: unknown): string | null {
   return t.slice(0, 180);
 }
 
+async function textosDe(ids: string[]): Promise<Map<string, string>> {
+  const textos = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += TANDA_TEXTOS) {
+    const tanda = ids.slice(i, i + TANDA_TEXTOS);
+    const { data, error } = await db().from('iniciativas').select('id, texto_extraido').in('id', tanda);
+    if (error) throw error;
+    for (const f of data ?? []) textos.set(f.id, String(f.texto_extraido ?? ''));
+  }
+  return textos;
+}
+
+async function textoDe(id: string): Promise<{ texto: string | null; error: string | null }> {
+  const { data, error } = await db().from('iniciativas').select('texto_extraido').eq('id', id).single();
+  if (error) return { texto: null, error: error.message };
+  return { texto: String(data?.texto_extraido ?? ''), error: null };
+}
+
 const yaHechas = await traerTodo<any>((a, b) =>
   db().from('resumenes_ia').select('iniciativa_id').eq('version_prompt', VERSION).order('iniciativa_id').range(a, b));
 const hechas = new Set(yaHechas.map((r: any) => r.iniciativa_id));
 
 const todas = await traerTodo<any>((a, b) => {
   let q = db().from('iniciativas')
-    .select('id, titulo, autor_texto, situacion, texto_extraido, texto_chars')
+    .select('id, titulo, autor_texto, situacion, texto_chars')
     .order('id').range(a, b);
   if (SOLO_CON_TEXTO) q = q.gt('texto_chars', 400);
   return q;
 });
 
-const notas = todas.filter((i: any) => esNotaDeTramite(i));
-const conNorma = todas.filter((i: any) => !esNotaDeTramite(i));
-const todasPendientes = conNorma.filter((i: any) => !hechas.has(i.id));
+const sinResumen = todas.filter((i: any) => !hechas.has(i.id));
+const cortas = sinResumen.filter((i: any) => Number(i.texto_chars ?? 0) < MIN_CHARS_NORMA);
+const textosCortos = await textosDe(cortas.map((i: any) => i.id));
+for (const i of cortas) i.texto_extraido = textosCortos.get(i.id) ?? '';
+
+const notas = sinResumen.filter((i: any) => esNotaDeTramite(i));
+const todasPendientes = sinResumen.filter((i: any) => !esNotaDeTramite(i));
+for (const i of notas) delete i.texto_extraido;
 const pendientes = LIMITE ? todasPendientes.slice(0, LIMITE) : todasPendientes;
 
 console.log(`\nModelo:      ${modeloActivo()}`);
 console.log(`Version:     ${VERSION}`);
 console.log(`Tope prompt: ${MAX_CHARS.toLocaleString('es')} caracteres  (MAX_CHARS_PROMPT)`);
 console.log(`Con texto:   ${todas.length}`);
-console.log(`Descartadas por ser nota de tramite sin articulado: ${notas.length}`);
 console.log(`Ya resumidas en esta version: ${hechas.size}`);
+console.log(`Sin resumir, descartadas por ser nota de tramite sin articulado: ${notas.length}`);
 console.log(`Pendientes:  ${todasPendientes.length}${LIMITE ? ` (se procesan ${pendientes.length} por --limite)` : ''}`);
 
 if (todasPendientes.length > 0) {
@@ -182,62 +205,84 @@ let resumenMuletilla = 0;
 let vigorDescartada = 0;
 let sinPuntos = 0;
 let errorEscritura = 0;
+let errorLectura = 0;
 const errores = new Map<string, number>();
+
+function anotarError(e: string) {
+  errores.set(e, (errores.get(e) ?? 0) + 1);
+}
+
+async function resumirUna(i: any, cadencia: Cadencia): Promise<true | null> {
+  if (i.texto_extraido === undefined) {
+    const leido = await textoDe(i.id);
+    if (leido.error) {
+      errorLectura++;
+      anotarError(`lectura: ${leido.error}`);
+      return null;
+    }
+    i.texto_extraido = leido.texto;
+  }
+
+  const { texto, recortado, chars } = promptConTexto(i);
+  if (recortado) fragmentadas++;
+
+  const r = await preguntar<any>(texto, cadencia, { esquema: ESQUEMA });
+  if (!r.ok || !r.datos) {
+    anotarError(r.error ?? 'sin detalle');
+    return null;
+  }
+  if (!r.datos.suficiente_informacion) { insuficientes++; return null; }
+
+  const frase = validarFrase(r.datos.frase_corta);
+  if (!frase) fraseRechazada++;
+  else if (frase.length > MAX_FRASE) fraseLarga++;
+
+  const resumen = String(r.datos.resumen ?? '').trim();
+  if (MULETILLA.test(resumen)) resumenMuletilla++;
+
+  const vigor = limpiarHueco(r.datos.entrada_en_vigor);
+  if (!vigor && String(r.datos.entrada_en_vigor ?? '').trim()) vigorDescartada++;
+
+  const puntos = [
+    ...(Array.isArray(r.datos.puntos_clave) ? r.datos.puntos_clave : []),
+    ...(Array.isArray(r.datos.que_cambia) ? r.datos.que_cambia : []).map((c: string) => `Cambio: ${c}`),
+    vigor ? `Entrada en vigor: ${vigor}` : null
+  ].filter(p => String(p ?? '').trim().length > 0);
+  if (puntos.length === 0) sinPuntos++;
+
+  const afecta = String(r.datos.a_quien_afecta ?? '').replace(/\s*·?\s*Entrada en vigor:.*$/i, '').trim();
+
+  const { error: e } = await db().from('resumenes_ia').upsert({
+    iniciativa_id: i.id,
+    modelo: r.modelo ?? modeloActivo(),
+    version_prompt: VERSION,
+    resumen,
+    frase_corta: frase,
+    puntos_clave: puntos,
+    a_quien_afecta: afecta || null,
+    tokens_entrada: r.tokensEntrada ?? null,
+    tokens_salida: r.tokensSalida ?? null,
+    basado_en: 'texto_bocg',
+    chars_fuente: chars,
+    revisado: false
+  }, { onConflict: 'iniciativa_id,version_prompt' });
+
+  if (e) {
+    errorEscritura++;
+    anotarError(`escritura: ${e.message}`);
+    return null;
+  }
+  return true;
+}
 
 const progreso = await procesarLote(
   pendientes,
   async (i: any, cadencia: Cadencia) => {
-    const { texto, recortado, chars } = promptConTexto(i);
-    if (recortado) fragmentadas++;
-
-    const r = await preguntar<any>(texto, cadencia, { esquema: ESQUEMA });
-    if (!r.ok || !r.datos) {
-      const e = r.error ?? 'sin detalle';
-      errores.set(e, (errores.get(e) ?? 0) + 1);
-      return null;
+    try {
+      return await resumirUna(i, cadencia);
+    } finally {
+      delete i.texto_extraido;
     }
-    if (!r.datos.suficiente_informacion) { insuficientes++; return null; }
-
-    const frase = validarFrase(r.datos.frase_corta);
-    if (!frase) fraseRechazada++;
-    else if (frase.length > MAX_FRASE) fraseLarga++;
-
-    const resumen = String(r.datos.resumen ?? '').trim();
-    if (MULETILLA.test(resumen)) resumenMuletilla++;
-
-    const vigor = limpiarHueco(r.datos.entrada_en_vigor);
-    if (!vigor && String(r.datos.entrada_en_vigor ?? '').trim()) vigorDescartada++;
-
-    const puntos = [
-      ...(Array.isArray(r.datos.puntos_clave) ? r.datos.puntos_clave : []),
-      ...(Array.isArray(r.datos.que_cambia) ? r.datos.que_cambia : []).map((c: string) => `Cambio: ${c}`),
-      vigor ? `Entrada en vigor: ${vigor}` : null
-    ].filter(p => String(p ?? '').trim().length > 0);
-    if (puntos.length === 0) sinPuntos++;
-
-    const afecta = String(r.datos.a_quien_afecta ?? '').replace(/\s*·?\s*Entrada en vigor:.*$/i, '').trim();
-
-    const { error: e } = await db().from('resumenes_ia').upsert({
-      iniciativa_id: i.id,
-      modelo: r.modelo ?? modeloActivo(),
-      version_prompt: VERSION,
-      resumen,
-      frase_corta: frase,
-      puntos_clave: puntos,
-      a_quien_afecta: afecta || null,
-      tokens_entrada: r.tokensEntrada ?? null,
-      tokens_salida: r.tokensSalida ?? null,
-      basado_en: 'texto_bocg',
-      chars_fuente: chars,
-      revisado: false
-    }, { onConflict: 'iniciativa_id,version_prompt' });
-
-    if (e) {
-      errorEscritura++;
-      errores.set(`escritura: ${e.message}`, (errores.get(`escritura: ${e.message}`) ?? 0) + 1);
-      return null;
-    }
-    return true;
   },
   {
     alProgreso: (n, total, i: any, ok) => {
@@ -248,17 +293,18 @@ const progreso = await procesarLote(
   }
 );
 
-const fallosModelo = Math.max(0, progreso.fallidos - insuficientes - errorEscritura);
+const fallosModelo = Math.max(0, progreso.fallidos - insuficientes - errorEscritura - errorLectura);
 
 console.log('\nRESULTADO');
 console.log(`  pedidas:          ${pendientes.length}`);
 console.log(`  guardadas:        ${progreso.procesados}`);
 console.log(`  sin info suf.:    ${insuficientes}`);
 console.log(`  fallidas modelo:  ${fallosModelo}`);
+console.log(`  fallidas al leer el texto: ${errorLectura}`);
 console.log(`  fallidas al guardar: ${errorEscritura}`);
 console.log(`  omitidas:         ${progreso.omitidos}`);
 
-const cuadra = progreso.procesados + insuficientes + fallosModelo + errorEscritura + progreso.omitidos;
+const cuadra = progreso.procesados + insuficientes + fallosModelo + errorLectura + errorEscritura + progreso.omitidos;
 if (cuadra !== pendientes.length) {
   console.log(`\n  AVISO: la suma da ${cuadra} y se pidieron ${pendientes.length}. Faltan ${pendientes.length - cuadra} sin explicar.`);
 }

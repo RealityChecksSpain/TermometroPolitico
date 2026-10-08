@@ -6,9 +6,6 @@ import { sanearImporte, patrimonioLiquido } from './euros.js';
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
 const clave = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 
-const MINIMO_PROMESAS_BRECHA = 10;
-const MINIMO_LEYES_BRECHA = 5;
-
 export function diagnosticarConfig() {
   const fallos = [];
 
@@ -480,13 +477,14 @@ function normalizarFilaMapa(d) {
 export async function traerRelacionadas(norma, limite = 4) {
   if (!norma?.materia) return [];
   const { data, error } = await leerConRespaldo('mv_normas_completas', 'v_normas_completas', q => q
-    .select('clave_norma, titular, frase_corta, resumen, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, votacion_principal')
+    .select('clave_norma, titular, frase_corta, resumen, fecha, materia_nombre, materia_color, total_si, total_no, resultado_final, resultado_ultima, resultado_fiable, votaciones, votacion_principal')
     .eq('materia', norma.materia)
     .neq('clave_norma', norma.clave_norma ?? '')
     .order('fecha', { ascending: false })
     .limit(30));
   if (error) return [];
   return (data ?? [])
+    .filter(n => !(n.resultado_fiable === false && Number(n.votaciones ?? 1) > 1))
     .filter(n => (n.resultado_final ?? n.resultado_ultima) === 'aprobada')
     .slice(0, limite);
 }
@@ -579,43 +577,6 @@ export async function traerFeed(limite = 20, desplazamiento = 0, filtros = {}) {
   });
   if (error) throw error;
   return data ?? [];
-}
-
-export async function traerPromesaVsVoto() {
-  let mapa = [];
-  try {
-    mapa = await traerMapaPartidos();
-  } catch {
-    return [];
-  }
-
-  const cuenta = v => {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
-
-  const filas = [];
-  for (const p of mapa ?? []) {
-    const prometido = Number(p.prog_economico);
-    const votado = Number(p.voto_economico);
-    if (!Number.isFinite(prometido) || !Number.isFinite(votado)) continue;
-    const promesas = cuenta(p.promesas_codificadas);
-    const leyes = cuenta(p.leyes_valoradas);
-    if (promesas !== null && promesas < MINIMO_PROMESAS_BRECHA) continue;
-    if (leyes !== null && leyes < MINIMO_LEYES_BRECHA) continue;
-    filas.push({
-      partido: p.partido ?? p.siglas,
-      siglas: p.siglas ?? p.partido,
-      color: p.color,
-      prometido_gasto: prometido,
-      votado_gasto: votado,
-      brecha_gasto: votado - prometido,
-      promesas_codificadas: promesas,
-      leyes_valoradas: leyes
-    });
-  }
-
-  return filas.sort((a, b) => a.prometido_gasto - b.prometido_gasto);
 }
 
 export function traerUltimas(limite = 6) {

@@ -159,6 +159,7 @@ crudo.slice(1).forEach((f, i) => {
       n_inmuebles_equivalentes: conteo.n_inmuebles_equivalentes,
       n_viviendas: conteo.n_viviendas,
       n_viviendas_propias: conteo.n_viviendas_propias,
+      n_viviendas_equivalentes: conteo.n_viviendas_equivalentes,
       n_suelo: conteo.n_suelo,
       n_anejos: conteo.n_anejos,
       n_productivos: conteo.n_productivos,
@@ -183,14 +184,18 @@ for (const c of cambios) {
 }
 
 console.log(`\n${RUTA}: ${cambios.length} diputados\n`);
-console.log(`  ${'diputado'.padEnd(46)} viviendas propias      inmuebles`);
+console.log(`  ${'diputado'.padEnd(46)} viviendas propias  equivalentes    inmuebles`);
 for (const c of cambios) {
   const a: any = actualDe.get(c.mandato_id) ?? {};
   const antesV = a.n_viviendas_propias ?? '—';
   const antesI = a.n_inmuebles ?? '—';
+  const equivalentes = String(c.datos.n_viviendas_equivalentes ?? '—').replace('.', ',');
   const posterior = c.ultima && c.ultima > c.fecha ? `   ultima en el Congreso: ${fechaES(c.ultima)}` : '';
-  console.log(`  ${c.nombre.slice(0, 45).padEnd(46)} ${String(antesV).padStart(4)} → ${String(c.datos.n_viviendas_propias).padEnd(10)} ${String(antesI).padStart(4)} → ${String(c.datos.n_inmuebles).padEnd(4)}${posterior}`);
+  console.log(`  ${c.nombre.slice(0, 45).padEnd(46)} ${String(antesV).padStart(4)} → ${String(c.datos.n_viviendas_propias).padEnd(10)} ${equivalentes.padStart(7)}      ${String(antesI).padStart(4)} → ${String(c.datos.n_inmuebles).padEnd(4)}${posterior}`);
 }
+
+const cruzan = cambios.filter(c => Number(c.datos.n_viviendas_equivalentes ?? 0) >= 4);
+console.log(`\nCon el equivalente a 4 o mas viviendas (las partes sin porcentaje no suman): ${cruzan.length}`);
 
 const nuevas = cambios.filter(c => c.ultima && c.ultima > c.revisado);
 if (nuevas.length) {
@@ -216,10 +221,10 @@ if (!publicar) {
   process.exit(0);
 }
 
-const { error: eColumnas } = await db().from('bienes_declarados').select('inmuebles_revisado, inmuebles_nota').limit(1);
+const { error: eColumnas } = await db().from('bienes_declarados').select('inmuebles_revisado, inmuebles_nota, n_viviendas_equivalentes').limit(1);
 if (eColumnas) {
   console.log(`\nERROR: a bienes_declarados le faltan las columnas nuevas (${eColumnas.message}).`);
-  console.log('Corre antes el SQL de la migracion. No se ha tocado nada.\n');
+  console.log('Corre antes en el SQL Editor sql/viviendas-equivalentes-2026-10-06.sql. No se ha tocado nada.\n');
   process.exit(1);
 }
 

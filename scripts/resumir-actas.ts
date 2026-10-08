@@ -104,11 +104,22 @@ const hechas = new Set(yaHechas.map((r: any) => r.clave_norma));
 const todas = await traerTodo<any>((a, b) =>
   db().from('mv_normas').select('clave_norma, titular').order('clave_norma').range(a, b));
 
-const conResumenPropio = new Set((await traerTodo<any>((a, b) =>
-  db().from('v_normas_completas')
-    .select('clave_norma, frase_corta, resumen')
-    .not('frase_corta', 'is', null)
-    .order('clave_norma').range(a, b))).map((n: any) => n.clave_norma));
+async function clavesConFrase(origen: string): Promise<Set<string>> {
+  const filas = await traerTodo<any>((a, b) =>
+    db().from(origen)
+      .select('clave_norma')
+      .not('frase_corta', 'is', null)
+      .order('clave_norma').range(a, b));
+  return new Set(filas.map((n: any) => n.clave_norma));
+}
+
+let conResumenPropio: Set<string>;
+try {
+  conResumenPropio = await clavesConFrase('mv_normas_completas');
+} catch (e: any) {
+  console.log(`\nNo se puede leer mv_normas_completas (${e?.message ?? e}). Se lee la vista viva, que es mas lenta.`);
+  conResumenPropio = await clavesConFrase('v_normas_completas');
+}
 
 const yaEnActa = new Set((await traerTodo<any>((a, b) =>
   db().from('resumen_acta').select('clave_norma').order('clave_norma').range(a, b))).map((r: any) => r.clave_norma));

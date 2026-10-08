@@ -5,6 +5,7 @@ import { etiquetasDeNorma } from '../lib/etiquetas.js';
 import { cabeza as cabezaDe, figura, limitar, mezcla, pildora, trazo } from '../lib/morfo.js';
 import { useTactil, useTelefono } from '../lib/pantalla.js';
 import Explica from './Explica.jsx';
+import { resultadoDeNorma } from './Feed.jsx';
 
 const TINTA = '#15171A';
 const PAPEL = '#F3F1E8';
@@ -84,7 +85,7 @@ function normalizar(n, i, colectivos) {
     etiquetas: etiquetasDeNorma(n, colectivos).slice(0, 3),
     si: n.total_si ?? 0,
     no: n.total_no ?? 0,
-    aprobada: (n.resultado_final ?? n.resultado_ultima) === 'aprobada',
+    resultado: resultadoDeNorma(n),
     fecha: fechaCorta(n.fecha),
     fila: n
   };
@@ -219,10 +220,19 @@ function Ficha({ t, total, expandida }) {
           transition={{ delay: 0.16, duration: 0.34, ease: [0.16, 1, 0.3, 1] }}>
           <span className="em pvMeta">
             <span style={{ color: '#C6B084' }}>{t.fecha}</span>
-            <span style={{ marginLeft: 'auto', fontWeight: 700, color: t.aprobada ? '#5FBF92' : '#E08278' }}>
-              {t.aprobada ? 'Aprobada' : 'Rechazada'}
+            <span style={{
+              marginLeft: 'auto', fontWeight: 700,
+              color: t.resultado.gana === 'si' ? '#5FBF92' : t.resultado.gana === 'no' ? '#E08278' : '#C6B084'
+            }}>
+              {t.resultado.texto}
             </span>
           </span>
+          {t.resultado.dudoso && (
+            <span className="em pvOficial">
+              Tiene {t.resultado.votaciones} votaciones y los datos abiertos no dicen cuál fue la final:
+              este es el resultado de la última.
+            </span>
+          )}
           <span className="em pvOficial">
             {t.vehiculo ? `${t.vehiculo.nombre} · ` : ''}{t.oficial}
           </span>

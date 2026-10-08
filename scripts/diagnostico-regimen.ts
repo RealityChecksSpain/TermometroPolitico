@@ -114,7 +114,7 @@ for (const miembro of consejo) {
       .map(h => `${h}=${res.headers.get(h) ?? '-'}`).join('  ')}`);
 
     let cuerpo: any = null;
-    try { cuerpo = JSON.parse(bruto); } catch { /* respuesta no JSON */ }
+    try { cuerpo = JSON.parse(bruto); } catch { cuerpo = null; }
 
     if (!cuerpo) {
       console.log(`  cuerpo no es JSON: ${bruto.slice(0, 200)}`);

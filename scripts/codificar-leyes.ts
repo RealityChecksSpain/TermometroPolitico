@@ -93,7 +93,7 @@ if (REFERENCIA) {
 }
 
 const todasSinFiltrar = await traerTodo<any>((a, b) =>
-  db().from('iniciativas').select('id, titulo, texto_extraido').order('id').range(a, b));
+  db().from('iniciativas').select('id, titulo').order('id').range(a, b));
 const todas = permitidas ? todasSinFiltrar.filter((i: any) => permitidas!.has(i.id)) : todasSinFiltrar;
 
 const pendientes = todas.filter((i: any) => !hechas.has(i.id));
@@ -115,27 +115,50 @@ const errores = new Map<string, number>();
 const porModelo = new Map<string, number>();
 let todoNeutro = 0;
 
+function anotarError(e: string) {
+  errores.set(e, (errores.get(e) ?? 0) + 1);
+}
+
+async function codificarUna(i: any, cadencia: Cadencia): Promise<true | null> {
+  const { data: texto, error: eLectura } = await db().from('iniciativas').select('texto_extraido').eq('id', i.id).single();
+  if (eLectura) {
+    anotarError(`lectura: ${eLectura.message}`);
+    return null;
+  }
+  i.texto_extraido = texto?.texto_extraido ?? null;
+
+  const r = await preguntar<any>(prompt(i), cadencia, { esquema: ESQUEMA });
+  if (!r.ok || !r.datos) {
+    anotarError(r.error ?? 'sin detalle');
+    return null;
+  }
+  const valido = (v: any) => ['aumenta', 'reduce', 'neutro'].includes(v) ? v : 'neutro';
+  const usado = r.modelo ?? modeloActivo();
+  porModelo.set(usado, (porModelo.get(usado) ?? 0) + 1);
+  const fila: any = {
+    iniciativa_id: i.id,
+    justificacion: String(r.datos.justificacion ?? '').slice(0, 200),
+    modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION
+  };
+  campos.forEach(c => { fila[c] = valido(r.datos[c]); });
+  if (campos.every(c => fila[c] === 'neutro')) todoNeutro++;
+
+  const { error: e } = await db().from('iniciativa_codigo').upsert(fila, { onConflict: 'iniciativa_id,version_prompt' });
+  if (e) {
+    anotarError(`escritura: ${e.message}`);
+    return null;
+  }
+  return true;
+}
+
 const progreso = await procesarLote(
   pendientes,
   async (i: any, cadencia: Cadencia) => {
-    const r = await preguntar<any>(prompt(i), cadencia, { esquema: ESQUEMA });
-    if (!r.ok || !r.datos) {
-      errores.set(r.error ?? 'sin detalle', (errores.get(r.error ?? 'sin detalle') ?? 0) + 1);
-      return null;
+    try {
+      return await codificarUna(i, cadencia);
+    } finally {
+      delete i.texto_extraido;
     }
-    const valido = (v: any) => ['aumenta', 'reduce', 'neutro'].includes(v) ? v : 'neutro';
-    const usado = r.modelo ?? modeloActivo();
-    porModelo.set(usado, (porModelo.get(usado) ?? 0) + 1);
-    const fila: any = {
-      iniciativa_id: i.id,
-      justificacion: String(r.datos.justificacion ?? '').slice(0, 200),
-      modelo: r.modelo ?? modeloActivo(), version_prompt: VERSION
-    };
-    campos.forEach(c => { fila[c] = valido(r.datos[c]); });
-    if (campos.every(c => fila[c] === 'neutro')) todoNeutro++;
-
-    const { error: e } = await db().from('iniciativa_codigo').upsert(fila, { onConflict: 'iniciativa_id,version_prompt' });
-    return e ? null : true;
   },
   {
     alProgreso: (n, total, i: any, ok) => {

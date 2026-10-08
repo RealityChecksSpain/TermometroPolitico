@@ -82,19 +82,19 @@ function TONO_ACCION(a) {
   return SUBE.test(a) ? '#2E7D5B' : '#B4552F';
 }
 
-function resultadoDeNorma(n) {
+export function resultadoDeNorma(n) {
   const votaciones = Number(n?.votaciones_norma ?? n?.votaciones ?? 1);
   const dudoso = n?.resultado_fiable === false && votaciones > 1;
   const bruto = dudoso
     ? (n?.resultado_ultima ?? null)
     : (n?.resultado_final ?? n?.resultado_ultima ?? n?.resultado ?? null);
   if (bruto === 'aprobada') {
-    return { texto: dudoso ? 'Última: aprobada' : 'Aprobada', color: C.si, conocido: true, dudoso, gana: 'si' };
+    return { texto: dudoso ? 'Última: aprobada' : 'Aprobada', color: C.si, conocido: true, dudoso, gana: 'si', votaciones };
   }
   if (bruto === 'rechazada') {
-    return { texto: dudoso ? 'Última: rechazada' : 'Rechazada', color: C.no, conocido: true, dudoso, gana: 'no' };
+    return { texto: dudoso ? 'Última: rechazada' : 'Rechazada', color: C.no, conocido: true, dudoso, gana: 'no', votaciones };
   }
-  return { texto: 'Sin resultado en el acta', color: C.tenue, conocido: false, dudoso: false, gana: null };
+  return { texto: 'Sin resultado en el acta', color: C.tenue, conocido: false, dudoso: false, gana: null, votaciones };
 }
 
 function Franja({ si, no, abs, gana, destacada, estrecho }) {

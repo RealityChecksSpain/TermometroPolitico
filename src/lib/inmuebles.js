@@ -4,6 +4,8 @@ const TIPO =
 const MARCA_SOCIEDAD =
   /\b(?:s\.?\s?l\.?\s?u|s\.?\s?l|s\.?\s?a)\b\.?|sociedad(?!\s+(?:de\s+)?gananciales)|mercantil|participaciones?\s+sociales|acciones|cotiza/i;
 
+const SIN_PORCENTAJE = /\bsin\s+porcentaje\b/i;
+
 const CORTE = /[;\n|]+|(?<![\d.,])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|terreno|bodega|cochera))/i;
 
 function legible(s) {
@@ -49,6 +51,10 @@ function origenDe(trozo) {
   return MARCA_SOCIEDAD.test(trozo) ? true : null;
 }
 
+function sinPorcentajeDe(trozo, pct) {
+  return pct == null && SIN_PORCENTAJE.test(trozo);
+}
+
 export function parsearInmueblesDetalle(detalle) {
   if (!detalle) return [];
   const trozos = legible(detalle)
@@ -61,6 +67,7 @@ export function parsearInmueblesDetalle(detalle) {
     const trozo = normalizar(original);
     const pct = porcentajeDe(trozo);
     const sociedad = origenDe(trozo);
+    const sinPorcentaje = sinPorcentajeDe(trozo, pct);
 
     const conNum = trozo.match(new RegExp(`^(\\d{1,3})\\s+(${TIPO.source})\\b`, 'i'));
     if (conNum) {
@@ -70,6 +77,7 @@ export function parsearInmueblesDetalle(detalle) {
         qty,
         texto: original,
         porcentaje: pct,
+        sinPorcentaje,
         sociedad,
         categoria: categoriaDe(trozo),
         esVivienda: /viviend|casa|piso|apartamento|chalet|estudio/i.test(tipo)
@@ -80,7 +88,7 @@ export function parsearInmueblesDetalle(detalle) {
     const menciones = [...trozo.matchAll(new RegExp(`\\b(${TIPO.source})\\b`, 'gi'))];
     if (menciones.length === 0) {
       if (/propiedad|herencia|%|provincia|madrid|barcelona|leon|almeria|coruna|sevilla|valencia/i.test(trozo) && trozo.length > 12) {
-        out.push({ qty: 1, texto: original, porcentaje: pct, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
+        out.push({ qty: 1, texto: original, porcentaje: pct, sinPorcentaje, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
       }
       continue;
     }
@@ -89,6 +97,7 @@ export function parsearInmueblesDetalle(detalle) {
         qty: 1,
         texto: menciones.length > 1 ? `${m[1]} — ${original}` : original,
         porcentaje: pct,
+        sinPorcentaje,
         sociedad,
         categoria: categoriaDe(m[1]),
         esVivienda: /viviend|casa|piso|apartamento|chalet|estudio/i.test(m[1])
@@ -116,17 +125,22 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
   let propios = 0;
   let sociedad = 0;
   let viviendasPropias = 0;
+  let viviendasEquivalentes = 0;
   let equivalentes = 0;
   const cats = { vivienda: 0, suelo: 0, anejo: 0, productivo: 0, otro: 0 };
   for (const it of items) {
     if (it.sociedad === true) sociedad += it.qty;
     else propios += it.qty;
-    if (it.esVivienda && it.sociedad === false) viviendasPropias += it.qty;
+    if (it.esVivienda && it.sociedad === false) {
+      viviendasPropias += it.qty;
+      if (!it.sinPorcentaje) viviendasEquivalentes += it.qty * ((it.porcentaje ?? 100) / 100);
+    }
     equivalentes += it.qty * ((it.porcentaje ?? 100) / 100);
     cats[it.categoria ?? 'otro'] = (cats[it.categoria ?? 'otro'] ?? 0) + it.qty;
   }
   const total = propios + sociedad;
   equivalentes = Math.round(equivalentes * 10) / 10;
+  viviendasEquivalentes = Math.round(viviendasEquivalentes * 10) / 10;
 
   if (total > 0) {
     return {
@@ -136,6 +150,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       n_inmuebles_equivalentes: equivalentes,
       n_viviendas: cats.vivienda,
       n_viviendas_propias: desgloseFiable ? viviendasPropias : null,
+      n_viviendas_equivalentes: desgloseFiable ? viviendasEquivalentes : null,
       n_suelo: cats.suelo,
       n_anejos: cats.anejo,
       n_productivos: cats.productivo,
@@ -158,6 +173,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       n_inmuebles_equivalentes: null,
       n_viviendas: null,
       n_viviendas_propias: null,
+      n_viviendas_equivalentes: null,
       n_suelo: null, n_anejos: null, n_productivos: null, n_otros_bienes: null,
       fuente: 'filas',
       items
@@ -171,6 +187,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
     n_inmuebles_equivalentes: null,
     n_viviendas: null,
     n_viviendas_propias: null,
+    n_viviendas_equivalentes: null,
     n_suelo: null, n_anejos: null, n_productivos: null, n_otros_bienes: null,
     fuente: null,
     items
