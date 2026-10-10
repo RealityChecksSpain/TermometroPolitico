@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { traerProgramasInicio } from '../lib/cliente.js';
+import { traerProgramasInicio, traerPromesasVotadas } from '../lib/cliente.js';
 import { useTelefono } from '../lib/pantalla.js';
 import { declaracionesDe, partidosSoloDeclaraciones, SIN_DATOS, REVISADO } from '../lib/declaraciones2026.js';
 
@@ -19,7 +19,7 @@ const SOMBRA = `6px 6px 0 ${NEGRO}`;
 
 const VOTADAS = [
   { k: 'cumplida', color: VERDE, corto: 'Cumplidas', largo: 'La votó a favor y salió una norma.' },
-  { k: 'apoyada_no_decisiva', color: AZUL, corto: 'No decisivas', largo: 'La apoyó en una votación que no aprueba ninguna norma.' },
+  { k: 'apoyada_no_decisiva', color: AZUL, corto: 'Solo paso previo', largo: 'La apoyó y salió, pero en un paso que no aprueba ninguna ley: una toma en consideración (solo admite la ley a trámite), una proposición no de ley o una moción. No cuenta como cumplida.' },
   { k: 'apoyada_sin_aprobar', color: MOSTAZA, corto: 'Apoyó, no salió', largo: 'La apoyó y la votación no salió adelante.' },
   { k: 'contradicha', color: ROJO, corto: 'Votó en contra', largo: 'Votó lo contrario de lo que prometió.' }
 ];
@@ -90,6 +90,10 @@ const CSS = `
 .bh-chip:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 ${NEGRO}; }
 .bh-chip:active { transform: translate(2px, 2px); box-shadow: 0 0 0 ${NEGRO}; }
 .bh-chip[data-on='1'] { background: ${NEGRO}; color: ${PAPEL}; }
+.bh-scroll { scrollbar-width: thin; scrollbar-color: ${NEGRO} ${CREMA}; }
+.bh-scroll::-webkit-scrollbar { width: 8px; }
+.bh-scroll::-webkit-scrollbar-thumb { background: ${NEGRO}; }
+.bh-scroll::-webkit-scrollbar-track { background: ${CREMA}; border-left: 2px solid ${NEGRO}; }
 .bh-tarjeta { transition: transform .2s ease, box-shadow .2s ease; }
 .bh-tarjeta:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 ${NEGRO}; }
 @media (prefers-reduced-motion: reduce) { .bh * { transition: none !important; } }
@@ -315,7 +319,7 @@ function SoloAhora({ partido, estrecho }) {
 
 function Medida({ children, color, pie, enFiltro, i }) {
   return (
-    <motion.li initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: i * 0.05, ease: SUAVE }}
+    <motion.li initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: Math.min(i, 8) * 0.05, ease: SUAVE }}
       style={{
         display: 'grid', gridTemplateColumns: '10px 1fr', border: BORDE, borderTop: i ? 'none' : BORDE,
         background: enFiltro ? CREMA : PAPEL
@@ -351,12 +355,20 @@ function Pasado({ partido, filtro }) {
   const pestanas = [
     { k: 'cumplida', titulo: 'Logros', vacio: 'Ninguna promesa verificable acabó en una norma aprobada con su voto.' },
     { k: 'contradicha', titulo: 'Votó en contra', vacio: 'No votó en contra de ninguna de sus promesas verificables.' },
+    { k: 'apoyada_no_decisiva', titulo: 'Solo paso previo', vacio: 'Ninguna.' },
     { k: 'apoyada_sin_aprobar', titulo: 'Apoyó, no salió', vacio: 'Ninguna.' }
   ];
+  const [todas, setTodas] = useState(null);
+  useEffect(() => {
+    let vivo = true;
+    setTodas(null);
+    traerPromesasVotadas(partido.partido).then(t => { if (vivo) setTodas(t); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [partido.partido]);
   const est = VOTADAS.find(e => e.k === pestana);
   const p = pestanas.find(x => x.k === pestana);
   const delFiltro = filtro ? partido.filtros?.[filtro] : null;
-  const filas = partido.muestras?.[pestana] ?? [];
+  const filas = todas?.[pestana] ?? partido.muestras?.[pestana] ?? [];
   return (
     <div style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
       <Rotulo adorno={<span aria-hidden="true" style={{ width: 26, height: 26, borderRadius: '50%', background: MOSTAZA, border: BORDE, flexShrink: 0 }} />}>2023 · lo que prometió y lo que votó</Rotulo>
@@ -381,7 +393,7 @@ function Pasado({ partido, filtro }) {
       </div>
       <AnimatePresence mode="wait">
         <motion.ul key={`${partido.siglas}-${pestana}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
-          style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          className="bh-scroll" style={{ listStyle: 'none', margin: 0, padding: '0 6px 0 0', maxHeight: 360, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {filas.length ? filas.map((f, i) => (
             <Medida key={i} i={i} color={est.color} pie={f.norma ? `${f.norma.length > 100 ? `${f.norma.slice(0, 100)}…` : f.norma}${f.fecha ? ` · ${fechaLegible(f.fecha)}` : ''}` : null}>
               <Resaltado texto={f.texto} />
@@ -389,6 +401,16 @@ function Pasado({ partido, filtro }) {
           )) : <li style={{ fontSize: 13, color: GRIS }}>{p.vacio}</li>}
         </motion.ul>
       </AnimatePresence>
+      {filas.length > 3 && (
+        <div className="bh-mono" style={{ fontSize: 10.5, color: GRIS, textTransform: 'none', letterSpacing: '.02em' }}>
+          {filas.length} en total · desliza dentro del recuadro para verlas todas
+        </div>
+      )}
+      {pestana === 'apoyada_no_decisiva' && (
+        <div style={{ fontSize: 12.5, lineHeight: 1.45, background: PAPEL, border: `2px solid ${NEGRO}`, padding: '8px 10px' }}>
+          {est.largo}
+        </div>
+      )}
     </div>
   );
 }

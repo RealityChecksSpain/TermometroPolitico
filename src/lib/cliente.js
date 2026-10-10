@@ -430,6 +430,23 @@ export function traerProgramasInicio() {
   });
 }
 
+export function traerPromesasVotadas(partido) {
+  return recordar(`promesasVotadas:${partido}`, async () => {
+    const { data, error } = await leerConRespaldo('mv_promesa_estado', 'v_promesa_estado', base =>
+      base.select('id, texto, estado, norma_titular, norma_fecha')
+        .eq('partido', partido)
+        .eq('verificable', true)
+        .in('estado', ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'contradicha']));
+    if (error) throw error;
+    const porEstado = {};
+    for (const f of data ?? []) {
+      (porEstado[f.estado] ??= []).push({ texto: f.texto, norma: f.norma_titular, fecha: f.norma_fecha });
+    }
+    for (const k of Object.keys(porEstado)) porEstado[k].sort((a, b) => String(b.fecha ?? '').localeCompare(String(a.fecha ?? '')));
+    return porEstado;
+  });
+}
+
 export function traerResumenPromesas() {
   return recordar('resumenPromesas', async () => {
     const { data, error } = await leerConRespaldo('mv_promesa_resumen', 'v_promesa_resumen', q => q.select('*'));

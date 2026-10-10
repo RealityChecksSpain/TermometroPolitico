@@ -13,7 +13,7 @@ import Explica from './Explica.jsx';
 
 const ESTADO = {
   cumplida: { icono: '✓', color: '#2E7D5B', fondo: '#E6F2EB', texto: 'cumplida' },
-  apoyada_no_decisiva: { icono: '◑', color: '#3F6E8C', fondo: '#E4EEF4', texto: 'la apoyó en una votación no decisiva' },
+  apoyada_no_decisiva: { icono: '◑', color: '#3F6E8C', fondo: '#E4EEF4', texto: 'la apoyó en un paso previo, no en la votación final' },
   apoyada_sin_aprobar: { icono: '◐', color: '#8A6D1F', fondo: '#F6EFDC', texto: 'la apoyó, no salió' },
   contradicha: { icono: '✕', color: '#9E1B32', fondo: '#FBE9EC', texto: 'votó lo contrario' },
   pendiente: { icono: '○', color: '#8E9299', fondo: '#F1F1EC', texto: 'sin votación aún' }
