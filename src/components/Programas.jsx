@@ -49,14 +49,14 @@ const CLAVES = [
   { re: 'nuevo estatus|autogobierno|plurinacionalidad|competencias', fondo: AZUL, tinta: '#FFF' },
   { re: 'pensiones|educación|becas', fondo: ROJO, tinta: '#FFF' }
 ];
-const RE_CLAVES = new RegExp(`(${CLAVES.map(c => c.re).join('|')})`, 'gi');
+const RE_CLAVES = new RegExp(`(?<![\\p{L}\\p{N}])(${CLAVES.map(c => c.re).join('|')})(?![\\p{L}\\p{N}])`, 'giu');
 
 function Resaltado({ texto }) {
   if (!texto) return null;
   const trozos = String(texto).split(RE_CLAVES);
   return trozos.map((t, i) => {
     if (i % 2 === 0) return <React.Fragment key={i}>{t}</React.Fragment>;
-    const c = CLAVES.find(x => new RegExp(`^(?:${x.re})$`, 'i').test(t)) ?? CLAVES[0];
+    const c = CLAVES.find(x => new RegExp(`^(?:${x.re})$`, 'iu').test(t)) ?? CLAVES[0];
     return (
       <span key={i} style={{ background: c.fondo, color: c.tinta, padding: '0 4px', fontWeight: 700, boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}>{t}</span>
     );
@@ -129,6 +129,31 @@ function fechaLegible(f) {
   if (d) return `${Number(d)} ${m[Number(mes) - 1]} ${a}`;
   if (mes) return `${m[Number(mes) - 1]} ${a}`;
   return a;
+}
+
+function Barrido() {
+  const bandas = [ROJO, MOSTAZA, AZUL, NEGRO];
+  return (
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 5 }}>
+      {bandas.map((c, i) => (
+        <motion.div key={c} initial={{ x: '-140%' }} animate={{ x: '160%' }} transition={{ duration: 0.95, delay: 0.05 + i * 0.1, ease: [0.55, 0, 0.35, 1] }}
+          style={{ position: 'absolute', top: '-10%', bottom: '-10%', left: 0, width: '70%', background: c, transform: 'skewX(-18deg)', borderLeft: BORDE, borderRight: BORDE }} />
+      ))}
+    </div>
+  );
+}
+
+function Titular({ texto, quieto, estrecho }) {
+  const palabras = texto.split(' ');
+  return (
+    <h2 className="bh-titulo" style={{ fontSize: estrecho ? 30 : 52, margin: '6px 0 0' }} aria-label={texto}>
+      {palabras.map((p, i) => (
+        <motion.span key={i} aria-hidden="true" initial={quieto ? false : { y: 40, opacity: 0, rotate: i % 2 ? 6 : -6 }}
+          animate={{ y: 0, opacity: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 380, damping: 18, delay: 0.55 + i * 0.045 }}
+          style={{ display: 'inline-block', marginRight: '0.24em', transformOrigin: 'bottom left' }}>{p}</motion.span>
+      ))}
+    </h2>
+  );
 }
 
 function Formas({ quieto, estrecho }) {
@@ -443,16 +468,25 @@ export default function Programas({ onIr }) {
   const color = colorDe(actual);
 
   return (
-    <section className="bh" aria-label="Lo que prometieron los partidos y lo que votaron"
-      style={{ margin: '4px 0 30px', background: CREMA, border: BORDE, boxShadow: estrecho ? 'none' : `10px 10px 0 ${NEGRO}` }}>
+    <AnimatePresence>
+    <motion.section key="programas" className="bh" aria-label="Lo que prometieron los partidos y lo que votaron"
+      initial={quieto ? false : { clipPath: 'polygon(0 0, 0 0, -12% 100%, -12% 100%)' }}
+      animate={{ clipPath: 'polygon(0 0, 112% 0, 100% 100%, -12% 100%)' }} transition={{ duration: 0.7, ease: [0.3, 0.7, 0.2, 1] }}
+      style={{ position: 'relative', margin: '4px 0 30px', background: CREMA, border: BORDE, boxShadow: estrecho ? 'none' : `10px 10px 0 ${NEGRO}` }}>
       <style>{CSS}</style>
-      <div style={{ padding: estrecho ? '16px 14px 14px' : '22px 26px 18px', borderBottom: BORDE, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-        <div>
+      {!quieto && <Barrido />}
+      <div style={{
+        padding: estrecho ? '16px 14px 14px' : '22px 26px 18px', borderBottom: BORDE,
+        position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+        <motion.span aria-hidden="true" initial={quieto ? false : { opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.9, ease: SUAVE }}
+          style={{
+            position: 'absolute', right: -20, top: -20, width: estrecho ? 140 : 260, height: estrecho ? 140 : 260, borderRadius: '50%', pointerEvents: 'none',
+            backgroundImage: `radial-gradient(${ROJO} 2px, transparent 2.6px)`, backgroundSize: '10px 10px',
+            WebkitMaskImage: 'radial-gradient(circle at 70% 30%, #000 0%, transparent 68%)', maskImage: 'radial-gradient(circle at 70% 30%, #000 0%, transparent 68%)'
+          }} />
+        <div style={{ position: 'relative' }}>
           <div className="bh-mono" style={{ fontSize: estrecho ? 11 : 13, fontWeight: 600 }}>Elecciones del 29 de noviembre</div>
-          <motion.h2 className="bh-titulo" initial={quieto ? false : { y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6, ease: SUAVE }}
-            style={{ fontSize: estrecho ? 30 : 52, margin: '6px 0 0' }}>
-            Lo que prometieron, lo que votaron y lo que prometen ahora
-          </motion.h2>
+          <Titular texto="Lo que prometieron, lo que votaron y lo que prometen ahora" quieto={quieto} estrecho={estrecho} />
         </div>
         {onIr && <button className="bh-chip" data-on="0" onClick={() => onIr('partidos')}>Todas las promesas →</button>}
       </div>
@@ -488,7 +522,7 @@ export default function Programas({ onIr }) {
             return (
               <motion.button key={p.siglas} className="bh-fila" data-on={p.siglas === actual.siglas ? '1' : '0'} data-apagado={filtro && !n?.total ? '1' : '0'}
                 aria-pressed={p.siglas === actual.siglas} onClick={() => setElegido(p.siglas)}
-                initial={quieto ? false : { x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.4, delay: 0.05 * i, ease: SUAVE }}
+                initial={quieto ? false : { x: 60, opacity: 0, skewX: -12 }} animate={{ x: 0, opacity: 1, skewX: 0 }} transition={{ duration: 0.45, delay: 0.7 + 0.05 * i, ease: SUAVE }}
                 style={{ '--c': c, '--t': textoSobre(c), flex: estrecho ? '0 0 auto' : undefined, width: estrecho ? 176 : '100%', borderRight: estrecho ? BORDE : 'none', borderBottom: estrecho ? 'none' : undefined }}>
                 <span className="bh-relleno" />
                 <span style={{ position: 'relative', zIndex: 1, display: 'flex' }}><span className="bh-disco" /></span>
@@ -523,6 +557,7 @@ export default function Programas({ onIr }) {
           Cada tema tiene sus dos sentidos. El número de cada partido suma sus promesas de 2023 en esa línea y sus declaraciones de 2026 que van en ella. Las de 2023 las clasifica un modelo de lenguaje promesa a promesa con las mismas reglas para todos; las de 2026, a mano, con su fuente. Las palabras en color marcan el tema de cada medida. «Sin votación» no quiere decir que la promesa no llegara al Congreso, sino que no hemos encontrado una votación relacionada.
         </p>
       </div>
-    </section>
+    </motion.section>
+    </AnimatePresence>
   );
 }
