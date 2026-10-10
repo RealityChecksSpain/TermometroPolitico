@@ -422,6 +422,14 @@ export function traerPromesas(partido, soloVerificables = false, limite = 200) {
   });
 }
 
+export function traerProgramasInicio() {
+  return recordar('programasInicio', async () => {
+    const { data, error } = await leerConRespaldo('mv_programas_inicio', 'v_programas_inicio', q => q.select('*'));
+    if (error) throw error;
+    return (data ?? []).filter(f => Number(f.promesas ?? 0) > 0);
+  });
+}
+
 export function traerResumenPromesas() {
   return recordar('resumenPromesas', async () => {
     const { data, error } = await leerConRespaldo('mv_promesa_resumen', 'v_promesa_resumen', q => q.select('*'));

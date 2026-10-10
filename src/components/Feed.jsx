@@ -277,6 +277,7 @@ const FRANJAS = ['#E0492E', '#EE7B3A', '#F2A93E', '#F7E2B4', '#0E3550', '#1A6B8A
 const VAIVEN = [1.7, 2.4, 1.3, 3.1, 2.0, 2.7, 1.5];
 const FASE = [0, 1.9, 3.4, 0.8, 4.6, 2.6, 5.4];
 const GROSOR = 13;
+const PAGINAS_AUTOMATICAS = 2;
 const CARRILES = 7;
 const SALIENTE = 58;
 const DESFASE = 130;
@@ -369,14 +370,16 @@ export default function Feed({ filtros, onAbrir, cabecera }) {
     };
   }, [items.length, conFranjas]);
 
+  const automatico = pagina.current < PAGINAS_AUTOMATICAS;
+
   useEffect(() => {
-    if (fin || cargando) return;
+    if (fin || cargando || !automatico) return;
     const el = centinela.current;
     if (!el) return;
     const obs = new IntersectionObserver(e => { if (e[0].isIntersecting) cargar(false); }, { rootMargin: '600px' });
     obs.observe(el);
     return () => obs.disconnect();
-  }, [fin, cargando, cargar]);
+  }, [fin, cargando, cargar, automatico]);
 
   return (
     <div>
@@ -428,6 +431,15 @@ export default function Feed({ filtros, onAbrir, cabecera }) {
       )}
 
       <div ref={centinela} style={{ height: 1 }} />
+
+      {!fin && !cargando && !fallo && !automatico && items.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '18px 0 6px' }}>
+          <button onClick={() => cargar(false)} className="em" style={{
+            padding: '11px 22px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', minHeight: 44,
+            background: C.tinta, color: '#F3F1E8', border: 'none', borderRadius: 2
+          }}>Cargar más leyes · llevas <Cifra valor={items.length} /></button>
+        </div>
+      )}
 
       {fin && items.length > 0 && (
         <div className="em" style={{ padding: 24, textAlign: 'center', color: C.tenue, fontSize: 11.5 }}>

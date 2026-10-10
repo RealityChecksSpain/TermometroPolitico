@@ -4,6 +4,7 @@ import Contraste from './Contraste.jsx';
 import Hallazgos from './Hallazgos.jsx';
 import Portada from './Portada.jsx';
 import AvisoCortes from './AvisoCortes.jsx';
+import Programas from './Programas.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
 import { nombreColectivo } from '../lib/etiquetas.js';
 import { implicacionDe } from '../lib/implicaciones.js';
@@ -158,6 +159,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
   return (
     <div>
       <AvisoCortes />
+      <Programas onIr={onIr} />
       <Portada onIr={onIr} onLey={onVotacion} ultimas={ultimas} estadoUltimas={estadoUltimas} colectivos={colectivos}
         escanos={cobertura?.escanos ?? 350} leyes={cobertura?.normas}
         valor={perfil} onValor={cambiarPerfil} onEnviar={buscar}
