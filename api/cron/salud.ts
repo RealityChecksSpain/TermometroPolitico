@@ -34,7 +34,7 @@ async function cachesSinRefrescar(): Promise<string[]> {
       console.error('cron/salud estado_caches', error.message);
       return [`estado_caches: ${plano(error.message)}`];
     }
-    const caches = ((data as any)?.caches ?? {}) as Record<string, any>;
+    const caches = { ...((data as any)?.caches ?? {}), ...((data as any)?.metricas ?? {}) } as Record<string, any>;
     return Object.entries(caches)
       .filter(([, c]) => c?.existe !== false && (c?.error || c?.horas == null || Number(c.horas) > HORAS_CACHE))
       .map(([mv, c]) => `${mv}: ${c?.error ? plano(c.error) : `sin refrescar desde hace ${c?.horas ?? '?'} horas`}`);

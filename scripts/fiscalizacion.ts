@@ -20,14 +20,16 @@ const MATERIAS = [
 const GRAVEDADES = ['infraccion', 'incumplimiento', 'contable'];
 const OPINIONES = ['favorable', 'con_salvedades', 'desfavorable', 'denegada'];
 
-const CABECERA = ['partido', 'ejercicio', 'apartado', 'materia', 'gravedad', 'resumen', 'importe', 'fuente_url', 'pagina', 'modelo', 'nota', 'nota_url'];
-const OPCIONALES = ['modelo', 'nota', 'nota_url'];
+const CABECERA = ['partido', 'ejercicio', 'apartado', 'materia', 'gravedad', 'resumen', 'importe', 'fuente_url', 'pagina', 'modelo', 'nota', 'nota_url', 'formacion'];
+const OPCIONALES = ['modelo', 'nota', 'nota_url', 'formacion'];
 const OBLIGATORIAS = CABECERA.filter(c => !OPCIONALES.includes(c));
-const CABECERA_OPINION = ['partido', 'ejercicio', 'opinion', 'salvedades', 'limitacion_alcance', 'fuente_url', 'pagina'];
+const CABECERA_OPINION = ['partido', 'ejercicio', 'opinion', 'salvedades', 'limitacion_alcance', 'fuente_url', 'pagina', 'formacion', 'nota', 'nota_url'];
+const OBLIGATORIAS_OPINION = CABECERA_OPINION.filter(c => !['formacion', 'nota', 'nota_url'].includes(c));
 const CARPETA = 'datos/fiscalizacion';
 const LARGO_MAXIMO = 220;
 const LARGO_APARTADO = 80;
 const LARGO_NOTA = 300;
+const LARGO_FORMACION = 80;
 
 function opcion(nombre: string): string | null {
   const i = process.argv.indexOf(`--${nombre}`);
@@ -120,9 +122,11 @@ if (plantilla) {
   console.log('  pagina: la numerada en el informe. Obligatoria.');
   console.log('  modelo: vacio si lo has transcrito tu; el nombre del modelo si lo ha extraido una IA.');
   console.log(`  nota y nota_url: opcionales, para algo que paso despues del informe (una multa, una sentencia). La nota lleva siempre su fuente; ${LARGO_NOTA} caracteres como mucho.`);
-  console.log(`\n${rutaOpiniones}: una fila por partido con la opinion del Tribunal sobre sus cuentas.`);
+  console.log('  formacion: opcional. El nombre con el que el informe fiscaliza a una formacion que hoy esta en el grupo de otro partido (Izquierda Unida en SUMAR, PSC en PSOE). En partido va el partido del grupo.');
+  console.log(`\n${rutaOpiniones}: una fila por partido, o por formacion, con la opinion del Tribunal sobre sus cuentas.`);
   console.log(`  opinion: ${OPINIONES.join(', ')}.`);
-  console.log('  salvedades: numero de salvedades de la opinion. limitacion_alcance: si o no.\n');
+  console.log('  salvedades: numero de salvedades de la opinion. limitacion_alcance: si o no.');
+  console.log('  formacion, nota y nota_url: opcionales, como en los reparos.\n');
   process.exit(creados ? 0 : 1);
 }
 
@@ -164,8 +168,10 @@ const opiniones: any[] = [];
     const modelo = col(f, 'modelo');
     const nota = col(f, 'nota').replace(/\s+/g, ' ');
     const notaUrl = col(f, 'nota_url');
+    const formacion = col(f, 'formacion').replace(/\s+/g, ' ');
 
     if (!p) { problemas.push(`${ruta} fila ${n}: "${col(f, 'partido')}" no es ningun partido`); return; }
+    if (formacion.length > LARGO_FORMACION) { problemas.push(`${ruta} fila ${n}: formacion de ${formacion.length} caracteres, el maximo es ${LARGO_FORMACION}`); return; }
     if (ej !== ejercicio) { problemas.push(`${ruta} fila ${n}: ejercicio ${col(f, 'ejercicio')} no es ${ejercicio}`); return; }
     if (!apartado) { problemas.push(`${ruta} fila ${n}: falta el apartado`); return; }
     if (apartado.length > LARGO_APARTADO) { problemas.push(`${ruta} fila ${n}: apartado de ${apartado.length} caracteres, el maximo es ${LARGO_APARTADO}`); return; }
@@ -199,7 +205,8 @@ const opiniones: any[] = [];
 
     filas.push({
       partido_id: p.id,
-      siglas: p.siglas ?? p.slug,
+      siglas: formacion || (p.siglas ?? p.slug),
+      formacion,
       apartado,
       materia,
       gravedad,
@@ -215,7 +222,7 @@ const opiniones: any[] = [];
 }
 
 if (existsSync(rutaOpiniones)) {
-  const { filas: crudo, col } = leerCSV(rutaOpiniones, CABECERA_OPINION);
+  const { filas: crudo, col } = leerCSV(rutaOpiniones, OBLIGATORIAS_OPINION);
   const vistos = new Set<string>();
   crudo.forEach((f, i) => {
     const n = i + 2;
@@ -226,6 +233,9 @@ if (existsSync(rutaOpiniones)) {
     const limitacion = col(f, 'limitacion_alcance').toLowerCase();
     const url = col(f, 'fuente_url');
     const pagina = col(f, 'pagina');
+    const formacion = col(f, 'formacion').replace(/\s+/g, ' ');
+    const nota = col(f, 'nota').replace(/\s+/g, ' ');
+    const notaUrl = col(f, 'nota_url');
 
     if (!p) { problemas.push(`${rutaOpiniones} fila ${n}: "${col(f, 'partido')}" no es ningun partido`); return; }
     if (ej !== ejercicio) { problemas.push(`${rutaOpiniones} fila ${n}: ejercicio ${col(f, 'ejercicio')} no es ${ejercicio}`); return; }
@@ -237,12 +247,24 @@ if (existsSync(rutaOpiniones)) {
     const urlMal = motivoUrlInvalida(url);
     if (urlMal) { problemas.push(`${rutaOpiniones} fila ${n}: fuente_url ${urlMal}`); return; }
     if (!paginaValida(pagina)) { problemas.push(`${rutaOpiniones} fila ${n}: pagina "${pagina}" no vale. Es obligatoria y va en numero entero`); return; }
-    if (vistos.has(p.id)) { problemas.push(`${rutaOpiniones} fila ${n}: ${p.slug} repetido`); return; }
-    vistos.add(p.id);
+    if (formacion.length > LARGO_FORMACION) { problemas.push(`${rutaOpiniones} fila ${n}: formacion de ${formacion.length} caracteres, el maximo es ${LARGO_FORMACION}`); return; }
+    if (nota && !notaUrl) { problemas.push(`${rutaOpiniones} fila ${n}: la nota no tiene nota_url; toda nota lleva su fuente`); return; }
+    if (notaUrl && !nota) { problemas.push(`${rutaOpiniones} fila ${n}: hay nota_url pero no nota`); return; }
+    if (nota.length > LARGO_NOTA) { problemas.push(`${rutaOpiniones} fila ${n}: nota de ${nota.length} caracteres, el maximo es ${LARGO_NOTA}`); return; }
+    if (notaUrl) {
+      const notaMal = motivoUrlInvalida(notaUrl);
+      if (notaMal) { problemas.push(`${rutaOpiniones} fila ${n}: nota_url ${notaMal}`); return; }
+    }
+    const llave = `${p.id}:${formacion.toLowerCase()}`;
+    if (vistos.has(llave)) { problemas.push(`${rutaOpiniones} fila ${n}: ${formacion || p.slug} repetido`); return; }
+    vistos.add(llave);
 
     opiniones.push({
       partido_id: p.id,
-      siglas: p.siglas ?? p.slug,
+      siglas: formacion || (p.siglas ?? p.slug),
+      formacion,
+      nota,
+      notaUrl,
       opinion,
       salvedades: Number(salvedades),
       limitacion_alcance: limitacion === 'si',
@@ -287,7 +309,9 @@ if (!existsSync(rutaOpiniones)) {
   if (sinOpinion.length) console.log(`\n  Aviso: sin opinion del Tribunal para ${sinOpinion.join(', ')}.`);
 }
 const conNota = filas.filter(f => f.nota).length;
-if (conNota) console.log(`\n  ${conNota} reparo(s) con nota sobre lo que paso despues del informe.`);
+if (conNota) console.log(`\n  ${conNota} reparo(s) con nota.`);
+const conFormacion = filas.filter(f => f.formacion).length;
+if (conFormacion) console.log(`  ${conFormacion} reparo(s) de formaciones que hoy estan en el grupo de otro partido.`);
 
 const urls = Array.from(new Set([...filas, ...opiniones].map(f => f.fuente_url)));
 const { data: docs, error: eDocs } = await db()
@@ -310,16 +334,16 @@ if (!publicar) {
   process.exit(0);
 }
 
-const { error: eColumnas } = await db().from('hallazgo_fiscalizacion').select('gravedad, apartado, leido_at, nota, nota_url').limit(1);
+const { error: eColumnas } = await db().from('hallazgo_fiscalizacion').select('gravedad, apartado, leido_at, nota, nota_url, formacion').limit(1);
 if (eColumnas) {
   console.log(`\nERROR: a hallazgo_fiscalizacion le faltan columnas nuevas (${eColumnas.message}).`);
   console.log('Corre antes el SQL de la migracion. No se ha tocado nada.\n');
   process.exit(1);
 }
 if (opiniones.length) {
-  const { error: eTabla } = await db().from('opinion_fiscalizacion').select('partido_id').limit(1);
+  const { error: eTabla } = await db().from('opinion_fiscalizacion').select('partido_id, formacion, nota, nota_url').limit(1);
   if (eTabla) {
-    console.log(`\nERROR: no existe la tabla opinion_fiscalizacion (${eTabla.message}).`);
+    console.log(`\nERROR: a opinion_fiscalizacion le faltan columnas o no existe (${eTabla.message}).`);
     console.log('Corre antes el SQL de la migracion. No se ha tocado nada.\n');
     process.exit(1);
   }
@@ -367,19 +391,28 @@ const aEscribir = filas.map(f => {
     fila.nota = f.nota;
     fila.nota_url = f.notaUrl;
   }
+  if (f.formacion) fila.formacion = f.formacion;
   return fila;
 });
 
-const opinionesAEscribir = opiniones.map(o => ({
-  partido_id: o.partido_id,
-  ejercicio,
-  opinion: o.opinion,
-  salvedades: o.salvedades,
-  limitacion_alcance: o.limitacion_alcance,
-  pagina: o.pagina,
-  documento_id: porUrl.get(o.fuente_url),
-  leido_at: leidoAt
-}));
+const opinionesAEscribir = opiniones.map(o => {
+  const fila: Record<string, unknown> = {
+    partido_id: o.partido_id,
+    ejercicio,
+    opinion: o.opinion,
+    salvedades: o.salvedades,
+    limitacion_alcance: o.limitacion_alcance,
+    pagina: o.pagina,
+    documento_id: porUrl.get(o.fuente_url),
+    leido_at: leidoAt
+  };
+  if (o.formacion) fila.formacion = o.formacion;
+  if (o.nota) {
+    fila.nota = o.nota;
+    fila.nota_url = o.notaUrl;
+  }
+  return fila;
+});
 
 const sinDocumento = [...aEscribir, ...opinionesAEscribir].filter(f => !f.documento_id).length;
 if (sinDocumento) {

@@ -360,10 +360,15 @@ function atribuir(nombre: string, indice: IndiceMandatos, fecha: string): Atribu
   return { nota: null };
 }
 
+export function organoDeVotacion(fecha: string, finLegislatura: string | null): string {
+  return finLegislatura && fecha > finLegislatura ? 'Diputación Permanente' : 'Pleno';
+}
+
 export async function procesarVotacion(
   enlace: EnlaceVotacion,
   legislaturaId: string,
-  indice: IndiceMandatos
+  indice: IndiceMandatos,
+  finLegislatura: string | null = null
 ): Promise<ResultadoProceso> {
   const base: ResultadoProceso = {
     url: enlace.urlJson,
@@ -411,7 +416,7 @@ export async function procesarVotacion(
         legislatura_id: legislaturaId,
         numero: String(json.informacion.sesion),
         fecha,
-        organo: 'Pleno',
+        organo: organoDeVotacion(fecha, finLegislatura),
         diario_url: null
       },
       { onConflict: 'legislatura_id,numero,fecha,organo' }
@@ -564,6 +569,14 @@ export async function ingestarFechas(
 
   const indice = await cargarIndiceMandatos(legislaturaId);
 
+  const { data: legislaturaFila, error: errLegislatura } = await db()
+    .from('legislaturas')
+    .select('fecha_fin')
+    .eq('id', legislaturaId)
+    .maybeSingle();
+  if (errLegislatura) throw new Error(`No se puede leer la legislatura: ${errLegislatura.message}`);
+  const finLegislatura: string | null = legislaturaFila?.fecha_fin ? String(legislaturaFila.fecha_fin).slice(0, 10) : null;
+
   let descubiertas = 0;
   let fechasConsultadas = 0;
   let fechasConError = 0;
@@ -602,7 +615,7 @@ export async function ingestarFechas(
         errores.push(`plazo agotado dentro de ${fecha}`);
         break;
       }
-      const r = await procesarVotacion(enlace, legislaturaId, indice);
+      const r = await procesarVotacion(enlace, legislaturaId, indice, finLegislatura);
       resultados.push(r);
       if (r.estado !== 'ok') errores.push(`${enlace.urlJson}: ${r.errores.join('; ')}`);
       await new Promise(res => setTimeout(res, pausaMs));
@@ -665,6 +678,6 @@ export async function ejecutarIngesta(
   const hoy = new Date();
   const desde = new Date(hoy);
   desde.setUTCDate(desde.getUTCDate() - diasAtras);
-  const fechas = rangoFechas(desde.toISOString().slice(0, 10), hoy.toISOString().slice(0, 10));
+  const fechas = rangoFechas(desde.toISOString().slice(0, 10), hoy.toISOString().slice(0, 10)).reverse();
   return ingestarFechas(fechas, legislaturaId, legislatura, opciones);
 }
