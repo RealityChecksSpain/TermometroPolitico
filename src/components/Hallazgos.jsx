@@ -29,7 +29,7 @@ display:inline-flex;align-items:center;justify-content:center}
 .hallazgoEnlaces{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;max-width:100%}
 .hallazgoEnlace{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid #A5603F;
 color:#F3D9A4;font-size:11px;line-height:1.3;padding:5px 9px;border-radius:2px;cursor:pointer;max-width:100%;
-text-align:left;font-family:inherit}
+text-align:left;font-family:inherit;text-decoration:none}
 .hallazgoEnlaceTitulo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hallazgoEnlaceFecha{flex-shrink:0;white-space:nowrap;color:#E8C56A}
 .hallazgoEnlace:hover{background:#7C3A24;border-color:#E8C56A}
@@ -50,20 +50,39 @@ function baseDe(h) {
   return `Calculado sobre ${Number(n).toLocaleString('es')} ${que}.`;
 }
 
+function urlSegura(valor) {
+  try {
+    const u = new URL(String(valor));
+    return u.protocol === 'https:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function Enlaces({ h, onLey }) {
-  const lista = Array.isArray(h?.enlaces) ? h.enlaces.filter(e => e?.votacion_principal) : [];
-  if (!lista.length || !onLey) return null;
+  const lista = (Array.isArray(h?.enlaces) ? h.enlaces : [])
+    .map(e => ({ ...e, url: e?.url ? urlSegura(e.url) : null }))
+    .filter(e => e.url || (e.votacion_principal && onLey));
+  if (!lista.length) return null;
   return (
     <div className="hallazgoEnlaces">
-      {lista.map(e => (
-        <button key={e.votacion_principal} className="em hallazgoEnlace"
+      {lista.map((e, n) => (e.url ? (
+        <a key={`url-${n}`} className="em hallazgoEnlace" href={e.url}
+          target="_blank" rel="noopener noreferrer"
+          title={e.titulo}
+          aria-label={`Abrir la fuente en otra pestaña: ${e.titulo}${e.fecha ? `, ${e.fecha}` : ''}`}>
+          <span className="hallazgoEnlaceTitulo">{e.titulo}</span>
+          <span className="hallazgoEnlaceFecha">{e.fecha ? `${e.fecha} ↗` : '↗'}</span>
+        </a>
+      ) : (
+        <button key={`votacion-${e.votacion_principal}`} className="em hallazgoEnlace"
           title={e.titulo}
           aria-label={`Abrir la votación: ${e.titulo}${e.fecha ? `, ${e.fecha}` : ''}`}
           onClick={() => onLey({ votacion_principal: e.votacion_principal, clave_norma: e.clave_norma })}>
           <span className="hallazgoEnlaceTitulo">{e.titulo}</span>
           <span className="hallazgoEnlaceFecha">{e.fecha ? `${e.fecha} →` : '→'}</span>
         </button>
-      ))}
+      )))}
     </div>
   );
 }

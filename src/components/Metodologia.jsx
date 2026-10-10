@@ -601,10 +601,11 @@ export default function Metodologia({ cobertura }) {
 
       <Seccion titulo="Qué no mide el mapa">
         <p style={{ margin: 0 }}>
-          Solo la actividad legislativa. Las proposiciones no de ley y las mociones consecuencia de
-          interpelación, que son 897 de las 2.055 votaciones del pleno, no se pueden usar: el
-          Congreso no las publica en su portal de datos abiertos como iniciativas, así que no hay
-          texto que codificar. El mapa describe cómo vota cada partido las leyes, no las
+          Solo la actividad legislativa. Las proposiciones no de ley, las mociones consecuencia de
+          interpelación y las demás votaciones que el Congreso no publica como iniciativa en su
+          portal de datos abiertos solo tienen título. Se codifican por ese título para otras
+          partes de la web, pero no entran en el mapa: un título no basta para saber hacia dónde
+          mueve cada pregunta. El mapa describe cómo vota cada partido las leyes, no las
           declaraciones de intenciones.
         </p>
         <p style={{ margin: '10px 0 0' }}>
@@ -625,9 +626,18 @@ export default function Metodologia({ cobertura }) {
           votación posible que lo confirme o lo desmienta.
         </p>
         <p style={{ margin: '10px 0 0' }}>
-          El porcentaje de cumplimiento se calcula <strong>solo sobre las promesas que llegaron a
-          votación</strong>. Las que nunca se sometieron a votación se cuentan aparte, porque
-          mezclarlas produciría un número engañoso.
+          El porcentaje de cada partido se calcula <strong>solo sobre las promesas que llegaron a
+          votación</strong>: es la parte de ellas en la que votó a favor, saliera o no adelante.
+          Las que nunca se sometieron a votación se cuentan aparte, porque mezclarlas produciría
+          un número engañoso.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          «Cumplida» es más estricto: el partido votó a favor y la iniciativa salió adelante en la
+          votación que la aprueba, como la final de una ley, la convalidación de un decreto o la
+          autorización de un tratado. Si lo que salió fue una votación que no aprueba ninguna
+          norma, como la toma en consideración de una ley, que solo la admite a trámite, una
+          proposición no de ley, una moción o la creación de una subcomisión, cuenta como «la apoyó
+          en una votación no decisiva».
         </p>
       </Seccion>
 

@@ -42,6 +42,26 @@ function Sello({ estilo, children }) {
   );
 }
 
+function Nota({ texto, url }) {
+  if (!texto) return null;
+  return (
+    <div style={{
+      fontSize: 10.5, color: C.media, lineHeight: 1.5, marginTop: 5,
+      paddingLeft: 8, borderLeft: `2px solid ${C.linea}`
+    }}>
+      {texto}
+      {url && (
+        <>
+          {' '}
+          <a href={url} target="_blank" rel="noopener noreferrer" className="em" style={{ color: C.media, whiteSpace: 'nowrap' }}>
+            fuente →
+          </a>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Caja({ ejercicio, children }) {
   return (
     <div style={{ border: `1px solid ${C.linea}`, borderRadius: 3, background: C.fondo, padding: 12, marginBottom: 12 }}>
@@ -56,9 +76,65 @@ function Caja({ ejercicio, children }) {
   );
 }
 
-export default function Fiscalizacion({ partido, siglas, datos }) {
+function Bloque({ f, titulo }) {
   const [todos, setTodos] = useState(false);
+  const total = f.reparos.length;
+  const lista = todos ? f.reparos : f.reparos.slice(0, VISIBLES);
+  const o = f.opinion;
 
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {titulo && (
+        <div className="ed" style={{ fontSize: 13.5, fontWeight: 700, color: C.tinta, margin: '2px 0 6px' }}>{titulo}</div>
+      )}
+
+      {o && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <Sello estilo={OPINION[o.opinion]}>{OPINION[o.opinion].texto}</Sello>
+            {o.opinion === 'con_salvedades' && <Explica termino="salvedad" titulo="Salvedad" />}
+            {o.pagina != null && (
+              <span className="em" style={{ fontSize: 9.5, color: C.tenue, marginLeft: 'auto' }}>p. {o.pagina}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.tinta, lineHeight: 1.5 }}>{fraseOpinion(o)}</div>
+          <Nota texto={o.nota} url={o.notaUrl} />
+        </div>
+      )}
+
+      {total > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: C.media, lineHeight: 1.5, marginBottom: 6 }}>
+          <span>{fraseCuenta(f.cuenta, total)}</span>
+          {f.cuenta.infraccion > 0 && <Explica termino="posibleInfraccion" titulo="Posible infracción" />}
+        </div>
+      )}
+
+      {lista.map(r => (
+        <div key={r.clave} style={{ borderTop: `1px solid ${C.linea}`, padding: '8px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+            <Sello estilo={GRAVEDAD[r.gravedad]}>{GRAVEDAD[r.gravedad].texto}</Sello>
+            {r.pagina != null && (
+              <span className="em" style={{ fontSize: 9.5, color: C.tenue, marginLeft: 'auto' }}>p. {r.pagina}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.tinta, lineHeight: 1.5 }}>{r.resumen}</div>
+          <Nota texto={r.nota} url={r.notaUrl} />
+        </div>
+      ))}
+
+      {total > VISIBLES && (
+        <button onClick={() => setTodos(!todos)} className="em" style={{
+          marginTop: 4, padding: '4px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 2,
+          background: 'transparent', color: C.media, border: `1px solid ${C.linea}`
+        }}>
+          {todos ? 'ver menos' : `ver los ${total}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function Fiscalizacion({ partido, siglas, datos }) {
   if (datos === undefined) return null;
 
   if (datos === null) {
@@ -74,90 +150,50 @@ export default function Fiscalizacion({ partido, siglas, datos }) {
   if (!datos.ejercicio) return null;
 
   const d = datos.porPartido?.[partido];
+  const nombre = siglasPartido(siglas);
 
-  if (!d) {
+  if (!d || !d.formaciones.length) {
     return (
       <Caja ejercicio={datos.ejercicio}>
         <div style={{ fontSize: 11.5, color: C.media, lineHeight: 1.5 }}>
-          El informe de fiscalización de {datos.ejercicio} no incluye a {siglasPartido(siglas)}.
+          El informe de fiscalización de {datos.ejercicio} no incluye a {nombre}.
         </div>
       </Caja>
     );
   }
 
-  const total = d.reparos.length;
-  const lista = todos ? d.reparos : d.reparos.slice(0, VISIBLES);
-  const o = d.opinion;
+  const propia = d.formaciones.find(f => f.nombre === null);
+  const otras = d.formaciones.filter(f => f.nombre !== null);
+  const varias = d.formaciones.length > 1;
+  const extraido = d.formaciones.some(f => f.extraido);
 
   return (
     <Caja ejercicio={datos.ejercicio}>
-      {o && (
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <Sello estilo={OPINION[o.opinion]}>{OPINION[o.opinion].texto}</Sello>
-            {o.opinion === 'con_salvedades' && <Explica termino="salvedad" titulo="Salvedad" />}
-            {o.pagina != null && (
-              <span className="em" style={{ fontSize: 9.5, color: C.tenue, marginLeft: 'auto' }}>p. {o.pagina}</span>
-            )}
-          </div>
-          <div style={{ fontSize: 11.5, color: C.tinta, lineHeight: 1.5 }}>{fraseOpinion(o)}</div>
+      {!propia && (
+        <div style={{ fontSize: 11.5, color: C.media, lineHeight: 1.5, marginBottom: 10 }}>
+          {nombre} no se fiscaliza con su nombre en las cuentas de {datos.ejercicio}. El informe revisa
+          por separado a las formaciones de su grupo:
         </div>
       )}
 
-      {total > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: C.media, lineHeight: 1.5, marginBottom: 6 }}>
-          <span>{fraseCuenta(d.cuenta, total)}</span>
-          {d.cuenta.infraccion > 0 && <Explica termino="posibleInfraccion" titulo="Posible infracción" />}
-        </div>
-      )}
+      {propia && <Bloque f={propia} titulo={varias ? nombre : null} />}
 
-      {lista.map(r => (
-        <div key={r.clave} style={{ borderTop: `1px solid ${C.linea}`, padding: '8px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <Sello estilo={GRAVEDAD[r.gravedad]}>{GRAVEDAD[r.gravedad].texto}</Sello>
-            {r.pagina != null && (
-              <span className="em" style={{ fontSize: 9.5, color: C.tenue, marginLeft: 'auto' }}>p. {r.pagina}</span>
-            )}
-          </div>
-          <div style={{ fontSize: 11.5, color: C.tinta, lineHeight: 1.5 }}>{r.resumen}</div>
-          {r.nota && (
-            <div style={{
-              fontSize: 10.5, color: C.media, lineHeight: 1.5, marginTop: 5,
-              paddingLeft: 8, borderLeft: `2px solid ${C.linea}`
-            }}>
-              {r.nota}
-              {r.notaUrl && (
-                <>
-                  {' '}
-                  <a href={r.notaUrl} target="_blank" rel="noreferrer" className="em" style={{ color: C.media, whiteSpace: 'nowrap' }}>
-                    fuente →
-                  </a>
-                </>
-              )}
-            </div>
-          )}
+      {otras.map(f => (
+        <div key={f.nombre} style={{ borderTop: varias ? `2px solid ${C.linea}` : 'none', paddingTop: varias ? 10 : 0, marginTop: varias ? 6 : 0 }}>
+          <Bloque f={f} titulo={f.nombre} />
         </div>
       ))}
 
-      {total > VISIBLES && (
-        <button onClick={() => setTodos(!todos)} className="em" style={{
-          marginTop: 4, padding: '4px 8px', fontSize: 10, cursor: 'pointer', borderRadius: 2,
-          background: 'transparent', color: C.media, border: `1px solid ${C.linea}`
-        }}>
-          {todos ? 'ver menos' : `ver los ${total}`}
-        </button>
-      )}
-
       <div style={{ fontSize: 9.5, color: C.tenue, marginTop: 9, lineHeight: 1.5 }}>
         Del informe de fiscalización del Tribunal de Cuentas, con la página de cada dato.
-        {d.extraido
+        {extraido
           ? ' Los ha sacado del informe un modelo de lenguaje y cada cifra está comprobada contra su página.'
           : ' Transcritos a mano del informe.'}
         {' '}Un reparo no es una condena.
       </div>
 
       {d.fuente && (
-        <a href={d.fuente.url} target="_blank" rel="noreferrer" className="em"
+        <a href={d.fuente.url} target="_blank" rel="noopener noreferrer" className="em"
           style={{ fontSize: 10.5, color: C.media, display: 'block', marginTop: 7 }}>
           {d.fuente.titulo ?? 'Informe original'} →
         </a>

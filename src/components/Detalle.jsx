@@ -13,6 +13,7 @@ import {
 import { implicacionDe } from '../lib/implicaciones.js';
 import { VOTO } from '../lib/paleta.js';
 import { mayoriaRequerida, umbralDe, nombreMayoria, faltaronPara } from '../lib/mayorias.js';
+import { esDiputacionPermanente } from '../lib/legislatura.js';
 
 const C = {
   superficie: '#FFFFFF', tinta: '#14161A', media: '#4A5057', tenue: '#7C8288',
@@ -192,7 +193,7 @@ export function DetalleLey({ votacion, onVolver }) {
               {votacion.materia_nombre}
             </span>
           )}
-          <span>{votacion.fecha} · Sesión {votacion.sesion}</span>
+          <span>{votacion.fecha} · {esDiputacionPermanente(votacion.fecha) ? 'Diputación Permanente · ' : ''}Sesión {votacion.sesion}</span>
         </div>
         {frase && (
           <div className="ed" style={{

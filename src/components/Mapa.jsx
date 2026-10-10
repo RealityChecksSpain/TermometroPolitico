@@ -14,6 +14,8 @@ import { puntoSvg, indiceMasCercano } from '../lib/svgPuntero.js';
 import { useTactil, useTelefono } from '../lib/pantalla.js';
 import Explica from './Explica.jsx';
 
+const POCO_MARGEN = new Set(['sin poder discriminante', 'bloque parlamentario']);
+
 const esTactil = typeof window !== 'undefined' &&
   (window.matchMedia?.('(hover: none)').matches || 'ontouchstart' in window);
 
@@ -1281,14 +1283,25 @@ export default function Mapa({ onDiputados }) {
       {fuente === 'programa' && sesgo && sesgo.partidos > 0 && (
         <div style={{ marginTop: 14, padding: 16, background: C.pizarra, borderRadius: 3 }}>
           <div className="ed" style={{ color: '#F2F3F0', fontSize: 16, fontWeight: 700 }}>
-            {sesgo.prometen_expandir} de {sesgo.partidos} programas solo prometen gastar más
+            {Number(sesgo.prometen_expandir) > 0
+              ? `${sesgo.prometen_expandir} de ${sesgo.partidos} programas solo prometen gastar más`
+              : `${sesgo.mas_gasto_que_recorte ?? '—'} de ${sesgo.partidos} programas prometen más gasto que recortes`}
           </div>
           <div style={{ color: '#A8AEB4', fontSize: 13, lineHeight: 1.6, marginTop: 8 }}>
-            Contando en bruto, sin comparar unos con otros, casi todos los partidos emiten muchas más
-            señales de aumentar gasto, ayudas y servicios que de reducirlos:
-            {' '}<strong style={{ color: '#F2F3F0' }}>{Number(sesgo.señales_expansivas).toLocaleString('es')}</strong> frente a
-            {' '}<strong style={{ color: '#F2F3F0' }}>{Number(sesgo.señales_restrictivas).toLocaleString('es')}</strong>.
-            Ningún programa dice que va a recortar, ni siquiera los que después lo hacen.
+            Contando en bruto, sin comparar unos con otros, los programas prometen subir el gasto
+            público{' '}<strong style={{ color: '#F2F3F0' }}>{Number(sesgo.señales_expansivas).toLocaleString('es')}</strong> veces
+            y bajarlo{' '}<strong style={{ color: '#F2F3F0' }}>{Number(sesgo.señales_restrictivas).toLocaleString('es')}</strong>.
+            {sesgo.mas_gasto_que_recorte != null && (
+              Number(sesgo.mas_gasto_que_recorte) === Number(sesgo.partidos)
+                ? <> En todos los programas hay más promesas de gastar que de recortar.</>
+                : <> En {sesgo.mas_gasto_que_recorte} de los {sesgo.partidos} programas hay más promesas de gastar que de recortar.</>
+            )}
+            {sesgo.sin_recortes && (
+              <> {String(sesgo.sin_recortes).replace(/, ([^,]+)$/, ' y $1')} no prometen ningún recorte.</>
+            )}
+            {sesgo.mas_recortes && Number(sesgo.mas_recortes_reduce) > 0 && (
+              <> El que más recortes promete es {sesgo.mas_recortes}: {sesgo.mas_recortes_reduce} promesas de bajar el gasto frente a {sesgo.mas_recortes_aumenta} de subirlo.</>
+            )}
           </div>
           <div style={{ color: '#8E959C', fontSize: 12, lineHeight: 1.55, marginTop: 10 }}>
             Por eso el mapa muestra posiciones relativas: en términos absolutos todos caerían a la
@@ -1508,21 +1521,21 @@ export default function Mapa({ onDiputados }) {
           Ningún eje se invierte ni se reescala a mano.
         </div>
         {fuente === 'votos' && auditoria && (
-          (auditoria.etiqueta_permitida !== 'izquierda-derecha' ||
-           auditoria.etiqueta_permitida_social !== 'conservador-progresista') && (
+          (POCO_MARGEN.has(auditoria.etiqueta_permitida) ||
+           POCO_MARGEN.has(auditoria.etiqueta_permitida_social)) && (
           <div style={{
             marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.linea}`,
             fontSize: 13, color: C.media, lineHeight: 1.6
           }}>
             <strong>Hasta dónde llega la precisión.</strong>{' '}
-            {auditoria.etiqueta_permitida !== 'izquierda-derecha' && (
+            {POCO_MARGEN.has(auditoria.etiqueta_permitida) && (
               <>El eje económico ordena a los partidos, pero con poco margen: solo{' '}
                 {auditoria.economico_significativos ?? 0}
                 {auditoria.partidos_economico != null && <> de {auditoria.partidos_economico}</>} tienen
                 posición distinguible del centro, porque el Congreso apenas vota normas que recorten
                 gasto o desregulen. El orden es informativo; las distancias exactas, no.{' '}</>
             )}
-            {auditoria.etiqueta_permitida_social !== 'conservador-progresista' && (
+            {POCO_MARGEN.has(auditoria.etiqueta_permitida_social) && (
               <>En el eje social la base es de {auditoria.n_social ?? '—'} normas con división real.</>
             )}
           </div>

@@ -4,8 +4,9 @@ import Hemiciclo, { LeyendaVoto } from './components/Hemiciclo.jsx';
 import Marca from './components/Marca.jsx';
 import { desgloseBienes } from './lib/inmuebles.js';
 import Explica from './components/Explica.jsx';
-import Detalle, { DetalleLey } from './components/Detalle.jsx';
-import FichaDiputado from './components/FichaDiputado.jsx';
+const Detalle = lazy(() => import('./components/Detalle.jsx'));
+const DetalleLey = lazy(() => import('./components/Detalle.jsx').then(m => ({ default: m.DetalleLey })));
+const FichaDiputado = lazy(() => import('./components/FichaDiputado.jsx'));
 const Mapa = lazy(() => import('./components/Mapa.jsx'));
 const Metodologia = lazy(() => import('./components/Metodologia.jsx'));
 const Descargas = lazy(() => import('./components/Descargas.jsx'));
@@ -279,6 +280,25 @@ body{padding-bottom:28px}
 
 const DIFERIDAS = ['siguiendo', 'partidos', 'ejes', 'metodo', 'datos'];
 
+function EstadoCarga({ listo, fallo, vacio, cargando, onReintentar }) {
+  if (fallo) {
+    return (
+      <div style={{ padding: 22, textAlign: 'center', fontSize: 12.5, color: C.media, lineHeight: 1.5 }}>
+        No se han podido cargar ahora mismo.{' '}
+        <button onClick={onReintentar} className="em" style={{
+          background: 'none', border: `1px solid ${C.linea}`, borderRadius: 2, cursor: 'pointer',
+          color: C.tinta, fontSize: 11.5, padding: '6px 10px', marginLeft: 4
+        }}>Reintentar</button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: 26, textAlign: 'center', fontSize: 12.5, color: C.tenue }}>
+      {listo ? vacio : cargando}
+    </div>
+  );
+}
+
 function Cargando() {
   return (
     <div style={{ padding: 40, textAlign: 'center', color: C.tenue, fontSize: 13 }}>Cargando…</div>
@@ -430,8 +450,10 @@ export default function App() {
   const [cobertura, setCobertura] = useState(null);
   const [facetas, setFacetas] = useState({ materias: [], colectivos: [] });
   const [ccaa, setCcaa] = useState([]);
-  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const [listo, setListo] = useState({});
+  const [fallos, setFallos] = useState({});
+  const [intento, setIntento] = useState(0);
 
   const [sel, setSel] = useState(null);
   const [votacionSel, setVotacionSel] = useState(null);
@@ -490,13 +512,44 @@ export default function App() {
   useEffect(() => {
     if (faltaConfig) {
       setError('Configuracion en .env:\n\n' + problemasConfig.map(p => '  - ' + p).join('\n'));
-      setCargando(false); return;
+      return;
     }
-    Promise.all([traerDiputados(), traerVotaciones(200), traerEjes(), traerCobertura(), traerFacetas(), traerCcaa(), traerCoherencia(), traerDestacadas(4)])
-      .then(([d, v, e, c, f, cc, co, de]) => { setDiputados(d); setVotaciones(v); setEjes(e); setCobertura(c); setFacetas(f); setCcaa(cc); setCoherencia(co); setDestacadas(de); })
-      .catch(e => setError(String(e.message ?? e)))
-      .finally(() => setCargando(false));
-  }, []);
+    let vivo = true;
+    const cargar = (clave, leer, poner) => {
+      Promise.resolve()
+        .then(leer)
+        .then(valor => {
+          if (!vivo) return;
+          poner(valor);
+          setFallos(f => {
+            if (!(clave in f)) return f;
+            const resto = { ...f };
+            delete resto[clave];
+            return resto;
+          });
+        })
+        .catch(e => {
+          if (!vivo) return;
+          console.error(`No se ha podido cargar ${clave}: ${e?.message ?? e}`);
+          setFallos(f => ({ ...f, [clave]: String(e?.message ?? e) }));
+        })
+        .finally(() => { if (vivo) setListo(l => ({ ...l, [clave]: true })); });
+    };
+    cargar('diputados', traerDiputados, setDiputados);
+    cargar('votaciones', () => traerVotaciones(200), setVotaciones);
+    cargar('ejes', traerEjes, setEjes);
+    cargar('cobertura', traerCobertura, setCobertura);
+    cargar('facetas', traerFacetas, setFacetas);
+    cargar('ccaa', traerCcaa, setCcaa);
+    cargar('coherencia', traerCoherencia, setCoherencia);
+    cargar('destacadas', () => traerDestacadas(4), setDestacadas);
+    return () => { vivo = false; };
+  }, [intento]);
+
+  const reintentar = clave => {
+    setListo(l => ({ ...l, [clave]: false }));
+    setIntento(i => i + 1);
+  };
 
   useEffect(() => {
     const leer = () => { try { setSiguiendo(totalSeguimientos()); } catch { setSiguiendo(0); } };
@@ -597,7 +650,6 @@ export default function App() {
     } finally { setCargandoLista(false); }
   }
 
-  if (cargando) return <><style>{estilos}</style><div className="e" style={{ padding: 60, textAlign: 'center', color: C.tenue }}>Cargando…</div></>;
   if (error) return <><style>{estilos}</style><div className="e app" style={{ paddingTop: 30 }}>
     <div className="ed" style={{ fontSize: 22, fontWeight: 800 }}>No se pudo cargar</div>
     <pre className="em" style={{ fontSize: 12, background: '#FBE9EC', padding: 12, borderRadius: 3, whiteSpace: 'pre-wrap', marginTop: 12 }}>{error}</pre>
@@ -653,7 +705,7 @@ export default function App() {
               <div className="hero">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div className="em" style={{ fontSize: 10.5, color: '#A0A6AC', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                {enHemiciclo.length} escaños{fCcaa ? ` · ${ccaa.find(c => c.slug === fCcaa)?.nombre}` : ''}
+                {diputados.length ? `${enHemiciclo.length} escaños` : (fallos.diputados ? 'Escaños sin cargar' : 'Cargando escaños…')}{fCcaa ? ` · ${ccaa.find(c => c.slug === fCcaa)?.nombre}` : ''}
                 <Explica termino="hemiciclo" titulo="El hemiciclo" tono="claro" />
               </div>
               {votacionSel && votos && <LeyendaVoto totales={{
@@ -794,9 +846,9 @@ export default function App() {
 
               <div className="tarjeta" style={{ opacity: cargandoLista ? .5 : 1 }}>
                 {votaciones.length === 0 && (
-                  <div style={{ padding: 26, textAlign: 'center', fontSize: 12.5, color: C.tenue }}>
-                    Ninguna votación con esos filtros.
-                  </div>
+                  <EstadoCarga listo={listo.votaciones} fallo={fallos.votaciones}
+                    vacio="Ninguna votación con esos filtros." cargando="Cargando las votaciones…"
+                    onReintentar={() => reintentar('votaciones')} />
                 )}
                 {votaciones.map((v, i) => {
                   const titular = titularDeNorma(v, 96);
@@ -864,14 +916,14 @@ export default function App() {
           )}
 
           {seccion === 'leyes' && votacionSel && (
-            <>
+            <Suspense fallback={<Cargando />}>
               <DetalleLey votacion={votacionSel} onVolver={() => setVotacionSel(null)} />
               <Detalle votacion={votacionSel} diputados={diputados} votos={votos} onDiputado={setSel}
                 onNorma={async n => {
                   const v = (await traerVotaciones(1, { id: n.votacion_principal }))[0];
                   if (v) setVotacionSel({ ...v, clave_norma: n.clave_norma, votaciones_norma: 1 });
                 }} />
-            </>
+            </Suspense>
           )}
 
           {seccion === 'diputados' && (
@@ -965,9 +1017,15 @@ export default function App() {
                 </div>
               )}
 
-              <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 8 }}>
-                {listaDip.length} diputados
-              </div>
+              {diputados.length === 0 ? (
+                <EstadoCarga listo={listo.diputados} fallo={fallos.diputados}
+                  vacio="No hay diputados cargados." cargando="Cargando los diputados…"
+                  onReintentar={() => reintentar('diputados')} />
+              ) : (
+                <div className="em" style={{ fontSize: 11, color: C.tenue, marginBottom: 8 }}>
+                  {listaDip.length} diputados
+                </div>
+              )}
               <div className="listaFilete rejillaDip">
                 {listaDip.slice(0, 200).map((d, i) => {
                   const cfg = ORDENES.find(o => o[0] === orden) ?? ORDENES[0];
@@ -1101,11 +1159,15 @@ export default function App() {
         </div>
       </div>
 
-      <FichaDiputado d={sel} onCerrar={() => setSel(null)}
-        onVotacion={async id => {
-          const v = votaciones.find(x => x.id === id) ?? (await traerVotaciones(1, { id }))[0];
-          if (v) { setVotacionSel(v); setSel(null); setSeccion('leyes'); }
-        }} />
+      {sel && (
+        <Suspense fallback={null}>
+          <FichaDiputado d={sel} onCerrar={() => setSel(null)}
+            onVotacion={async id => {
+              const v = votaciones.find(x => x.id === id) ?? (await traerVotaciones(1, { id }))[0];
+              if (v) { setVotacionSel(v); setSel(null); setSeccion('leyes'); }
+            }} />
+        </Suspense>
+      )}
     </>
   );
 }

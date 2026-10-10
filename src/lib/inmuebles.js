@@ -127,6 +127,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
   let viviendasPropias = 0;
   let viviendasEquivalentes = 0;
   let equivalentes = 0;
+  let sinPorcentaje = 0;
   const cats = { vivienda: 0, suelo: 0, anejo: 0, productivo: 0, otro: 0 };
   for (const it of items) {
     if (it.sociedad === true) sociedad += it.qty;
@@ -135,7 +136,8 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       viviendasPropias += it.qty;
       if (!it.sinPorcentaje) viviendasEquivalentes += it.qty * ((it.porcentaje ?? 100) / 100);
     }
-    equivalentes += it.qty * ((it.porcentaje ?? 100) / 100);
+    if (it.sinPorcentaje) sinPorcentaje += it.qty;
+    else equivalentes += it.qty * ((it.porcentaje ?? 100) / 100);
     cats[it.categoria ?? 'otro'] = (cats[it.categoria ?? 'otro'] ?? 0) + it.qty;
   }
   const total = propios + sociedad;
@@ -148,6 +150,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       n_inmuebles_propios: desgloseFiable ? propios : null,
       n_inmuebles_sociedad: desgloseFiable ? sociedad : null,
       n_inmuebles_equivalentes: equivalentes,
+      n_inmuebles_sin_porcentaje: sinPorcentaje,
       n_viviendas: cats.vivienda,
       n_viviendas_propias: desgloseFiable ? viviendasPropias : null,
       n_viviendas_equivalentes: desgloseFiable ? viviendasEquivalentes : null,
@@ -171,6 +174,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
       n_inmuebles_propios: null,
       n_inmuebles_sociedad: null,
       n_inmuebles_equivalentes: null,
+      n_inmuebles_sin_porcentaje: null,
       n_viviendas: null,
       n_viviendas_propias: null,
       n_viviendas_equivalentes: null,
@@ -185,6 +189,7 @@ export function contarInmuebles(detalle, urbanos = null, rusticos = null, detall
     n_inmuebles_propios: null,
     n_inmuebles_sociedad: null,
     n_inmuebles_equivalentes: null,
+    n_inmuebles_sin_porcentaje: null,
     n_viviendas: null,
     n_viviendas_propias: null,
     n_viviendas_equivalentes: null,

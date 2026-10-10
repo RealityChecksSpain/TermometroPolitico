@@ -521,7 +521,7 @@ export default function Portada({
           initial={reducido ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: reducido ? 0 : 1.55, duration: 0.45 }}>
-          <p className="em pvEncabezadoTitulo">Lo último votado en el pleno<Explica termino="ultimasLeyes" titulo="Lo último votado" /></p>
+          <p className="em pvEncabezadoTitulo">Lo último votado en el Congreso<Explica termino="ultimasLeyes" titulo="Lo último votado" /></p>
           <p className="pvEncabezadoPie">
             Pasa por encima para ver el texto oficial y a quién afecta.
           </p>
@@ -544,7 +544,7 @@ export default function Portada({
             padding: '18px 16px', fontSize: 13.5, lineHeight: 1.55, color: '#5C5442'
           }}>
             {estadoUltimas === 'cargando'
-              ? 'Cargando las últimas votaciones del pleno…'
+              ? 'Cargando las últimas votaciones del Congreso…'
               : estadoUltimas === 'error'
               ? 'Ahora mismo no se pueden leer las últimas votaciones. No enseñamos nada antes que enseñar algo que no sea el registro oficial.'
               : 'Todavía no hay votaciones cargadas en la base.'}

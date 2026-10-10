@@ -13,6 +13,7 @@ export interface ConteoInmuebles {
   n_inmuebles_propios: number | null;
   n_inmuebles_sociedad: number | null;
   n_inmuebles_equivalentes: number | null;
+  n_inmuebles_sin_porcentaje: number | null;
   n_viviendas: number | null;
   n_viviendas_propias: number | null;
   n_viviendas_equivalentes: number | null;

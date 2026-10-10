@@ -3,6 +3,7 @@ import Feed from './Feed.jsx';
 import Contraste from './Contraste.jsx';
 import Hallazgos from './Hallazgos.jsx';
 import Portada from './Portada.jsx';
+import AvisoCortes from './AvisoCortes.jsx';
 import { detectarPerfil, detectarPerfilAmpliado, EJEMPLOS } from '../lib/perfil.js';
 import { nombreColectivo } from '../lib/etiquetas.js';
 import { implicacionDe } from '../lib/implicaciones.js';
@@ -156,6 +157,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
 
   return (
     <div>
+      <AvisoCortes />
       <Portada onIr={onIr} onLey={onVotacion} ultimas={ultimas} estadoUltimas={estadoUltimas} colectivos={colectivos}
         escanos={cobertura?.escanos ?? 350} leyes={cobertura?.normas}
         valor={perfil} onValor={cambiarPerfil} onEnviar={buscar}
@@ -269,7 +271,7 @@ export default function Inicio({ cobertura, colectivos, facetas, onVotacion, onI
             }}>quitar filtro</button>
           </div>
         )}
-        {!etiqueta && <div className="rot" style={{ marginBottom: 12 }}>Todo lo que ha votado el Pleno</div>}
+        {!etiqueta && <div className="rot" style={{ marginBottom: 12 }}>Todo lo que ha votado el Congreso</div>}
         <Feed filtros={filtro ?? {}} onAbrir={onVotacion} />
       </div>
 

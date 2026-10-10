@@ -304,7 +304,7 @@ export default function FichaDiputado({ d, onCerrar, onVotacion }) {
                   <div style={{ fontSize: 10, color: C.tenue }}>
                     {desgloseBienes(d).map(x => x.texto).join(' · ') || 'unidades declaradas'}
                     {d.n_inmuebles_equivalentes != null && Number(d.n_inmuebles_equivalentes) < Number(d.n_casas ?? d.n_inmuebles) * 0.9 && (
-                      <> · equivalen a {Number(d.n_inmuebles_equivalentes).toLocaleString('es-ES', { maximumFractionDigits: 1 })} en propiedad plena
+                      <> · equivalen {Number(d.n_inmuebles_sin_porcentaje) > 0 ? 'al menos ' : ''}a {Number(d.n_inmuebles_equivalentes).toLocaleString('es-ES', { maximumFractionDigits: 1 })} en propiedad plena
                         <Explica termino="inmueblesEquivalentes" titulo="Inmuebles equivalentes" /></>
                     )}
                   </div>

@@ -19,14 +19,29 @@ function numero(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-function nuevo() {
+function texto(v) {
+  const t = String(v ?? '').trim();
+  return t || null;
+}
+
+function nuevaFormacion(nombre) {
   return {
+    nombre,
     reparos: [],
     opinion: null,
-    fuente: null,
     extraido: false,
     cuenta: { infraccion: 0, incumplimiento: 0, contable: 0 }
   };
+}
+
+function nuevoPartido() {
+  return { formaciones: new Map(), fuente: null };
+}
+
+function formacionDe(p, nombre) {
+  const clave = nombre ?? '';
+  if (!p.formaciones.has(clave)) p.formaciones.set(clave, nuevaFormacion(nombre));
+  return p.formaciones.get(clave);
 }
 
 export function resumirFiscalizacion(reparos, opiniones) {
@@ -34,44 +49,58 @@ export function resumirFiscalizacion(reparos, opiniones) {
   const ejercicio = ejercicios.length ? Math.max(...ejercicios) : null;
   if (!ejercicio) return { ejercicio: null, porPartido: {} };
 
-  const porPartido = {};
+  const partidos = {};
 
   for (const r of reparos) {
-    if (!r.partido || Number(r.ejercicio) !== ejercicio || !String(r.resumen ?? '').trim()) continue;
-    const p = (porPartido[r.partido] ??= nuevo());
+    if (!r.partido || Number(r.ejercicio) !== ejercicio || !texto(r.resumen)) continue;
+    const p = (partidos[r.partido] ??= nuevoPartido());
+    const f = formacionDe(p, texto(r.formacion));
     const gravedad = GRAVEDAD[r.gravedad] ? r.gravedad : 'contable';
-    p.reparos.push({
-      clave: r.apartado ?? `${r.pagina}-${p.reparos.length}`,
+    f.reparos.push({
+      clave: r.apartado ?? `${r.pagina}-${f.reparos.length}`,
       gravedad,
-      resumen: String(r.resumen).trim(),
+      resumen: texto(r.resumen),
       importe: numero(r.importe),
       pagina: numero(r.pagina),
-      nota: r.nota ? String(r.nota).trim() : null,
-      notaUrl: r.nota_url ?? null
+      nota: texto(r.nota),
+      notaUrl: texto(r.nota_url)
     });
-    p.cuenta[gravedad] += 1;
-    if (r.confianza === 'comprobado') p.extraido = true;
+    f.cuenta[gravedad] += 1;
+    if (r.confianza === 'comprobado') f.extraido = true;
     if (!p.fuente && r.fuente_url) p.fuente = { url: r.fuente_url, titulo: r.fuente ?? null };
   }
 
   for (const o of opiniones) {
     if (!o.partido || Number(o.ejercicio) !== ejercicio || !OPINION[o.opinion]) continue;
-    const p = (porPartido[o.partido] ??= nuevo());
-    p.opinion = {
+    const p = (partidos[o.partido] ??= nuevoPartido());
+    const f = formacionDe(p, texto(o.formacion));
+    f.opinion = {
       opinion: o.opinion,
       salvedades: numero(o.salvedades) ?? 0,
       limitacion: o.limitacion_alcance === true,
-      pagina: numero(o.pagina)
+      pagina: numero(o.pagina),
+      nota: texto(o.nota),
+      notaUrl: texto(o.nota_url)
     };
     if (!p.fuente && o.fuente_url) p.fuente = { url: o.fuente_url, titulo: o.fuente ?? null };
   }
 
-  for (const p of Object.values(porPartido)) {
-    p.reparos.sort((a, b) =>
-      GRAVEDAD[a.gravedad].orden - GRAVEDAD[b.gravedad].orden ||
-      (b.importe ?? -1) - (a.importe ?? -1) ||
-      (a.pagina ?? 0) - (b.pagina ?? 0)
-    );
+  const porPartido = {};
+  for (const [slug, p] of Object.entries(partidos)) {
+    const formaciones = [...p.formaciones.values()];
+    for (const f of formaciones) {
+      f.reparos.sort((a, b) =>
+        GRAVEDAD[a.gravedad].orden - GRAVEDAD[b.gravedad].orden ||
+        (b.importe ?? -1) - (a.importe ?? -1) ||
+        (a.pagina ?? 0) - (b.pagina ?? 0)
+      );
+    }
+    formaciones.sort((a, b) => {
+      if (a.nombre === null) return -1;
+      if (b.nombre === null) return 1;
+      return a.nombre.localeCompare(b.nombre, 'es');
+    });
+    porPartido[slug] = { formaciones, fuente: p.fuente };
   }
 
   return { ejercicio, porPartido };

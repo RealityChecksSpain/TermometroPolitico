@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { PostgrestClient } from '@supabase/postgrest-js';
 import { clasificarVehiculos } from './vehiculos.js';
 import { contarInmuebles } from './inmuebles.js';
 import { sanearImporte, patrimonioLiquido } from './euros.js';
@@ -35,9 +35,47 @@ export function diagnosticarConfig() {
 export const problemasConfig = diagnosticarConfig();
 export const faltaConfig = problemasConfig.length > 0;
 
+const REINTENTABLES = new Set([500, 502, 504, 522, 524]);
+const ESPERAS_MS = [600, 1500];
+
+function esperar(ms) {
+  return new Promise(res => setTimeout(res, ms));
+}
+
+async function fetchConReintento(entrada, opciones = {}) {
+  const metodo = String(opciones?.method ?? 'GET').toUpperCase();
+  const reintentable = metodo === 'GET' || metodo === 'HEAD';
+  for (let intento = 0; ; intento++) {
+    const respuesta = await fetch(entrada, opciones);
+    if (!reintentable || intento >= ESPERAS_MS.length || !REINTENTABLES.has(respuesta.status) || opciones?.signal?.aborted) {
+      return respuesta;
+    }
+    await respuesta.text().catch(() => null);
+    await esperar(ESPERAS_MS[intento]);
+  }
+}
+
+const base = url.replace(/\/$/, '');
+
 export const supabase = faltaConfig
   ? null
-  : createClient(url.replace(/\/$/, ''), clave, { auth: { persistSession: false } });
+  : new PostgrestClient(`${base}/rest/v1`, {
+    headers: { apikey: clave, Authorization: `Bearer ${clave}` },
+    fetch: fetchConReintento
+  });
+
+let conSesion = null;
+
+async function clienteConSesion() {
+  if (!conSesion) {
+    const { createClient } = await import('@supabase/supabase-js');
+    conSesion = createClient(base, clave, {
+      auth: { persistSession: false },
+      global: { fetch: fetchConReintento }
+    });
+  }
+  return conSesion;
+}
 
 const DIEZ_MINUTOS = 10 * 60 * 1000;
 const recuerdos = new Map();
@@ -107,21 +145,42 @@ async function leerDiputados() {
   if (error) throw error;
   let lista = data ?? [];
 
+  const trozos = ids => {
+    const salida = [];
+    for (let i = 0; i < ids.length; i += 200) salida.push(ids.slice(i, i + 200));
+    return salida;
+  };
   const sinFoto = lista.filter(d => !d.foto_url).map(d => d.mandato_id).filter(Boolean);
-  if (sinFoto.length) {
-    const fotos = [];
-    for (let i = 0; i < sinFoto.length; i += 200) {
-      const chunk = sinFoto.slice(i, i + 200);
-      const { data: filas, error } = await supabase
-        .from('mandatos')
-        .select('id, foto_url, cod_parlamentario, url_ficha, url_bienes')
-        .in('id', chunk);
-      if (error) {
-        console.error(`traerDiputados: no se pueden leer las fichas de mandato (${error.message}).`);
-        break;
-      }
-      if (filas?.length) fotos.push(...filas);
+  const ids = lista.map(d => d.mandato_id).filter(Boolean);
+
+  const [respuestasFotos, respuestasBienes] = await Promise.all([
+    Promise.all(trozos(sinFoto).map(chunk => supabase
+      .from('mandatos')
+      .select('id, foto_url, cod_parlamentario, url_ficha, url_bienes')
+      .in('id', chunk))),
+    Promise.all(trozos(ids).map(chunk => leerBienes(chunk)))
+  ]);
+
+  const fotos = [];
+  for (const { data: filas, error } of respuestasFotos) {
+    if (error) {
+      console.error(`traerDiputados: no se pueden leer las fichas de mandato (${error.message}).`);
+      break;
     }
+    if (filas?.length) fotos.push(...filas);
+  }
+
+  const bienes = [];
+  for (const { data: filas, error } of respuestasBienes) {
+    if (error) {
+      console.error(`traerDiputados: no se pueden leer los bienes declarados (${error.message}). Se muestran los diputados sin patrimonio.`);
+      bienes.length = 0;
+      break;
+    }
+    if (filas?.length) bienes.push(...filas);
+  }
+
+  if (sinFoto.length) {
     if (fotos.length) {
       const mapa = new Map(fotos.map(f => [f.id, f]));
       lista = lista.map(d => {
@@ -140,17 +199,6 @@ async function leerDiputados() {
     }
   }
 
-  const ids = lista.map(d => d.mandato_id).filter(Boolean);
-  const bienes = [];
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i + 200);
-    const { data: filas, error } = await leerBienes(chunk);
-    if (error) {
-      console.error(`traerDiputados: no se pueden leer los bienes declarados (${error.message}). Se muestran los diputados sin patrimonio.`);
-      break;
-    }
-    if (filas?.length) bienes.push(...filas);
-  }
   if (bienes.length) {
     const bm = new Map(bienes.map(b => [b.mandato_id, b]));
     lista = lista.map(d => {
@@ -204,6 +252,7 @@ async function leerDiputados() {
         n_inmuebles_propios: propios,
         n_inmuebles_sociedad: sociedad,
         n_inmuebles_equivalentes: inm.n_inmuebles_equivalentes ?? (b.n_inmuebles_equivalentes != null ? Number(b.n_inmuebles_equivalentes) : null),
+        n_inmuebles_sin_porcentaje: inm.n_inmuebles_sin_porcentaje ?? null,
         n_viviendas: inm.n_viviendas ?? b.n_viviendas ?? null,
         n_suelo: inm.n_suelo ?? b.n_suelo ?? null,
         n_anejos: inm.n_anejos ?? b.n_anejos ?? null,
@@ -591,7 +640,8 @@ export function traerUltimas(limite = 6) {
   });
 }
 export async function traerPerfilActual() {
-  const { data } = await supabase.auth.getUser();
+  const cliente = await clienteConSesion();
+  const { data } = await cliente.auth.getUser();
   return data?.user?.id ?? null;
 }
 
@@ -607,7 +657,8 @@ export async function seguir(tipo, id) {
   const perfilId = await traerPerfilActual();
   if (!perfilId) return { ok: false, motivo: 'sin sesion' };
   const [tabla, columna] = par;
-  const { error } = await supabase
+  const cliente = await clienteConSesion();
+  const { error } = await cliente
     .from(tabla)
     .upsert({ perfil_id: perfilId, [columna]: id }, { onConflict: `perfil_id,${columna}` });
   return error ? { ok: false, motivo: error.message } : { ok: true };
@@ -619,7 +670,8 @@ export async function dejarDeSeguir(tipo, id) {
   const perfilId = await traerPerfilActual();
   if (!perfilId) return { ok: false, motivo: 'sin sesion' };
   const [tabla, columna] = par;
-  const { error } = await supabase
+  const cliente = await clienteConSesion();
+  const { error } = await cliente
     .from(tabla)
     .delete()
     .eq('perfil_id', perfilId)
@@ -630,10 +682,11 @@ export async function dejarDeSeguir(tipo, id) {
 export async function traerSeguimientos() {
   const perfilId = await traerPerfilActual();
   if (!perfilId) return { iniciativa: [], materia: [], politico: [] };
+  const cliente = await clienteConSesion();
   const [ini, mat, pol] = await Promise.all([
-    supabase.from('seguimientos_iniciativa').select('iniciativa_id'),
-    supabase.from('seguimientos_materia').select('materia_id'),
-    supabase.from('seguimientos_politico').select('politico_id')
+    cliente.from('seguimientos_iniciativa').select('iniciativa_id'),
+    cliente.from('seguimientos_materia').select('materia_id'),
+    cliente.from('seguimientos_politico').select('politico_id')
   ]);
   return {
     iniciativa: (ini.data ?? []).map(r => r.iniciativa_id),
@@ -645,7 +698,8 @@ export async function traerSeguimientos() {
 export async function traerFeedPersonal(limite = 30, desplazamiento = 0) {
   const perfilId = await traerPerfilActual();
   if (!perfilId) return [];
-  const { data, error } = await supabase
+  const cliente = await clienteConSesion();
+  const { data, error } = await cliente
     .from('v_feed_personal')
     .select('*')
     .order('fecha', { ascending: false })
@@ -659,7 +713,8 @@ export async function enviarEnlaceAcceso(correo) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(limpio)) {
     return { ok: false, motivo: 'correo no valido' };
   }
-  const { error } = await supabase.auth.signInWithOtp({
+  const cliente = await clienteConSesion();
+  const { error } = await cliente.auth.signInWithOtp({
     email: limpio,
     options: { emailRedirectTo: window.location.origin }
   });
@@ -667,15 +722,25 @@ export async function enviarEnlaceAcceso(correo) {
 }
 
 export async function cerrarSesion() {
-  const { error } = await supabase.auth.signOut();
+  const cliente = await clienteConSesion();
+  const { error } = await cliente.auth.signOut();
   return error ? { ok: false, motivo: error.message } : { ok: true };
 }
 
 export function alCambiarSesion(callback) {
-  const { data } = supabase.auth.onAuthStateChange((_evento, sesion) => {
-    callback(sesion?.user?.id ?? null);
+  let vivo = true;
+  let cancelar = null;
+  clienteConSesion().then(cliente => {
+    if (!vivo) return;
+    const { data } = cliente.auth.onAuthStateChange((_evento, sesion) => {
+      callback(sesion?.user?.id ?? null);
+    });
+    cancelar = () => data?.subscription?.unsubscribe();
   });
-  return () => data?.subscription?.unsubscribe();
+  return () => {
+    vivo = false;
+    cancelar?.();
+  };
 }
 
 const VISTA_ACTIVIDAD = {

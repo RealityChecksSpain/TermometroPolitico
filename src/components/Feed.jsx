@@ -8,6 +8,7 @@ import { nombreCompletoNorma, resumenBreve, titularDeNorma, vehiculoNorma } from
 import { useConsulta, useTelefono } from '../lib/pantalla.js';
 import { VOTO } from '../lib/paleta.js';
 import Explica from './Explica.jsx';
+import { esDiputacionPermanente } from '../lib/legislatura.js';
 
 const C = {
   papel: '#EFEFE9', superficie: '#FFFFFF', pizarra: '#1F2328',
@@ -198,6 +199,12 @@ function Tarjeta({ n, onAbrir, destacada, materiaId, estrecho }) {
           }}>Sin materia</span>
         )}
         <span className="em" style={{ fontSize: 10.5, color: C.tenue }}>{fechaCorta(n.fecha)}</span>
+        {esDiputacionPermanente(n.fecha) && (
+          <span className="em" style={{
+            fontSize: 10, color: '#6B5518', border: '1px solid #E8D9A8', background: '#FFF8E6',
+            padding: '2px 7px', borderRadius: 2
+          }}>Diputación Permanente</span>
+        )}
         {votaciones > 1 && (
           <span className="em" style={{ fontSize: 10, color: C.media }}>{votaciones} votaciones</span>
         )}

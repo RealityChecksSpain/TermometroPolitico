@@ -13,12 +13,13 @@ import Explica from './Explica.jsx';
 
 const ESTADO = {
   cumplida: { icono: '✓', color: '#2E7D5B', fondo: '#E6F2EB', texto: 'cumplida' },
+  apoyada_no_decisiva: { icono: '◑', color: '#3F6E8C', fondo: '#E4EEF4', texto: 'la apoyó en una votación no decisiva' },
   apoyada_sin_aprobar: { icono: '◐', color: '#8A6D1F', fondo: '#F6EFDC', texto: 'la apoyó, no salió' },
   contradicha: { icono: '✕', color: '#9E1B32', fondo: '#FBE9EC', texto: 'votó lo contrario' },
   pendiente: { icono: '○', color: '#8E9299', fondo: '#F1F1EC', texto: 'sin votación aún' }
 };
 
-const ORDEN = ['cumplida', 'apoyada_sin_aprobar', 'contradicha', 'pendiente'];
+const ORDEN = ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'contradicha', 'pendiente'];
 
 const MUESTRA_MINIMA = 10;
 
@@ -29,6 +30,7 @@ function desdeResumen(f) {
   const intentadas = Number(f.intentadas ?? 0);
   return {
     cumplida: Number(f.cumplida ?? 0),
+    apoyada_no_decisiva: Number(f.apoyada_no_decisiva ?? 0),
     apoyada_sin_aprobar: Number(f.apoyada_sin_aprobar ?? 0),
     contradicha: Number(f.contradicha ?? 0),
     pendiente: Number(f.pendiente ?? 0),
@@ -61,14 +63,14 @@ function Estado({ pr }) {
 
 function contar(filas) {
   const verificables = (filas ?? []).filter(x => x.verificable);
-  const n = { cumplida: 0, apoyada_sin_aprobar: 0, contradicha: 0, pendiente: 0 };
+  const n = { cumplida: 0, apoyada_no_decisiva: 0, apoyada_sin_aprobar: 0, contradicha: 0, pendiente: 0 };
   for (const x of verificables) {
     if (n[x.estado] === undefined) n.pendiente++;
     else n[x.estado]++;
   }
   const total = verificables.length;
   const juzgadas = total - n.pendiente;
-  const intentadas = n.cumplida + n.apoyada_sin_aprobar;
+  const intentadas = n.cumplida + n.apoyada_no_decisiva + n.apoyada_sin_aprobar;
   return {
     ...n, total, juzgadas, intentadas,
     cobertura: total ? Math.round((juzgadas / total) * 100) : 0,
@@ -115,6 +117,7 @@ function frase(p, c) {
   if (!c.juzgadas) return `${c.total} compromisos verificables, ninguno ha llegado aún a votación.`;
   const trozos = [];
   if (c.cumplida) trozos.push(`cumplió ${c.cumplida}`);
+  if (c.apoyada_no_decisiva) trozos.push(`apoyó ${c.apoyada_no_decisiva} en votaciones que no aprueban ninguna norma`);
   if (c.apoyada_sin_aprobar) trozos.push(`apoyó ${c.apoyada_sin_aprobar} sin que salieran adelante`);
   if (c.contradicha) trozos.push(`votó en contra de ${c.contradicha}`);
   if (!trozos.length) return `${c.juzgadas} compromisos ya votados, sin correspondencia clara.`;
@@ -172,8 +175,8 @@ export default function Partidos({ onDiputados }) {
     return [...programas].sort((a, b) => {
       const ca = cuentas[a.partido];
       const cb = cuentas[b.partido];
-      const ia = ca?.intentadas ?? -1;
-      const ib = cb?.intentadas ?? -1;
+      const ia = ca?.pct ?? -1;
+      const ib = cb?.pct ?? -1;
       if (ib !== ia) return ib - ia;
       const ja = ca?.juzgadas ?? 0;
       const jb = cb?.juzgadas ?? 0;
@@ -204,14 +207,15 @@ export default function Partidos({ onDiputados }) {
 
   return (
     <div>
-      <Rotulo pie="Ordenado por cumplimiento sobre los compromisos ya votados">
+      <Rotulo pie="Ordenado por el porcentaje de compromisos ya votados que apoyó">
         Prometido contra votado
       </Rotulo>
 
       <div style={{ fontSize: 12.5, color: C.media, lineHeight: 1.6, marginBottom: 6 }}>
         Qué prometió cada partido en 2023 y qué ha votado desde entonces. Solo cuentan los
         compromisos <strong>verificables</strong>: los que se pueden emparejar con una votación
-        concreta del Congreso. Ordenado por porcentaje de cumplimiento sobre los ya votados.
+        concreta del Congreso. Ordenado por el porcentaje de compromisos ya votados en los que
+        votó a favor, salieran o no adelante.
       </div>
 
       <div className="em" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '0 0 16px', fontSize: 10.5, color: C.tenue }}>
@@ -219,6 +223,8 @@ export default function Partidos({ onDiputados }) {
           <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <i style={{ width: 9, height: 9, borderRadius: 2, background: k === 'pendiente' ? '#DCD9CE' : ESTADO[k].color }} />
             {ESTADO[k].texto}
+            {k === 'cumplida' && <Explica termino="promesaCumplida" titulo="Cumplida" />}
+            {k === 'apoyada_no_decisiva' && <Explica termino="promesaNoDecisiva" titulo="La apoyó en una votación no decisiva" />}
             {k === 'contradicha' && <Explica termino="promesaContradicha" titulo="Votó lo contrario" />}
           </span>
         ))}
