@@ -158,16 +158,22 @@ console.log('\n=== Placebo de los ejes (subejes por dimension) ===\n');
 const VERSION = versionCodigoLey();
 
 const columnas = ['iniciativa_id', ...DIMS.map(([d]) => d)].join(', ');
-const codigos = await paginar<any>((a, b) =>
+const codificadas = await paginar<any>((a, b) =>
   db().from('iniciativa_codigo').select(columnas).eq('version_prompt', VERSION).range(a, b));
+
+const derivadas = await paginar<any>((a, b) =>
+  db().from('iniciativas').select('id').eq('supertipo', 'Derivada de votacion').range(a, b));
+const derivadaSet = new Set<string>(derivadas.map(d => d.id as string));
+const codigos = codificadas.filter(c => !derivadaSet.has(c.iniciativa_id as string));
 
 const todas = await paginar<any>((a, b) =>
   db().from('iniciativa_codigo').select('version_prompt').range(a, b));
-const fuera = todas.length - codigos.length;
+const fuera = todas.length - codificadas.length;
 
 const utilSet = new Set<string>(codigos.map(c => c.iniciativa_id as string));
 console.log(`Version de prompt:      ${VERSION}`);
 console.log(`Iniciativas codificadas: ${utilSet.size}`);
+console.log(`Fuera del mapa:          ${codificadas.length - codigos.length} derivadas de votaciones sin iniciativa con texto (mociones, PNL, tratados)`);
 if (fuera > 0) {
   const otras = new Map<string, number>();
   todas.forEach((t: any) => {
