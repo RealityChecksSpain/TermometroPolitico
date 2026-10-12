@@ -1,5 +1,6 @@
 import type { Page } from 'playwright-core';
 import { db, exigirEnv } from '../src/lib/supabase';
+import { traerTodo } from '../src/lib/paginar';
 import { abrirNavegador, cargar, enlaces, esperar, lineas } from '../src/lib/navegador';
 
 exigirEnv('SUPABASE_URL');
@@ -125,9 +126,10 @@ async function main() {
   const navegador = await abrirNavegador(OCULTO);
   const page = await (await navegador.newContext({ locale: 'es-ES' })).newPage();
 
-  const { data: conocidas, error } = await db().from('asamblea_iniciativas').select('clave').eq('legislatura', 13).in('siglas', TIPOS);
-  if (error) throw error;
-  const enBase = new Set((conocidas ?? []).map(c => c.clave));
+  const conocidas = await traerTodo<{ clave: string }>((a, b) =>
+    db().from('asamblea_iniciativas').select('clave').eq('legislatura', 13).in('siglas', TIPOS).order('clave').range(a, b));
+  const enBase = new Set(conocidas.map(c => c.clave));
+  console.log(`Iniciativas de estos tipos en los datos abiertos: ${enBase.size}`);
 
   for (const tipo of TIPOS) {
     const hallados = await buscarTipo(page, tipo);
@@ -141,9 +143,9 @@ async function main() {
   }
 
   if (!SIN_FIRMANTES) {
-    const { data: pendientes, error: e } = await db().from('asamblea_iniciativa_web').select('clave, id_web').is('firmantes', null).order('clave');
-    if (e) throw e;
-    const lista = (pendientes ?? []).slice(0, LIMITE);
+    const pendientes = await traerTodo<{ clave: string; id_web: number }>((a, b) =>
+      db().from('asamblea_iniciativa_web').select('clave, id_web').is('firmantes', null).order('clave').range(a, b));
+    const lista = pendientes.slice(0, LIMITE);
     console.log(`\nFirmantes por leer: ${lista.length}. Se puede cortar con Ctrl+C y seguir otro día: solo lee los que faltan.`);
     let n = 0;
     for (const p of lista) {
