@@ -163,7 +163,7 @@ export default function LeyesMadrid({ colores }) {
                   <span className="lmEstado" style={{ background: fondo, color: tinta }}>{txt}</span>
                   <span>{NOMBRE_TIPO[l.tipo_siglas] ?? l.tipo_siglas} {l.exp_reg}/{l.exp_ano}</span>
                   <span>{autorCorto(l.autor)}</span>
-                  {l.num_ley && l.num_ley !== '-' && <span>Ley {l.num_ley}</span>}
+                  {l.tipo_siglas !== 'PNL' && l.num_ley && l.num_ley !== '-' && <span>Ley {l.num_ley}</span>}
                   {l.tipo_siglas === 'PNL' && l.organo && l.organo !== '-' && <span>{l.organo}</span>}
                   {l.fecha && <span>{fecha(l.fecha)}</span>}
                 </div>

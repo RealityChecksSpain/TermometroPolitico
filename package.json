@@ -70,6 +70,7 @@
     "busquedas": "node --env-file=.env --import tsx scripts/revisar-busquedas.ts",
     "sondear:fotos": "node --import tsx scripts/sondear-fotos.ts",
     "sondear:asamblea": "node --import tsx scripts/sondear-asamblea.ts",
+    "sondear:asamblea:diarios": "node --import tsx scripts/sondear-asamblea-diarios.ts",
     "asamblea": "node --env-file=.env --import tsx scripts/asamblea.ts",
     "asamblea:asistencia": "node --env-file=.env --import tsx scripts/asamblea-asistencia.ts",
     "asamblea:iniciativas": "node --env-file=.env --import tsx scripts/asamblea-iniciativas.ts",
