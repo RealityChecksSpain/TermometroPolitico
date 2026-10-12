@@ -95,7 +95,7 @@ async function main() {
   const sinAutor = [...porClave.keys()].filter(c => !conAutor.has(c)).length;
   console.log(`\nExpedientes sin grupo autor: ${sinAutor} de ${porClave.size}`);
   console.log('\nMUESTRA');
-  for (const f of expedientes.filter(f => /^(PL|PPL|PNL)$/.test(f.SIGLAS)).slice(0, 6)) {
+  for (const f of expedientes.filter(f => /^(PL|PROPL|PNL)$/.test(f.SIGLAS)).slice(0, 6)) {
     console.log(`  ${f.SIGLAS} ${f.EXP_REG}/${f.EXP_ANO} · ${f.STATUS} · ${f.RESULTADO_TRAM} · ${f.FECHA} · ${(f.ASUNTO ?? '').slice(0, 120)}`);
   }
   console.log('\nFIN. Pega toda la salida.');

@@ -1,16 +1,16 @@
 # Lente Democrática
 
-Transparencia parlamentaria española. Congreso de los Diputados.
+Transparencia parlamentaria española. Congreso de los Diputados y Asamblea de Madrid.
 
 Aplicación independiente. Sin vínculo con ninguna institución pública.
 
 ## Principio de diseño
 
-La aplicación no asigna ideología a ninguna ley ni a ningún diputado.
+Nadie decide a mano quién es de izquierdas o de derechas.
 
 - Los **votos** salen del registro oficial del Congreso.
-- Las **posiciones de partido** salen de fuentes académicas externas y citadas (CHES, CIS, Manifesto Project).
-- La **posición de una votación** se calcula: es el centro de gravedad de las posiciones externas de los partidos que la apoyaron, ponderado por escaños.
+- Las **normas** las codifica un modelo de lenguaje: lee el texto oficial y responde preguntas de hecho (¿sube o baja el gasto?, ¿amplía o restringe derechos?) con las dimensiones del Manifesto Project y de la encuesta de expertos de Chapel Hill. Una segunda IA vuelve a codificar a ciegas una muestra para medir cuánto coinciden.
+- La **posición de un partido** en cada dimensión es el porcentaje de normas que recortan que apoyó menos el de las que amplían, de −1 a +1.
 - Las **cuentas de los partidos** se transcriben de los estados financieros que cada partido publica en su web y del informe de fiscalización del Tribunal de Cuentas. Cada cifra guarda el documento del que sale.
 
 Si un dato no se puede trazar hasta un documento concreto y citable, no se publica.
@@ -19,9 +19,7 @@ Si un dato no se puede trazar hasta un documento concreto y citable, no se publi
 
 ### 1. Base de datos
 
-En el SQL Editor de Supabase, pegar entero:
-
-    sql/TODO_EN_UNO.sql
+Los SQL se guardan fuera del repo y se aplican en orden en el SQL Editor de Supabase.
 
 Si compartes el proyecto Supabase con otra app, primero:
 
