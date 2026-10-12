@@ -32,22 +32,36 @@ async function resultados(page: Page): Promise<{ hallados: Hallado[]; siguiente:
   return { hallados, siguiente: sig?.href ?? null };
 }
 
+async function estable<T>(page: Page, fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      return await fn();
+    } catch (e) {
+      if (i >= 5 || !/context was destroyed|navigation/i.test((e as Error).message)) throw e;
+      await esperar(1500);
+    }
+  }
+}
+
 async function fijar(page: Page, sufijo: string, valor: string): Promise<boolean> {
-  const cambiado = await page.evaluate(([suf, val]) => {
+  const navega = page.waitForNavigation({ timeout: 20000 }).catch(() => null);
+  const cambiado = await estable(page, () => page.evaluate(([suf, val]) => {
     const el = [...document.querySelectorAll('select')].find(s => s.name.endsWith(suf)) as HTMLSelectElement | undefined;
     if (!el) return false;
     if (el.value === val) return true;
     el.value = val;
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
-  }, [sufijo, valor]);
+  }, [sufijo, valor]));
+  await navega;
   await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await esperar(PAUSA_MS);
   return cambiado;
 }
 
 async function valorDe(page: Page, sufijo: string) {
-  return page.evaluate(suf => ([...document.querySelectorAll('select')].find(s => s.name.endsWith(suf)) as HTMLSelectElement | undefined)?.value ?? null, sufijo);
+  return estable(page, () => page.evaluate(suf => ([...document.querySelectorAll('select')].find(s => s.name.endsWith(suf)) as HTMLSelectElement | undefined)?.value ?? null, sufijo));
 }
 
 async function buscarTipo(page: Page, tipo: string): Promise<Hallado[]> {
@@ -57,27 +71,29 @@ async function buscarTipo(page: Page, tipo: string): Promise<Hallado[]> {
   await fijar(page, '_tipo', tipo);
   console.log(`  ${tipo}: legislatura ${await valorDe(page, '_legislatura')}, tipo ${await valorDe(page, '_tipo')}`);
   const boton = page.locator('form:has(select[name$="_tipo"])').locator('button:visible, input[type=submit]:visible').filter({ hasText: /buscar/i }).first();
-  const botones = await page.locator('form:has(select[name$="_tipo"])').locator('button:visible, input[type=submit]:visible').allInnerTexts().catch(() => []);
+  const botones = await estable(page, () => page.locator('form:has(select[name$="_tipo"])').locator('button:visible, input[type=submit]:visible').allInnerTexts()).catch(() => [] as string[]);
   console.log(`  botones del formulario: ${botones.map(b => b.trim()).filter(Boolean).join(' | ') || '(ninguno visible)'}`);
   if (await boton.count()) {
-    await Promise.all([page.waitForLoadState('domcontentloaded').catch(() => {}), boton.click()]);
+    await Promise.all([page.waitForNavigation({ timeout: 30000 }).catch(() => null), boton.click()]);
   } else {
-    await page.evaluate(() => {
+    const navega = page.waitForNavigation({ timeout: 30000 }).catch(() => null);
+    await estable(page, () => page.evaluate(() => {
       const f = ([...document.querySelectorAll('select')].find(s => s.name.endsWith('_tipo')) as HTMLSelectElement | undefined)?.form;
       if (f) (f.requestSubmit ? f.requestSubmit() : f.submit());
-    });
+    }));
+    await navega;
   }
   await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await esperar(PAUSA_MS);
-  const muestra = (await resultados(page)).hallados.slice(0, 3).map(h => h.clave).join(', ');
+  const muestra = (await estable(page, () => resultados(page))).hallados.slice(0, 3).map(h => h.clave).join(', ');
   console.log(`  primeros resultados: ${muestra || '(ninguno)'}`);
-  const sig = (await enlaces(page)).find(e => /^siguiente$/i.test(e.texto) && !e.href.endsWith('#'));
+  const sig = (await estable(page, () => enlaces(page))).find(e => /^siguiente$/i.test(e.texto) && !e.href.endsWith('#'));
   if (sig) console.log(`  parámetros de la página 2: ${decodeURIComponent(sig.href.split('FormValues=')[1] ?? '').slice(0, 400)}`);
 
   const todos = new Map<string, Hallado>();
   let pagina = 1;
   while (true) {
-    const { hallados, siguiente } = await resultados(page);
+    const { hallados, siguiente } = await estable(page, () => resultados(page));
     const ajenos = hallados.filter(h => !h.clave.startsWith(`${tipo}-`));
     if (pagina === 1 && (ajenos.length || !hallados.length)) {
       console.log(`  ${tipo}: el filtro no ha funcionado (${hallados.length} resultados, ${ajenos.length} de otro tipo). Paro este tipo.`);
