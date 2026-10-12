@@ -1,189 +1,158 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { chromium, type Browser, type Page } from 'playwright-core';
 import { getDocumentProxy, extractText } from 'unpdf';
-import { UA } from '../src/lib/descubrir';
 
 const avisoOriginal = console.warn;
 console.warn = (...a: any[]) => { if (!/glyf|TT:|undefined function/i.test(String(a[0] ?? ''))) avisoOriginal(...a); };
 
 const BASE = 'https://www.asambleamadrid.es';
-const ESPERA_MS = 25000;
+const SALIDA = resolve(process.argv.find(a => a.startsWith('--salida='))?.slice(9) ?? '../asamblea-sondeo');
+const OCULTO = process.argv.includes('--oculto');
+const PAUSA_MS = 4000;
 
 const PAGINAS = [
-  `${BASE}/composicion/diputados/regimen-economico-social/lista-general-bienes`,
   `${BASE}/diputados`,
+  `${BASE}/composicion/diputados/regimen-economico-social/lista-general-bienes`,
+  `${BASE}/actividad/leyes-y-resoluciones`,
   `${BASE}/organos/pleno/informacion-pleno`,
   `${BASE}/servicios/datos-abiertos`,
-  `${BASE}/ES/OpenData/Paginas/Default.aspx`,
   `${BASE}/transparencia`
 ];
 
-const CLAVES = /bien|declara|inter[eé]s|actividad|incompatib|retribu|votaci|voto|diario|sesi[oó]n|pleno|opendata|datos-abiertos|datos abiertos|iniciativ|boam|ley|\.pdf|\.json|\.csv|\.xml|\.xlsx?|rss|api/i;
+const CLAVES = /bien|declara|inter[eé]s|actividad|retribu|votaci|voto|diario|sesi[oó]n|pleno|datos.abiertos|opendata|iniciativ|boam|ley|resoluci|\.pdf|\.json|\.csv|\.xml|\.xlsx?|rss|api/i;
 
-interface Pagina {
-  url: string;
-  final: string;
-  estado: number;
-  tipo: string;
-  bytes: number;
-  cuerpo: string;
-}
+interface Enlace { texto: string; href: string }
 
-const galletas = new Map<string, string>();
+const esperar = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-function guardarGalletas(res: Response) {
-  const lista = typeof (res.headers as any).getSetCookie === 'function' ? (res.headers as any).getSetCookie() as string[] : [];
-  for (const g of lista) {
-    const par = g.split(';')[0];
-    const i = par.indexOf('=');
-    if (i > 0) galletas.set(par.slice(0, i).trim(), par.slice(i + 1).trim());
+async function abrirNavegador(): Promise<Browser> {
+  for (const channel of ['chrome', 'msedge']) {
+    try {
+      const b = await chromium.launch({ channel, headless: OCULTO });
+      console.log(`navegador: ${channel}${OCULTO ? ' (oculto)' : ''}`);
+      return b;
+    } catch {}
   }
+  throw new Error('No encuentro Chrome ni Edge instalados en este equipo');
 }
 
-function cabeceraGalletas(): string {
-  return Array.from(galletas, ([k, v]) => `${k}=${v}`).join('; ');
-}
-
-async function bajar(url: string): Promise<Pagina | null> {
-  let actual = url;
+async function cargar(page: Page, url: string): Promise<boolean> {
   try {
-    for (let salto = 0; salto < 8; salto++) {
-      const res = await fetch(actual, {
-        redirect: 'manual',
-        signal: AbortSignal.timeout(ESPERA_MS),
-        headers: {
-          'User-Agent': UA,
-          Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'es-ES,es;q=0.9',
-          ...(galletas.size ? { Cookie: cabeceraGalletas() } : {})
-        }
-      });
-      guardarGalletas(res);
-      const destino = res.headers.get('location');
-      if (res.status >= 300 && res.status < 400 && destino) {
-        console.log(`  ${res.status} -> ${destino}`);
-        actual = new URL(destino, actual).href;
-        continue;
-      }
-      const cuerpo = await res.text();
-      if (res.status >= 300 || /being redirected/i.test(cuerpo)) {
-        console.log(`  respuesta ${res.status} sin destino. Cabeceras:`);
-        res.headers.forEach((v, k) => console.log(`    ${k}: ${k === 'set-cookie' ? v.replace(/=[^;,]+/g, '=…') : v.slice(0, 160)}`));
-        console.log('  cuerpo:');
-        console.log(cuerpo.slice(0, 1500).split('\n').map(l => '    ' + l).join('\n'));
-        const js = cuerpo.match(/(?:location(?:\.href)?\s*=|location\.replace\(|http-equiv=["']?refresh["']?[^>]*url=)\s*["']?([^"' >)]+)/i)?.[1];
-        if (js && salto < 7) {
-          console.log(`  el cuerpo manda a ${js}; lo sigo con las galletas recibidas`);
-          actual = new URL(js, actual).href;
-          continue;
-        }
-      }
-      return { url, final: actual, estado: res.status, tipo: res.headers.get('content-type') ?? '', bytes: cuerpo.length, cuerpo };
-    }
-    console.log(`  demasiadas redirecciones desde ${url}`);
-    return null;
-  } catch (e: any) {
-    console.log(`  ERROR ${actual}: ${e?.message ?? e}${e?.cause ? ` (${e.cause?.code ?? e.cause?.message ?? e.cause})` : ''}`);
-    return null;
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  } catch (e) {
+    console.log(`  no carga: ${(e as Error).message.split('\n')[0]}`);
+    return false;
   }
-}
-
-function titulo(html: string): string {
-  return (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').replace(/\s+/g, ' ').trim();
-}
-
-function enlaces(html: string, base: string): { url: string; texto: string }[] {
-  const vistos = new Map<string, string>();
-  const re = /<a\b[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    let url: string;
-    try { url = new URL(m[1], base).href; } catch { continue; }
-    if (!/^https?:/.test(url)) continue;
-    const texto = m[2].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!vistos.has(url)) vistos.set(url, texto);
+  for (let i = 0; i < 20; i++) {
+    const titulo = await page.title().catch(() => '');
+    if (!/being redirected/i.test(titulo)) break;
+    await esperar(1000);
   }
-  return Array.from(vistos, ([url, texto]) => ({ url, texto }));
+  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  const titulo = await page.title().catch(() => '');
+  if (/being redirected|access denied|blocked/i.test(titulo)) {
+    console.log(`  la pagina sigue bloqueada: ${titulo}`);
+    return false;
+  }
+  return true;
 }
 
-function extension(url: string): string {
-  const ruta = url.split('?')[0].toLowerCase();
-  const m = ruta.match(/\.([a-z0-9]{2,5})$/);
-  return m ? m[1] : 'html';
+async function enlaces(page: Page): Promise<Enlace[]> {
+  return page.$$eval('a[href]', as => as.map(a => ({
+    texto: (a.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+    href: (a as HTMLAnchorElement).href
+  })));
 }
 
-function resumir(p: Pagina) {
-  console.log(`  estado ${p.estado}  tipo ${p.tipo}  ${(p.bytes / 1024).toFixed(0)} KB`);
-  if (p.final !== p.url) console.log(`  redirige a ${p.final}`);
-  console.log(`  titulo: ${titulo(p.cuerpo) || '(sin titulo)'}`);
-  const todos = enlaces(p.cuerpo, p.final);
-  const porTipo = new Map<string, number>();
-  todos.forEach(e => porTipo.set(extension(e.url), (porTipo.get(extension(e.url)) ?? 0) + 1));
-  console.log(`  enlaces: ${todos.length}  (${Array.from(porTipo, ([k, n]) => `${k} ${n}`).join(', ')})`);
-  const utiles = todos.filter(e => CLAVES.test(e.url) || CLAVES.test(e.texto));
-  console.log(`  enlaces que importan: ${utiles.length}`);
-  utiles.slice(0, 60).forEach(e => console.log(`    ${e.texto.slice(0, 60).padEnd(62)} ${e.url}`));
-  if (utiles.length > 60) console.log(`    ... y ${utiles.length - 60} mas`);
-  const scripts = Array.from(p.cuerpo.matchAll(/["'](\/[^"'\s]*(?:api|json|ajax|servicio|rest)[^"'\s]*)["']/gi)).map(m => m[1]);
-  if (scripts.length) console.log(`  rutas de datos dentro del HTML: ${Array.from(new Set(scripts)).slice(0, 15).join('  ')}`);
-  return todos;
+function nombreFichero(url: string, ext: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '_').slice(0, 120) + ext;
 }
 
-async function leerPdf(url: string) {
-  console.log(`\n  PDF ${url}`);
+async function guardarPagina(page: Page, url: string): Promise<Enlace[]> {
+  const html = await page.content();
+  const texto = await page.evaluate(() => document.body?.innerText ?? '');
+  await writeFile(join(SALIDA, nombreFichero(url, '.html')), html);
+  await writeFile(join(SALIDA, nombreFichero(url, '.txt')), texto);
+  const lista = await enlaces(page);
+  const utiles = lista.filter(e => CLAVES.test(e.href) || CLAVES.test(e.texto));
+  console.log(`  titulo: ${await page.title()}`);
+  console.log(`  texto ${texto.length} caracteres, enlaces ${lista.length}, interesantes ${utiles.length}`);
+  for (const e of utiles.slice(0, 40)) console.log(`    ${e.texto || '(sin texto)'}  ->  ${e.href}`);
+  console.log('  primeras lineas:');
+  console.log(texto.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 25).map(l => '    ' + l.slice(0, 160)).join('\n'));
+  return lista;
+}
+
+async function leerPdf(page: Page, url: string, etiqueta: string) {
+  console.log(`\n=== PDF ${etiqueta}: ${url}`);
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(ESPERA_MS), headers: { 'User-Agent': UA } });
-    const buf = new Uint8Array(await res.arrayBuffer());
-    console.log(`  HTTP ${res.status}  ${(buf.length / 1024).toFixed(0)} KB`);
-    if (String.fromCharCode(...buf.slice(0, 4)) !== '%PDF') {
-      console.log('  No es un PDF.');
+    const res = await page.context().request.get(url, { timeout: 60000 });
+    const tipo = res.headers()['content-type'] ?? '';
+    const cuerpo = await res.body();
+    console.log(`  estado ${res.status()}  tipo ${tipo}  ${Math.round(cuerpo.length / 1024)} KB`);
+    if (!/pdf/i.test(tipo) && cuerpo.subarray(0, 4).toString() !== '%PDF') {
+      console.log('  no es un PDF');
       return;
     }
-    const pdf = await getDocumentProxy(buf);
-    let campos: any = null;
-    try { campos = await (pdf as any).getFieldObjects(); } catch {}
-    const nCampos = campos ? Object.keys(campos).length : 0;
-    console.log(`  campos de formulario: ${nCampos}`);
+    await writeFile(join(SALIDA, nombreFichero(url, '.pdf')), cuerpo);
+    const pdf = await getDocumentProxy(new Uint8Array(cuerpo));
     const { totalPages, text } = await extractText(pdf, { mergePages: true });
-    const limpio = text.replace(/[ \t]+/g, ' ').trim();
-    console.log(`  paginas ${totalPages}  caracteres de texto ${limpio.length}${limpio.length < 200 ? '  (casi sin texto: probablemente escaneado)' : ''}`);
-    const importes = limpio.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g) ?? [];
-    console.log(`  importes detectados: ${importes.length}`);
-    ['BIENES', 'INMUEBLE', 'URBANO', 'R[UÚ]STICO', 'MUNICIPIO', 'PROVINCIA', 'DEP[OÓ]SITO', 'VALORES', 'ACCIONES', 'VEH[IÍ]CULO', 'DEUDA', 'PR[EÉ]STAMO', 'PENSIONES', 'RENTA', 'ACTIVIDAD']
-      .forEach(s => { if (new RegExp(s, 'i').test(limpio)) console.log(`    contiene ${s}`); });
-    console.log('\n  primeros 1500 caracteres:\n');
-    console.log(limpio.slice(0, 1500).split('\n').map(l => '    ' + l).join('\n'));
-  } catch (e: any) {
-    console.log(`  ERROR ${e?.message ?? e}`);
+    await writeFile(join(SALIDA, nombreFichero(url, '.pdf.txt')), text);
+    console.log(`  paginas ${totalPages}, texto ${text.length} caracteres`);
+    const pistas = text.match(/.{0,80}(votaci[oó]n nominal|votos a favor|votos en contra|abstenciones|vot[oó] s[ií]|llamamiento|resultado de la votaci[oó]n).{0,120}/gi) ?? [];
+    console.log(`  pistas de votacion: ${pistas.length}`);
+    for (const p of pistas.slice(0, 12)) console.log(`    ${p.replace(/\s+/g, ' ')}`);
+    console.log('  muestra:');
+    console.log(text.replace(/\s+/g, ' ').slice(0, 1500).replace(/(.{150})/g, '    $1\n'));
+  } catch (e) {
+    console.log(`  fallo: ${(e as Error).message.split('\n')[0]}`);
   }
 }
 
-console.log(`\nSONDEO ASAMBLEA DE MADRID  ${new Date().toISOString()}\n`);
+async function main() {
+  await mkdir(SALIDA, { recursive: true });
+  console.log(`\nSONDEO ASAMBLEA DE MADRID  ${new Date().toISOString()}`);
+  console.log(`guardo copias en ${SALIDA}\n`);
+  const navegador = await abrirNavegador();
+  const page = await (await navegador.newContext({ locale: 'es-ES' })).newPage();
+  const todos: Enlace[] = [];
 
-const resultados = new Map<string, { url: string; texto: string }[]>();
+  for (const url of PAGINAS) {
+    console.log(`\n=== ${url}`);
+    if (await cargar(page, url)) todos.push(...await guardarPagina(page, url));
+    await esperar(PAUSA_MS);
+  }
 
-for (const url of PAGINAS) {
-  console.log(`\n=== ${url}`);
-  const p = await bajar(url);
-  if (p) resultados.set(url, resumir(p));
+  const unicos = [...new Map(todos.map(e => [e.href, e])).values()].filter(e => e.href.startsWith(BASE));
+  const ficha = unicos.find(e => /\/diputados\/[^/?#]+\/?$/i.test(e.href) && !/lista|regimen/i.test(e.href));
+  if (ficha) {
+    console.log(`\n=== FICHA ${ficha.texto}: ${ficha.href}`);
+    if (await cargar(page, ficha.href)) await guardarPagina(page, ficha.href);
+    await esperar(PAUSA_MS);
+  } else console.log('\n=== FICHA: no encuentro enlace con pinta de ficha de diputado');
+
+  const pdfs = unicos.filter(e => /\.pdf(\?|$)/i.test(e.href));
+  console.log(`\n=== ${pdfs.length} PDF enlazados en total`);
+  const bienes = pdfs.find(e => /bien|declara/i.test(e.href + e.texto));
+  if (bienes) { await leerPdf(page, bienes.href, 'declaracion de bienes'); await esperar(PAUSA_MS); }
+
+  const diarios = unicos.filter(e => /diario|dsam|sesi[oó]n/i.test(e.href + e.texto));
+  console.log(`\n=== enlaces a diarios o sesiones: ${diarios.length}`);
+  for (const d of diarios.slice(0, 15)) console.log(`    ${d.texto}  ->  ${d.href}`);
+  const diarioPdf = diarios.find(e => /\.pdf(\?|$)/i.test(e.href)) ?? pdfs.find(e => /diario|dsam/i.test(e.href + e.texto));
+  if (diarioPdf) await leerPdf(page, diarioPdf.href, 'diario de sesiones');
+  else if (diarios[0]) {
+    console.log(`\n=== DIARIO ${diarios[0].href}`);
+    if (await cargar(page, diarios[0].href)) {
+      const dentro = await guardarPagina(page, diarios[0].href);
+      const p = dentro.find(e => /\.pdf(\?|$)/i.test(e.href));
+      if (p) { await esperar(PAUSA_MS); await leerPdf(page, p.href, 'diario de sesiones'); }
+    }
+  }
+
+  await navegador.close();
+  console.log('\nFIN. Pega toda esta salida en el chat. Las copias se quedan en la carpeta indicada, fuera del repo.');
 }
 
-const bienes = resultados.get(PAGINAS[0]) ?? [];
-const pdfsBienes = bienes.filter(e => extension(e.url) === 'pdf');
-console.log(`\n\n=== DECLARACIONES: ${pdfsBienes.length} PDF en la lista general de bienes`);
-pdfsBienes.slice(0, 12).forEach(e => console.log(`  ${e.texto.slice(0, 60).padEnd(62)} ${e.url}`));
-if (pdfsBienes.length) {
-  await leerPdf(pdfsBienes[0].url);
-  if (pdfsBienes.length > 1) await leerPdf(pdfsBienes[Math.floor(pdfsBienes.length / 2)].url);
-}
-
-const diputados = (resultados.get(PAGINAS[1]) ?? []).filter(e => /\/diputados\/[^/?#]+/i.test(e.url) && !/regimen|lista|composicion\/?$/i.test(e.url));
-console.log(`\n\n=== FICHAS: ${diputados.length} enlaces con pinta de ficha de diputado`);
-diputados.slice(0, 10).forEach(e => console.log(`  ${e.texto.slice(0, 60).padEnd(62)} ${e.url}`));
-for (const ficha of diputados.slice(0, 2)) {
-  console.log(`\n=== FICHA ${ficha.url}`);
-  const p = await bajar(ficha.url);
-  if (p) resumir(p);
-}
-
-console.log('\nFIN. Pega toda esta salida en el chat.\n');
-
-export {};
+main().catch(e => { console.error(e); process.exit(1); });
