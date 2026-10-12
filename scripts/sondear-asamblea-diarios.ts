@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { Page } from 'playwright-core';
 import { extractText, getDocumentProxy } from 'unpdf';
@@ -17,63 +17,37 @@ function decir(t = '') {
   salida.push(t);
 }
 
-async function bajarCsv(page: Page, nombre: string) {
+async function csv(page: Page, nombre: string) {
+  for (const ruta of [join(COPIAS, '..', nombre), join(COPIAS, nombre)]) {
+    try { return leerCsv(await readFile(ruta, 'utf8')); } catch {}
+  }
   const res = await page.context().request.get(`${OPENDATA}/${nombre}`, { timeout: 300000 });
-  if (!res.ok()) { decir(`  ${nombre} devolvió ${res.status()}`); return []; }
+  if (!res.ok()) return [];
   const texto = (await res.body()).toString('utf8');
   await writeFile(join(COPIAS, nombre), texto);
   await esperar(PAUSA_MS);
   return leerCsv(texto);
 }
 
-function describir(nombre: string, filas: Record<string, string>[]) {
-  decir(`\n=== ${nombre}: ${filas.length} filas`);
-  if (!filas.length) return;
-  decir(`  columnas: ${Object.keys(filas[0]).join(', ')}`);
-  for (const f of filas.slice(-3)) decir(`  ${JSON.stringify(f).slice(0, 600)}`);
-}
-
-function urlDe(f: Record<string, string>): string | null {
-  for (const v of Object.values(f)) {
-    if (/^https?:\/\//i.test(v)) return v;
-    if (/\.pdf$/i.test(v)) return v.startsWith('/') ? `${BASE}${v}` : `${BASE}/${v}`;
-  }
-  return null;
-}
-
-async function leerVotaciones(page: Page, url: string) {
-  decir(`\n=== LECTURA DE ${url}`);
+async function textoPdf(page: Page, url: string): Promise<string | null> {
   const buf = await bajarPdf(page, url);
   await esperar(PAUSA_MS);
-  if (!buf) { decir('  no se pudo bajar como PDF'); return; }
-  await writeFile(join(COPIAS, url.split('/').pop()!.split('?')[0] || 'diario.pdf'), buf);
-  const { totalPages, text } = await extractText(await getDocumentProxy(new Uint8Array(buf)), { mergePages: true });
-  const t = String(text).replace(/\s+/g, ' ');
-  decir(`  ${totalPages} páginas, ${t.length} caracteres`);
-  const re = /(resultado de la votaci[oó]n|votos a favor|queda(n)? (aprobad|rechazad)|con los votos|se procede a la votaci[oó]n)/gi;
+  if (!buf) return null;
+  await writeFile(join(COPIAS, url.split('/').pop()!.split('?')[0]), buf);
+  const { text } = await extractText(await getDocumentProxy(new Uint8Array(buf)), { mergePages: true });
+  return String(text).replace(/\s+/g, ' ');
+}
+
+function votaciones(t: string, max = 8) {
+  const re = /(resultado de la votaci[oó]n|votos a favor|queda(n)? (aprobad|rechazad)|con los votos|se aprueba|se rechaza|sometid[ao] a votaci[oó]n)/gi;
   let m: RegExpExecArray | null;
   let n = 0;
-  while ((m = re.exec(t)) && n < 10) {
+  while ((m = re.exec(t)) && n < max) {
     decir(`  … ${t.slice(Math.max(0, m.index - 250), m.index + 450)} …`);
     re.lastIndex = m.index + 450;
     n++;
   }
-  if (!n) decir('  no aparece ninguna fórmula de votación en el texto');
-}
-
-async function pagina(page: Page, url: string) {
-  if (!(await cargar(page, url))) { decir(`  no carga ${url}`); return; }
-  decir(`\n=== ${url}  (${await page.title()})`);
-  const formularios = await page.$$eval('form', fs => fs.map(f => ({
-    accion: (f as HTMLFormElement).action,
-    campos: [...f.querySelectorAll('input,select')].map(i => (i as HTMLInputElement).name.replace(/^_es_satec_liferay_[^_]+(_INSTANCE_[A-Za-z0-9]+)?_/, '')).filter(Boolean).join(' ')
-  })));
-  for (const f of formularios.filter(f => !/update_language|busqueda$|#$/.test(f.accion))) decir(`  formulario ${f.accion.slice(0, 160)} · ${f.campos.slice(0, 300)}`);
-  const ls = await lineas(page);
-  decir(`  texto: ${ls.slice(0, 120).join(' | ').slice(0, 1500)}`);
-  const es = (await enlaces(page)).filter(e => e.href.startsWith(BASE) && /expediente|iniciativa|detalle|ficha|votaci|\.pdf/i.test(e.href)).slice(0, 25);
-  for (const e of es) decir(`  ${e.texto.slice(0, 60).padEnd(60)}  ${e.href}`);
-  await esperar(PAUSA_MS);
+  if (!n) decir('  no aparece ninguna fórmula de votación');
 }
 
 async function main() {
@@ -83,23 +57,48 @@ async function main() {
   if (!(await cargar(page, `${BASE}/servicios/datos-abiertos`))) throw new Error('No carga la página de datos abiertos');
   await esperar(PAUSA_MS);
 
-  const dsam = await bajarCsv(page, 'SGP_ADMIN.OPENDATA_DSAM_VIEW.csv');
-  describir('DIARIOS DE SESIONES', dsam);
-  const boam = await bajarCsv(page, 'SGP_ADMIN.OPENDATA_BOAM_VIEW.csv');
-  describir('BOLETINES OFICIALES', boam);
-  const reuniones = await bajarCsv(page, 'SGP_ADMIN.REUNIONES_TODAS.csv');
-  describir('REUNIONES', reuniones);
+  const exp = await csv(page, 'ARCHIVO.F_PRINCIPALES_OPENDATA_VIEW.csv');
+  decir(`\n=== EXPEDIENTES: ${exp.length} filas`);
+  if (exp.length) {
+    decir(`  columnas: ${Object.keys(exp[0]).join(', ')}`);
+    const pcop = exp.find(f => f.SIGLAS === 'PCOP' && f.EXP_REG === '3211' && f.EXP_ANO === '2026');
+    decir(`  PCOP-3211/2026: ${JSON.stringify(pcop ?? 'no está')}`);
+    const contiene = pcop ? Object.entries(pcop).filter(([, v]) => v.includes('490725')) : [];
+    decir(`  columnas con 490725: ${contiene.map(([k]) => k).join(', ') || 'ninguna'}`);
+  }
 
-  const col = (f: Record<string, string>, re: RegExp) => Object.entries(f).find(([k]) => re.test(k))?.[1] ?? '';
-  const ds13 = dsam.filter(f => legislaturaDe(col(f, /legis/i)) === 13);
-  decir(`\nDiarios de la XIII legislatura: ${ds13.length}`);
-  const plenos = ds13.filter(f => /pleno/i.test(Object.values(f).join(' ')) && urlDe(f));
-  decir(`  de Pleno con enlace: ${plenos.length}`);
-  for (const f of plenos.slice(-2)) await leerVotaciones(page, urlDe(f)!);
-  if (!plenos.length && ds13.length && urlDe(ds13[ds13.length - 1])) await leerVotaciones(page, urlDe(ds13[ds13.length - 1])!);
+  const dsam = (await csv(page, 'SGP_ADMIN.OPENDATA_DSAM_VIEW.csv')).filter(f => legislaturaDe(f.LEGISLATURA) === 13);
+  decir(`\n=== DIARIOS XIII: ${dsam.length}`);
+  for (const f of dsam.filter(f => /pleno/i.test(f.ORGANO)).slice(-4)) decir(`  ${JSON.stringify(f)}`);
 
-  await pagina(page, `${BASE}/actividad/iniciativas`);
-  await pagina(page, `${BASE}/actividad/sesiones`);
+  if (await cargar(page, `${BASE}/actividad/iniciativa?iniciativa=490725`)) {
+    const ls = await lineas(page);
+    const i = ls.findIndex(l => /PCOP-3211/.test(l));
+    decir(`\n=== PÁGINA DE INICIATIVA (sin redirect): ${await page.title()}`);
+    decir(`  ${ls.slice(Math.max(0, i - 2), i + 60).join(' | ').slice(0, 2500)}`);
+    for (const e of (await enlaces(page)).filter(e => /\.pdf|diario|boam|ds_|votaci/i.test(e.href)).slice(0, 15)) decir(`  ${e.texto.slice(0, 60).padEnd(60)}  ${e.href}`);
+  }
+  await esperar(PAUSA_MS);
+
+  if (await cargar(page, `${BASE}/servicios/publicaciones`)) {
+    decir(`\n=== PUBLICACIONES: ${await page.title()}`);
+    for (const e of (await enlaces(page)).filter(e => e.href.startsWith(BASE) && /\.pdf|diario|boletin|boam|dsam|publicaci/i.test(`${e.href} ${e.texto}`)).slice(0, 30)) decir(`  ${e.texto.slice(0, 60).padEnd(60)}  ${e.href}`);
+  }
+  await esperar(PAUSA_MS);
+
+  if (await cargar(page, `${BASE}/actividad/sesiones`)) {
+    const pdfs = (await enlaces(page)).filter(e => /\/static\/doc\/actas\/.*\.pdf/i.test(e.href));
+    decir(`\n=== ACTAS EN LA PÁGINA DE SESIONES: ${pdfs.length}`);
+    for (const e of pdfs) decir(`  ${e.texto.slice(0, 70).padEnd(70)}  ${e.href}`);
+    const elegidas = [...pdfs.filter(e => /pleno|plenaria/i.test(e.texto)).slice(0, 1), ...pdfs.filter(e => /^Acta de la Comisi[oó]n de fecha/i.test(e.texto)).slice(0, 2)];
+    for (const e of elegidas) {
+      decir(`\n=== LECTURA: ${e.texto}  ${e.href}`);
+      const t = await textoPdf(page, e.href);
+      if (!t) { decir('  no se pudo bajar'); continue; }
+      decir(`  ${t.length} caracteres. Inicio: ${t.slice(0, 400)}`);
+      votaciones(t);
+    }
+  }
 
   await navegador.close();
   await writeFile(join(COPIAS, 'sondeo.txt'), salida.join('\n'));
