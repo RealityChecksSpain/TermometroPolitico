@@ -11,7 +11,7 @@ padding:10px 12px;border-top:1px solid #E3DFD1}
 .madFila:last-child{border-bottom:1px solid #E3DFD1}
 .madNombre{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .madMeta{font-size:10.5px;color:#7C8288;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
-.madDatos{display:flex;gap:14px;text-align:right}
+.madDatos{display:flex;gap:14px;flex-wrap:wrap;text-align:right}
 .madDatos a{color:#3C63A0;font-size:10.5px}
 .madDudosa{font-size:9.5px;color:#8A6D1F;background:#F6E7B0;padding:1px 5px;border-radius:2px;margin-left:6px}
 .madBusca{width:100%;max-width:320px;padding:8px 10px;border:1px solid #E3DFD1;border-radius:2px;font-size:13px;background:#fff}
@@ -21,6 +21,7 @@ padding:10px 12px;border-top:1px solid #E3DFD1}
 const ORDENES = [
   ['inmuebles', 'Más propiedades'],
   ['viviendas', 'Más viviendas'],
+  ['faltas', 'Más faltas a Pleno'],
   ['nombre', 'Nombre']
 ];
 
@@ -60,7 +61,7 @@ export default function Madrid() {
     const filtrados = diputados.filter(d =>
       (!partido || (d.partido_siglas ?? 'SIN PARTIDO') === partido) &&
       (!q || d.nombre_completo.toLowerCase().includes(q)));
-    const clave = orden === 'viviendas' ? 'n_viviendas_equivalentes' : 'n_inmuebles_equivalentes';
+    const clave = orden === 'viviendas' ? 'n_viviendas_equivalentes' : orden === 'faltas' ? 'plenos_faltados' : 'n_inmuebles_equivalentes';
     return [...filtrados].sort((a, b) => orden === 'nombre'
       ? a.nombre_completo.localeCompare(b.nombre_completo, 'es')
       : (Number(b[clave] ?? -1) - Number(a[clave] ?? -1)) || a.nombre_completo.localeCompare(b.nombre_completo, 'es'));
@@ -125,6 +126,12 @@ export default function Madrid() {
                     <div className="dato" style={{ fontSize: 20 }}>{numero(d.n_viviendas_equivalentes)}</div>
                     <span className="datoUnidad">viviendas</span>
                   </div>
+                  {d.plenos_convocado > 0 && (
+                    <div title={`Faltó a ${d.plenos_faltados} de los ${d.plenos_convocado} Plenos celebrados desde su alta`}>
+                      <div className="dato" style={{ fontSize: 20 }}>{d.plenos_faltados}</div>
+                      <span className="datoUnidad">faltas a Pleno</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
                     <a className="em" href={d.url_ficha} target="_blank" rel="noopener noreferrer">ficha ↗</a>
                     {d.url_declaracion && (
@@ -142,7 +149,8 @@ export default function Madrid() {
             Fuente: fichas y declaraciones de bienes publicadas por la Asamblea de Madrid. {leidas} de {diputados.length} declaraciones leídas.
             Las declaraciones son escaneos y las lee un modelo de lenguaje; cada cifra enlaza a su PDF original para comprobarla.
             Cada propiedad cuenta por la parte que declara poseer: media casa es 0,5. Las de lectura dudosa no entran en los hallazgos.
-            Las votaciones de la Asamblea todavía no están cargadas.
+            Las faltas salen de la lista oficial de asistentes a cada Pleno que publica la Asamblea en datos abiertos y cuentan solo los Plenos posteriores al alta de cada diputado. Quien tiene un cargo en el Gobierno regional o es senador puede faltar por esa agenda: su cargo aparece junto al nombre.
+            La Asamblea no publica en su web ni en datos abiertos cómo vota cada diputado: su página de votaciones está vacía.
           </p>
         </>
       )}

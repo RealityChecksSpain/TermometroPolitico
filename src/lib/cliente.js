@@ -928,9 +928,12 @@ export function traerHallazgosMadrid() {
 export function traerDiputadosMadrid() {
   return recordar('diputadosMadrid', async () => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('v_asamblea_diputados').select('*')
-      .eq('activo', true).order('nombre_completo');
+    const [{ data, error }, asistencia] = await Promise.all([
+      supabase.from('v_asamblea_diputados').select('*').eq('activo', true).order('nombre_completo'),
+      supabase.from('v_asamblea_asistencia').select('id_asamblea, plenos_convocado, plenos_faltados')
+    ]);
     if (error) throw error;
-    return data ?? [];
+    const faltas = new Map((asistencia.error ? [] : asistencia.data ?? []).map(a => [a.id_asamblea, a]));
+    return (data ?? []).map(d => ({ ...d, ...(faltas.get(d.id_asamblea) ?? {}) }));
   });
 }
