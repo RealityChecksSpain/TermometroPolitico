@@ -61,7 +61,10 @@ export interface ResultadoValidacion {
   valida: boolean;
   errores: string[];
   avisos: string[];
+  sinVotosIndividuales?: boolean;
 }
+
+export const AVISO_SIN_VOTOS = 'Votación nominal sin votos individuales: queda apartada y se vuelve a mirar en cada carga hasta que el Congreso publique los votos';
 
 export function validarVotacion(json: VotacionJson): ResultadoValidacion {
   const errores: string[] = [];
@@ -80,7 +83,7 @@ export function validarVotacion(json: VotacionJson): ResultadoValidacion {
 
   if (filas.length === 0) {
     errores.push('Votación nominal sin votos individuales');
-    return { valida: false, errores, avisos };
+    return { valida: false, errores, avisos, sinVotosIndividuales: true };
   }
 
   const suma = t.afavor + t.enContra + t.abstenciones;
@@ -318,7 +321,7 @@ async function cargarIndiceMandatos(legislaturaId: string): Promise<IndiceMandat
 
 export interface ResultadoProceso {
   url: string;
-  estado: 'ok' | 'rechazada' | 'error';
+  estado: 'ok' | 'apartada' | 'rechazada' | 'error';
   votosInsertados: number;
   sinResolver: string[];
   errores: string[];
@@ -388,6 +391,9 @@ export async function procesarVotacion(
 
   const validacion = validarVotacion(json);
   base.avisos = validacion.avisos;
+  if (!validacion.valida && validacion.sinVotosIndividuales) {
+    return { ...base, estado: 'apartada', avisos: [...base.avisos, AVISO_SIN_VOTOS] };
+  }
   if (!validacion.valida) {
     return { ...base, estado: 'rechazada', errores: validacion.errores };
   }
@@ -526,6 +532,7 @@ export interface ResumenIngesta {
   nuevas: number;
   procesadas: number;
   conError: number;
+  apartadas: string[];
   estado: 'ok' | 'parcial' | 'error';
   plazoAgotado: boolean;
   nombresSinResolver: string[];
@@ -617,7 +624,7 @@ export async function ingestarFechas(
       }
       const r = await procesarVotacion(enlace, legislaturaId, indice, finLegislatura);
       resultados.push(r);
-      if (r.estado !== 'ok') errores.push(`${enlace.urlJson}: ${r.errores.join('; ')}`);
+      if (r.estado !== 'ok' && r.estado !== 'apartada') errores.push(`${enlace.urlJson}: ${r.errores.join('; ')}`);
       await new Promise(res => setTimeout(res, pausaMs));
     }
 
@@ -625,8 +632,11 @@ export async function ingestarFechas(
     await new Promise(res => setTimeout(res, pausaMs));
   }
 
-  const conError = resultados.filter(r => r.estado !== 'ok').length;
-  const todoFalla = resultados.length > 0 && conError === resultados.length;
+  const apartadas = resultados.filter(r => r.estado === 'apartada').map(r => `${r.url}: ${AVISO_SIN_VOTOS}`);
+  const intentadas = resultados.length - apartadas.length;
+  const conError = resultados.filter(r => r.estado !== 'ok' && r.estado !== 'apartada').length;
+  const todoFalla = intentadas > 0 && conError === intentadas;
+  const detalle = [...errores, ...apartadas.map(a => `apartada: ${a}`)];
   const ningunaFecha = fechasConsultadas === 0 && fechas.length > 0;
 
   const estado: ResumenIngesta['estado'] =
@@ -641,7 +651,7 @@ export async function ingestarFechas(
     registros_leidos: descubiertas,
     registros_insertados: resultados.reduce((a, r) => a + r.votosInsertados, 0),
     registros_actualizados: 0,
-    error_detalle: errores.length ? JSON.stringify(errores.slice(0, 20)) : null,
+    error_detalle: detalle.length ? JSON.stringify(detalle.slice(0, 20)) : null,
     iniciado_at: inicio,
     finalizado_at: new Date().toISOString()
   });
@@ -662,6 +672,7 @@ export async function ingestarFechas(
     nuevas: resultados.length,
     procesadas: resultados.filter(r => r.estado === 'ok').length,
     conError,
+    apartadas,
     estado,
     plazoAgotado,
     nombresSinResolver: Array.from(new Set(resultados.flatMap(r => r.sinResolver))),

@@ -1,0 +1,160 @@
+
+> lente-democratica@0.1.0 sondear:asamblea
+> node --import tsx scripts/sondear-asamblea.ts
+
+
+SONDEO ASAMBLEA DE MADRID  2026-10-10T21:49:03.472Z
+
+
+=== https://www.asambleamadrid.es/composicion/diputados/regimen-economico-social/lista-general-bienes
+  respuesta 307 sin destino. Cabeceras:
+    alt-svc: h3=":443"; ma=86400
+    connection: keep-alive
+    content-security-policy: upgrade-insecure-requests;
+    content-type: text/html
+    date: Sat, 10 Oct 2026 21:49:03 GMT
+    server: Sucuri/Cloudproxy
+    strict-transport-security: max-age=31536000; includeSubdomains; preload
+    transfer-encoding: chunked
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-sucuri-id: 19007
+  cuerpo:
+    	        <html><title>You are being redirected...</title>
+    		<noscript>Javascript is required. Please enable javascript before you are allowed to see this page.</noscript>
+    		<script>var s={},u,c,U,r,i,l=0,a,e=eval,w=String.fromCharCode,sucuri_cloudproxy_js='',S='dj0nOCcgKyAiYiIgKyAnZCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk3KSArICdkJyArIFN0cmluZy5mcm9tQ2hhckNvZGUoOTcpICsgJ2MnICsgU3RyaW5nLmZyb21DaGFyQ29kZSg1MykgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDEwMikgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk4KSArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTApICsgU3RyaW5nLmZyb21DaGFyQ29kZSg1NykgKyAnZScgKyAnMycgKyAnYScgKyAnNCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDUxKSArICc3JyArICJjIiArICcxJyArICdmJyArICdjJyArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTEpICsgU3RyaW5nLmZyb21DaGFyQ29kZSg1MikgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDU0KSArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTQpICsgU3RyaW5nLmZyb21DaGFyQ29kZSg1NikgKyAnNycgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk3KSArICIyIiArICJkIiArICIwIiArICcnO2RvY3VtZW50LmNvb2tpZT0ncycrJ3UnKydjJysndScrJ3InKydpJysnXycrJ2MnKydsJysnbycrJ3UnKydkJysncCcrJ3InKydvJysneCcrJ3knKydfJysndScrJ3UnKydpJysnZCcrJ18nKyc3JysnYicrJzMnKyc4JysnNCcrJ2InKycxJysnOScrJ2QnKyI9IiArIHYgKyAnO3BhdGg9LzttYXgtYWdlPTg2NDAwO1NhbWVTaXRlPUxheDtTZWN1cmUnOyBsb2NhdGlvbi5yZWxvYWQoKTs=';L=S.length;U=0;r='';var A='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for(u=0;u<64;u++){s[A.charAt(u)]=u;}for(i=0;i<L;i++){c=s[S.charAt(i)];U=(U<<6)+c;l+=6;while(l>=8){((a=(U>>>(l-=8))&0xff)||(i<(L-2)))&&(r+=w(a));}}e(r);</script></html>
+            	
+    
+  estado 307  tipo text/html  1 KB
+  titulo: You are being redirected...
+  enlaces: 0  ()
+  enlaces que importan: 0
+
+=== https://www.asambleamadrid.es/diputados
+  respuesta 307 sin destino. Cabeceras:
+    alt-svc: h3=":443"; ma=86400
+    connection: keep-alive
+    content-security-policy: upgrade-insecure-requests;
+    content-type: text/html
+    date: Sat, 10 Oct 2026 21:49:04 GMT
+    server: Sucuri/Cloudproxy
+    strict-transport-security: max-age=31536000; includeSubdomains; preload
+    transfer-encoding: chunked
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-sucuri-id: 19007
+  cuerpo:
+    	        <html><title>You are being redirected...</title>
+    		<noscript>Javascript is required. Please enable javascript before you are allowed to see this page.</noscript>
+    		<script>var s={},u,c,U,r,i,l=0,a,e=eval,w=String.fromCharCode,sucuri_cloudproxy_js='',S='eT0nOCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk4KSArICdkJyArICJhIiArICdkJyArICJhIiArICJjIiArICc1JyArICdmJyArICdiJyArICIyIiArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTcpICsgJ2UnICsgJzMnICsgU3RyaW5nLmZyb21DaGFyQ29kZSg5NykgKyAnNCcgKyAnMycgKyAnNycgKyAnYycgKyAnMScgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDEwMikgKyAiYyIgKyAnMycgKyAnNCcgKyAnNicgKyAnNicgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDU2KSArICI3IiArIFN0cmluZy5mcm9tQ2hhckNvZGUoOTcpICsgJzInICsgU3RyaW5nLmZyb21DaGFyQ29kZSgxMDApICsgU3RyaW5nLmZyb21DaGFyQ29kZSg0OCkgKyAnJztkb2N1bWVudC5jb29raWU9J3MnKyd1JysnYycrJ3UnKydyJysnaScrJ18nKydjJysnbCcrJ28nKyd1JysnZCcrJ3AnKydyJysnbycrJ3gnKyd5JysnXycrJ3UnKyd1JysnaScrJ2QnKydfJysnNycrJ2InKyczJysnOCcrJzQnKydiJysnMScrJzknKydkJysiPSIgKyB5ICsgJztwYXRoPS87bWF4LWFnZT04NjQwMDtTYW1lU2l0ZT1MYXg7U2VjdXJlJzsgbG9jYXRpb24ucmVsb2FkKCk7';L=S.length;U=0;r='';var A='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for(u=0;u<64;u++){s[A.charAt(u)]=u;}for(i=0;i<L;i++){c=s[S.charAt(i)];U=(U<<6)+c;l+=6;while(l>=8){((a=(U>>>(l-=8))&0xff)||(i<(L-2)))&&(r+=w(a));}}e(r);</script></html>
+            	
+    
+  estado 307  tipo text/html  1 KB
+  titulo: You are being redirected...
+  enlaces: 0  ()
+  enlaces que importan: 0
+
+=== https://www.asambleamadrid.es/organos/pleno/informacion-pleno
+  respuesta 307 sin destino. Cabeceras:
+    alt-svc: h3=":443"; ma=86400
+    connection: keep-alive
+    content-security-policy: upgrade-insecure-requests;
+    content-type: text/html
+    date: Sat, 10 Oct 2026 21:49:04 GMT
+    server: Sucuri/Cloudproxy
+    strict-transport-security: max-age=31536000; includeSubdomains; preload
+    transfer-encoding: chunked
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-sucuri-id: 19007
+  cuerpo:
+    	        <html><title>You are being redirected...</title>
+    		<noscript>Javascript is required. Please enable javascript before you are allowed to see this page.</noscript>
+    		<script>var s={},u,c,U,r,i,l=0,a,e=eval,w=String.fromCharCode,sucuri_cloudproxy_js='',S='eT0nOCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk4KSArICdkJyArICJhIiArICdkJyArICJhIiArICJjIiArICc1JyArICdmJyArICdiJyArICIyIiArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTcpICsgJ2UnICsgJzMnICsgU3RyaW5nLmZyb21DaGFyQ29kZSg5NykgKyAnNCcgKyAnMycgKyAnNycgKyAnYycgKyAnMScgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDEwMikgKyAiYyIgKyAnMycgKyAnNCcgKyAnNicgKyAnNicgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDU2KSArICI3IiArIFN0cmluZy5mcm9tQ2hhckNvZGUoOTcpICsgJzInICsgU3RyaW5nLmZyb21DaGFyQ29kZSgxMDApICsgU3RyaW5nLmZyb21DaGFyQ29kZSg0OCkgKyAnJztkb2N1bWVudC5jb29raWU9J3MnKyd1JysnYycrJ3UnKydyJysnaScrJ18nKydjJysnbCcrJ28nKyd1JysnZCcrJ3AnKydyJysnbycrJ3gnKyd5JysnXycrJ3UnKyd1JysnaScrJ2QnKydfJysnNycrJ2InKyczJysnOCcrJzQnKydiJysnMScrJzknKydkJysiPSIgKyB5ICsgJztwYXRoPS87bWF4LWFnZT04NjQwMDtTYW1lU2l0ZT1MYXg7U2VjdXJlJzsgbG9jYXRpb24ucmVsb2FkKCk7';L=S.length;U=0;r='';var A='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for(u=0;u<64;u++){s[A.charAt(u)]=u;}for(i=0;i<L;i++){c=s[S.charAt(i)];U=(U<<6)+c;l+=6;while(l>=8){((a=(U>>>(l-=8))&0xff)||(i<(L-2)))&&(r+=w(a));}}e(r);</script></html>
+            	
+    
+  estado 307  tipo text/html  1 KB
+  titulo: You are being redirected...
+  enlaces: 0  ()
+  enlaces que importan: 0
+
+=== https://www.asambleamadrid.es/servicios/datos-abiertos
+  respuesta 307 sin destino. Cabeceras:
+    alt-svc: h3=":443"; ma=86400
+    connection: keep-alive
+    content-security-policy: upgrade-insecure-requests;
+    content-type: text/html
+    date: Sat, 10 Oct 2026 21:49:04 GMT
+    server: Sucuri/Cloudproxy
+    strict-transport-security: max-age=31536000; includeSubdomains; preload
+    transfer-encoding: chunked
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-sucuri-id: 19007
+  cuerpo:
+    	        <html><title>You are being redirected...</title>
+    		<noscript>Javascript is required. Please enable javascript before you are allowed to see this page.</noscript>
+    		<script>var s={},u,c,U,r,i,l=0,a,e=eval,w=String.fromCharCode,sucuri_cloudproxy_js='',S='eT0nOCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk4KSArICdkJyArICJhIiArICdkJyArICJhIiArICJjIiArICc1JyArICdmJyArICdiJyArICIyIiArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTcpICsgJ2UnICsgJzMnICsgU3RyaW5nLmZyb21DaGFyQ29kZSg5NykgKyAnNCcgKyAnMycgKyAnNycgKyAnYycgKyAnMScgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDEwMikgKyAiYyIgKyAnMycgKyAnNCcgKyAnNicgKyAnNicgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDU2KSArICI3IiArIFN0cmluZy5mcm9tQ2hhckNvZGUoOTcpICsgJzInICsgU3RyaW5nLmZyb21DaGFyQ29kZSgxMDApICsgU3RyaW5nLmZyb21DaGFyQ29kZSg0OCkgKyAnJztkb2N1bWVudC5jb29raWU9J3MnKyd1JysnYycrJ3UnKydyJysnaScrJ18nKydjJysnbCcrJ28nKyd1JysnZCcrJ3AnKydyJysnbycrJ3gnKyd5JysnXycrJ3UnKyd1JysnaScrJ2QnKydfJysnNycrJ2InKyczJysnOCcrJzQnKydiJysnMScrJzknKydkJysiPSIgKyB5ICsgJztwYXRoPS87bWF4LWFnZT04NjQwMDtTYW1lU2l0ZT1MYXg7U2VjdXJlJzsgbG9jYXRpb24ucmVsb2FkKCk7';L=S.length;U=0;r='';var A='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for(u=0;u<64;u++){s[A.charAt(u)]=u;}for(i=0;i<L;i++){c=s[S.charAt(i)];U=(U<<6)+c;l+=6;while(l>=8){((a=(U>>>(l-=8))&0xff)||(i<(L-2)))&&(r+=w(a));}}e(r);</script></html>
+            	
+    
+  estado 307  tipo text/html  1 KB
+  titulo: You are being redirected...
+  enlaces: 0  ()
+  enlaces que importan: 0
+
+=== https://www.asambleamadrid.es/ES/OpenData/Paginas/Default.aspx
+  respuesta 307 sin destino. Cabeceras:
+    alt-svc: h3=":443"; ma=86400
+    connection: keep-alive
+    content-security-policy: upgrade-insecure-requests;
+    content-type: text/html
+    date: Sat, 10 Oct 2026 21:49:04 GMT
+    server: Sucuri/Cloudproxy
+    strict-transport-security: max-age=31536000; includeSubdomains; preload
+    transfer-encoding: chunked
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-sucuri-id: 19007
+  cuerpo:
+    	        <html><title>You are being redirected...</title>
+    		<noscript>Javascript is required. Please enable javascript before you are allowed to see this page.</noscript>
+    		<script>var s={},u,c,U,r,i,l=0,a,e=eval,w=String.fromCharCode,sucuri_cloudproxy_js='',S='eT0nOCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk4KSArICdkJyArICJhIiArICdkJyArICJhIiArICJjIiArICc1JyArICdmJyArICdiJyArICIyIiArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTcpICsgJ2UnICsgJzMnICsgU3RyaW5nLmZyb21DaGFyQ29kZSg5NykgKyAnNCcgKyAnMycgKyAnNycgKyAnYycgKyAnMScgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDEwMikgKyAiYyIgKyAnMycgKyAnNCcgKyAnNicgKyAnNicgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDU2KSArICI3IiArIFN0cmluZy5mcm9tQ2hhckNvZGUoOTcpICsgJzInICsgU3RyaW5nLmZyb21DaGFyQ29kZSgxMDApICsgU3RyaW5nLmZyb21DaGFyQ29kZSg0OCkgKyAnJztkb2N1bWVudC5jb29raWU9J3MnKyd1JysnYycrJ3UnKydyJysnaScrJ18nKydjJysnbCcrJ28nKyd1JysnZCcrJ3AnKydyJysnbycrJ3gnKyd5JysnXycrJ3UnKyd1JysnaScrJ2QnKydfJysnNycrJ2InKyczJysnOCcrJzQnKydiJysnMScrJzknKydkJysiPSIgKyB5ICsgJztwYXRoPS87bWF4LWFnZT04NjQwMDtTYW1lU2l0ZT1MYXg7U2VjdXJlJzsgbG9jYXRpb24ucmVsb2FkKCk7';L=S.length;U=0;r='';var A='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for(u=0;u<64;u++){s[A.charAt(u)]=u;}for(i=0;i<L;i++){c=s[S.charAt(i)];U=(U<<6)+c;l+=6;while(l>=8){((a=(U>>>(l-=8))&0xff)||(i<(L-2)))&&(r+=w(a));}}e(r);</script></html>
+            	
+    
+  estado 307  tipo text/html  1 KB
+  titulo: You are being redirected...
+  enlaces: 0  ()
+  enlaces que importan: 0
+
+=== https://www.asambleamadrid.es/transparencia
+  respuesta 307 sin destino. Cabeceras:
+    alt-svc: h3=":443"; ma=86400
+    connection: keep-alive
+    content-security-policy: upgrade-insecure-requests;
+    content-type: text/html
+    date: Sat, 10 Oct 2026 21:49:04 GMT
+    server: Sucuri/Cloudproxy
+    strict-transport-security: max-age=31536000; includeSubdomains; preload
+    transfer-encoding: chunked
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-sucuri-id: 19007
+  cuerpo:
+    	        <html><title>You are being redirected...</title>
+    		<noscript>Javascript is required. Please enable javascript before you are allowed to see this page.</noscript>
+    		<script>var s={},u,c,U,r,i,l=0,a,e=eval,w=String.fromCharCode,sucuri_cloudproxy_js='',S='eT0nOCcgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDk4KSArICdkJyArICJhIiArICdkJyArICJhIiArICJjIiArICc1JyArICdmJyArICdiJyArICIyIiArIFN0cmluZy5mcm9tQ2hhckNvZGUoNTcpICsgJ2UnICsgJzMnICsgU3RyaW5nLmZyb21DaGFyQ29kZSg5NykgKyAnNCcgKyAnMycgKyAnNycgKyAnYycgKyAnMScgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDEwMikgKyAiYyIgKyAnMycgKyAnNCcgKyAnNicgKyAnNicgKyBTdHJpbmcuZnJvbUNoYXJDb2RlKDU2KSArICI3IiArIFN0cmluZy5mcm9tQ2hhckNvZGUoOTcpICsgJzInICsgU3RyaW5nLmZyb21DaGFyQ29kZSgxMDApICsgU3RyaW5nLmZyb21DaGFyQ29kZSg0OCkgKyAnJztkb2N1bWVudC5jb29raWU9J3MnKyd1JysnYycrJ3UnKydyJysnaScrJ18nKydjJysnbCcrJ28nKyd1JysnZCcrJ3AnKydyJysnbycrJ3gnKyd5JysnXycrJ3UnKyd1JysnaScrJ2QnKydfJysnNycrJ2InKyczJysnOCcrJzQnKydiJysnMScrJzknKydkJysiPSIgKyB5ICsgJztwYXRoPS87bWF4LWFnZT04NjQwMDtTYW1lU2l0ZT1MYXg7U2VjdXJlJzsgbG9jYXRpb24ucmVsb2FkKCk7';L=S.length;U=0;r='';var A='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for(u=0;u<64;u++){s[A.charAt(u)]=u;}for(i=0;i<L;i++){c=s[S.charAt(i)];U=(U<<6)+c;l+=6;while(l>=8){((a=(U>>>(l-=8))&0xff)||(i<(L-2)))&&(r+=w(a));}}e(r);</script></html>
+            	
+    
+  estado 307  tipo text/html  1 KB
+  titulo: You are being redirected...
+  enlaces: 0  ()
+  enlaces que importan: 0
+
+
+=== DECLARACIONES: 0 PDF en la lista general de bienes
+
+
+=== FICHAS: 0 enlaces con pinta de ficha de diputado
+
+FIN. Pega toda esta salida en el chat.
+

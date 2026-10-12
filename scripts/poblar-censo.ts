@@ -170,6 +170,26 @@ async function inspeccionar() {
   );
 }
 
+async function partidosPuestosAMano(legislaturaId: string): Promise<Map<string, string>> {
+  const puestos = new Map<string, string>();
+  const tam = 1000;
+  for (let desde = 0; ; desde += tam) {
+    const { data, error } = await db()
+      .from('mandatos')
+      .select('id_externo, partido_id, partido_efectivo_id')
+      .eq('legislatura_id', legislaturaId)
+      .range(desde, desde + tam - 1);
+    if (error) throw new Error(`No se pueden leer los mandatos actuales: ${error.message}`);
+    for (const m of data ?? []) {
+      if (m.id_externo && m.partido_efectivo_id && m.partido_efectivo_id !== m.partido_id) {
+        puestos.set(m.id_externo, m.partido_efectivo_id);
+      }
+    }
+    if (!data || data.length < tam) break;
+  }
+  return puestos;
+}
+
 async function cargar() {
   const legislaturaId = exigirEnv('LEGISLATURA_ACTIVA_ID');
   const { activos, baja } = await localizarFicheros();
@@ -193,7 +213,14 @@ async function cargar() {
 
   const { data: partidos } = await db().from('partidos').select('id, slug');
   const idxPartidos = new Map<string, string>();
-  (partidos ?? []).forEach(p => idxPartidos.set(p.slug, p.id));
+  const slugDe = new Map<string, string>();
+  (partidos ?? []).forEach(p => {
+    idxPartidos.set(p.slug, p.id);
+    slugDe.set(p.id, p.slug);
+  });
+
+  const aMano = await partidosPuestosAMano(legislaturaId);
+  const respetados: string[] = [];
 
   let insertados = 0;
   let conPartido = 0;
@@ -246,14 +273,22 @@ async function cargar() {
     }
     if (partidoId) conPartido++;
 
+    const puesto = aMano.get(slug);
+    const respetar = puesto !== undefined && puesto !== partidoId;
+    const partidoReal = respetar
+      ? {}
+      : { partido_efectivo_id: partidoId, partido_confirmado: partidoId !== null };
+    if (respetar) {
+      respetados.push(`${bruto}: ${slugDe.get(puesto) ?? puesto} (el fichero dice ${partidoSlug ?? 'sin partido'})`);
+    }
+
     const { error: errMandato } = await db().from('mandatos').upsert(
       {
         politico_id: politico.id,
         legislatura_id: legislaturaId,
         grupo_id: grupoId,
         partido_id: partidoId,
-        partido_efectivo_id: partidoId,
-        partido_confirmado: partidoId !== null,
+        ...partidoReal,
         circunscripcion: leer(fila, F.circunscripcion),
         id_externo: slug,
         fecha_alta: aIso(leer(fila, F.alta)) ?? '2023-08-17',
@@ -272,6 +307,11 @@ async function cargar() {
 
   console.log(`\nMandatos cargados: ${insertados}`);
   console.log(`Con partido asignado: ${conPartido}`);
+
+  if (respetados.length > 0) {
+    console.log(`\nPartido real puesto a mano y respetado: ${respetados.length}`);
+    respetados.forEach(r => console.log('  ' + r));
+  }
 
   if (nombresRotos.length > 0) {
     console.log(`\nNombres no interpretables: ${nombresRotos.length}`);

@@ -33,10 +33,15 @@ console.log(`  dias con sesion:     ${conVotaciones}`);
 console.log(`  votaciones halladas: ${resumen.descubiertas}`);
 console.log(`  nuevas procesadas:   ${resumen.procesadas}`);
 console.log(`  con error:           ${resumen.conError}`);
+console.log(`  apartadas:           ${resumen.apartadas.length}`);
 console.log(`  nombres sin resolver: ${resumen.nombresSinResolver.length}`);
 
 if (resumen.nombresSinResolver.length > 0) {
   resumen.nombresSinResolver.slice(0, 20).forEach(n => console.log('    ' + n));
+}
+if (resumen.apartadas.length > 0) {
+  console.log('\nAPARTADAS');
+  resumen.apartadas.forEach(a => console.log('  ' + a.slice(0, 200)));
 }
 if (resumen.errores.length > 0) {
   console.log('\nERRORES');
