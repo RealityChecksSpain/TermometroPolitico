@@ -139,8 +139,16 @@ async function leerBienes(page: Page, f: Ficha): Promise<string> {
   if (!lectura.ok || !lectura.datos) return `lectura fallida: ${lectura.error}`;
   const d: any = sanearDeclaracion(lectura.datos);
   const inm = contarInmuebles(null, d.inmuebles_urbanos, d.inmuebles_rusticos, d.inmuebles_detalle_propios, d.inmuebles_detalle_sociedad);
+  const sinInmuebles = [d.inmuebles_urbanos, d.inmuebles_rusticos, d.inmuebles_detalle_propios, d.inmuebles_detalle_sociedad].every(v => v == null || v === '');
+  if (sinInmuebles && d.confianza !== 'baja') {
+    Object.assign(inm, {
+      n_inmuebles: 0, n_inmuebles_propios: 0, n_inmuebles_sociedad: 0, n_inmuebles_equivalentes: 0,
+      n_viviendas: 0, n_viviendas_propias: 0, n_viviendas_equivalentes: 0,
+      n_suelo: 0, n_anejos: 0, n_productivos: 0, n_otros_bienes: 0
+    });
+  }
   const anomalia = motivoAnomalia(d);
-  const dudas = [...(Array.isArray(d.dudas) ? d.dudas : []), ...(anomalia ? [`anomalía: ${anomalia}`] : [])];
+  const dudas = [...(Array.isArray(d.dudas) ? d.dudas : []), ...(anomalia ? [`anomalía: ${anomalia}`] : []), ...(sinInmuebles ? ['sin inmuebles declarados: las tres tablas de inmuebles están vacías'] : [])];
   const fila = {
     id_asamblea: f.id,
     url_declaracion: decl.url,
