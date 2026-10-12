@@ -126,7 +126,7 @@ export default function Madrid() {
                     <div className="dato" style={{ fontSize: 20 }}>{numero(d.n_viviendas_equivalentes)}</div>
                     <span className="datoUnidad">viviendas</span>
                   </div>
-                  {d.plenos_convocado > 0 && (
+                  {d.plenos_convocado > 0 && d.plenos_faltados != null && (
                     <div title={`Faltó a ${d.plenos_faltados} de los ${d.plenos_convocado} Plenos celebrados desde su alta`}>
                       <div className="dato" style={{ fontSize: 20 }}>{d.plenos_faltados}</div>
                       <span className="datoUnidad">faltas a Pleno</span>
@@ -149,7 +149,7 @@ export default function Madrid() {
             Fuente: fichas y declaraciones de bienes publicadas por la Asamblea de Madrid. {leidas} de {diputados.length} declaraciones leídas.
             Las declaraciones son escaneos y las lee un modelo de lenguaje; cada cifra enlaza a su PDF original para comprobarla.
             Cada propiedad cuenta por la parte que declara poseer: media casa es 0,5. Las de lectura dudosa no entran en los hallazgos.
-            Las faltas salen de la lista oficial de asistentes a cada Pleno que publica la Asamblea en datos abiertos y cuentan solo los Plenos posteriores al alta de cada diputado. Quien tiene un cargo en el Gobierno regional o es senador puede faltar por esa agenda: su cargo aparece junto al nombre.
+            Las faltas salen de la lista oficial de asistentes a cada Pleno que publica la Asamblea en datos abiertos y cuentan solo los Plenos posteriores al alta de cada diputado. A la presidenta y a los consejeros no se les cuentan faltas: la lista oficial no los recoge en las sesiones ordinarias y daría ausencias que no son. Los senadores pueden faltar por la agenda del Senado: su cargo aparece junto al nombre.
             La Asamblea no publica en su web ni en datos abiertos cómo vota cada diputado: su página de votaciones está vacía.
           </p>
         </>

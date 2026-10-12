@@ -129,7 +129,7 @@ async function main() {
     tipos.set(f.TIPO_VOTO, (tipos.get(f.TIPO_VOTO) ?? 0) + 1);
     cargosCsv.set(f.CARGO, (cargosCsv.get(f.CARGO) ?? 0) + 1);
     const fecha = fechaIso(f.FECHA_PLENO);
-    if (!fecha) continue;
+    if (!fecha || fecha > new Date().toISOString().slice(0, 10)) continue;
     const d = cruzar(desdeApellidosComaNombre(f.NOMBRE), porClave, todos);
     if (!d) { sinCruzar.set(f.NOMBRE, (sinCruzar.get(f.NOMBRE) ?? 0) + 1); continue; }
     if (!porFecha.has(fecha)) porFecha.set(fecha, new Map());
