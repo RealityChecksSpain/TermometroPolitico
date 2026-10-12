@@ -11,6 +11,7 @@ const Mapa = lazy(() => import('./components/Mapa.jsx'));
 const Metodologia = lazy(() => import('./components/Metodologia.jsx'));
 const Descargas = lazy(() => import('./components/Descargas.jsx'));
 const Partidos = lazy(() => import('./components/Partidos.jsx'));
+const Madrid = lazy(() => import('./components/Madrid.jsx'));
 import Inicio from './components/Inicio.jsx';
 const FeedPersonal = lazy(() => import('./components/FeedPersonal.jsx'));
 import AvatarPartido from './components/AvatarPartido.jsx';
@@ -234,6 +235,11 @@ flex-wrap:wrap;padding:var(--s4) 0 var(--s3)}
 .cabeceraTitulo{display:flex;align-items:center;gap:10px;background:none;border:none;padding:0;
 cursor:pointer;color:${C.tinta}}
 .cabeceraTitulo img{width:44px;height:44px;display:block;flex-shrink:0}
+.camaraSel{display:inline-flex;border:1px solid ${C.tinta};border-radius:2px;overflow:hidden}
+.camaraSel button{background:transparent;border:none;padding:6px 12px;font-size:11px;font-weight:600;
+letter-spacing:.08em;text-transform:uppercase;color:${C.tinta};cursor:pointer;min-height:32px}
+.camaraSel button[data-on="1"]{background:${C.tinta};color:${C.papel}}
+@media(hover:none){.camaraSel button{min-height:44px;padding:8px 14px}}
 @media(min-width:701px){.cabeceraTitulo{gap:12px}.cabeceraTitulo img{width:64px;height:64px}}
 .filaLey{display:block;width:100%;text-align:left;cursor:pointer;padding:12px;background:transparent;border:none}
 .filaLeyTitular{font-size:15px;font-weight:600;line-height:1.3}
@@ -442,6 +448,20 @@ function Barra({ si, no, abs, alto = 5 }) {
 export default function App() {
   const estrecho = useTelefono();
   const [seccion, setSeccion] = useState('inicio');
+  const [camara, setCamara] = useState(() => {
+    try {
+      if (window.location.hash === '#madrid') return 'madrid';
+      return localStorage.getItem('camara') === 'madrid' ? 'madrid' : 'espana';
+    } catch {
+      return 'espana';
+    }
+  });
+  const elegirCamara = c => {
+    setCamara(c);
+    setSel(null);
+    setVotacionSel(null);
+    try { localStorage.setItem('camara', c); } catch {}
+  };
   const [coherencia, setCoherencia] = useState([]);
   const [destacadas, setDestacadas] = useState([]);
   const [diputados, setDiputados] = useState([]);
@@ -674,13 +694,21 @@ export default function App() {
               onError={e => { e.currentTarget.style.display = 'none'; }} />
             Lente Democrática
           </button>
-          <div className="em" style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: C.tenue }}>
-            XV legislatura
+          <div className="camaraSel em" role="group" aria-label="Elegir parlamento">
+            <button data-on={camara === 'madrid' ? '1' : '0'} aria-pressed={camara === 'madrid'}
+              onClick={() => elegirCamara('madrid')}>Madrid</button>
+            <button data-on={camara === 'espana' ? '1' : '0'} aria-pressed={camara === 'espana'}
+              onClick={() => elegirCamara('espana')}>España</button>
           </div>
         </div>
 
         <Marca key={`marca-${seccion}`} quieta={seccion === 'inicio'} />
 
+        {camara === 'madrid' ? (
+          <Suspense fallback={<Cargando />}>
+            <Madrid />
+          </Suspense>
+        ) : (<>
         <nav className="nav">
           {secciones.map(([k, t]) => (
             <button key={k} className="navb" data-on={seccion === k ? '1' : '0'}
@@ -1143,9 +1171,12 @@ export default function App() {
           </div>
         </motion.div>
         </AnimatePresence>
+        </>)}
 
         <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 12, color: C.tenue, lineHeight: 1.9 }}>
-          Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.
+          {camara === 'madrid'
+            ? 'Fuente: Asamblea de Madrid, fichas de diputados y declaraciones de bienes publicadas.'
+            : 'Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.'}
           Aplicación independiente, sin vínculo con ninguna institución.{' '}
           <button onClick={() => { setSeccion('metodo'); setVotacionSel(null); }} style={{
             background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',

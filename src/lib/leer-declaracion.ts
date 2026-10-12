@@ -60,7 +60,7 @@ const ESQUEMA = {
   required: ['confianza', 'dudas']
 };
 
-const PROMPT = `Lees una DECLARACIÓN DE BIENES Y RENTAS de un diputado del Congreso de España.
+const PROMPT_BASE = `Lees una DECLARACIÓN DE BIENES Y RENTAS de un diputado del Congreso de España.
 Es un documento escaneado o con texto. Extrae los valores EXACTAMENTE como aparecen escritos.
 
 REGLAS CRÍTICAS:
@@ -356,13 +356,17 @@ export async function revalidarCifrasAnomalas(
   return { ok: false, error: 'revalidación fallida' };
 }
 
-export async function leerDeclaracion(url: string): Promise<{ ok: boolean; datos?: DeclaracionLeida; error?: string; modelo?: string }> {
-  const clave = exigirEnv('GEMINI_API_KEY');
+type Lectura = { ok: boolean; datos?: DeclaracionLeida; error?: string; modelo?: string };
 
+export async function leerDeclaracion(url: string): Promise<Lectura> {
   const r = await fetch(url, { headers: { 'User-Agent': UA } });
   if (!r.ok) return { ok: false, error: `El PDF devolvio HTTP ${r.status}` };
+  return leerDeclaracionPdf(Buffer.from(await r.arrayBuffer()));
+}
 
-  const buf = Buffer.from(await r.arrayBuffer());
+export async function leerDeclaracionPdf(buf: Buffer, organo = 'del Congreso de España'): Promise<Lectura> {
+  const clave = exigirEnv('GEMINI_API_KEY');
+  const PROMPT = PROMPT_BASE.replace('del Congreso de España', organo);
   if (buf.subarray(0, 4).toString() !== '%PDF') return { ok: false, error: 'La URL no devuelve un PDF' };
   if (buf.length > 18 * 1024 * 1024) return { ok: false, error: 'PDF demasiado grande' };
 

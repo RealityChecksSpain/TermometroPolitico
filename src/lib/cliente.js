@@ -912,3 +912,25 @@ export async function traerMaterias() {
   if (error) return [];
   return data ?? [];
 }
+export function traerHallazgosMadrid() {
+  return recordar('hallazgosMadrid', async () => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('v_asamblea_hallazgos').select('*')
+      .order('relevancia', { ascending: false }).order('orden');
+    if (error) throw error;
+    return (data ?? []).filter(h => h.titular);
+  }).catch(e => {
+    console.error(`traerHallazgosMadrid: ${e?.message ?? e}`);
+    return [];
+  });
+}
+
+export function traerDiputadosMadrid() {
+  return recordar('diputadosMadrid', async () => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('v_asamblea_diputados').select('*')
+      .eq('activo', true).order('nombre_completo');
+    if (error) throw error;
+    return data ?? [];
+  });
+}

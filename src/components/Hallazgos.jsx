@@ -93,7 +93,7 @@ function utilizable(h) {
   return true;
 }
 
-export default function Hallazgos({ onIr, onLey }) {
+export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
   const reducido = useReducedMotion();
   const [lista, setLista] = useState([]);
   const [i, setI] = useState(0);
@@ -104,14 +104,14 @@ export default function Hallazgos({ onIr, onLey }) {
   const [descartados, setDescartados] = useState(0);
 
   useEffect(() => {
-    traerHallazgos()
+    traer()
       .then(filas => {
         const buenos = (filas ?? []).filter(utilizable);
         setDescartados((filas ?? []).length - buenos.length);
         setLista(buenos.slice(0, MAXIMO));
       })
       .catch(() => setLista([]));
-  }, []);
+  }, [traer]);
 
   useEffect(() => {
     if (pausa || manual || reducido || lista.length < 2) return;
