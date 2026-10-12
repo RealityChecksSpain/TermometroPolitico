@@ -930,10 +930,20 @@ export function traerDiputadosMadrid() {
     if (!supabase) return [];
     const [{ data, error }, asistencia] = await Promise.all([
       supabase.from('v_asamblea_diputados').select('*').eq('activo', true).order('nombre_completo'),
-      supabase.from('v_asamblea_asistencia').select('id_asamblea, plenos_convocado, plenos_faltados')
+      supabase.from('v_asamblea_asistencia').select('id_asamblea, plenos_convocado, plenos_asistidos, plenos_faltados, telematicos')
     ]);
     if (error) throw error;
     const faltas = new Map((asistencia.error ? [] : asistencia.data ?? []).map(a => [a.id_asamblea, a]));
     return (data ?? []).map(d => ({ ...d, ...(faltas.get(d.id_asamblea) ?? {}) }));
+  });
+}
+
+export function traerDocumentosMadrid(idAsamblea) {
+  return recordar(`documentosMadrid:${idAsamblea}`, async () => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('v_asamblea_documentos').select('url, tipo, fecha')
+      .eq('id_asamblea', idAsamblea).order('fecha', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data ?? [];
   });
 }

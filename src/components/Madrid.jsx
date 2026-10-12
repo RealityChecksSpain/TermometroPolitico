@@ -1,14 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import Hallazgos from './Hallazgos.jsx';
+import Hemiciclo from './Hemiciclo.jsx';
 import { traerDiputadosMadrid, traerHallazgosMadrid } from '../lib/cliente.js';
+
+const FichaMadrid = lazy(() => import('./FichaMadrid.jsx'));
 
 const estilos = `
 .madCab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 4px}
 .madPartidos{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
 .madOrden{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
-.madFila{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;
+.madHemi{margin:14px 0 4px}
+.madFila{cursor:pointer;display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;
 padding:10px 12px;border-top:1px solid #E3DFD1}
 .madFila:last-child{border-bottom:1px solid #E3DFD1}
+.madFila:hover{background:#F8F6EE}
 .madNombre{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .madMeta{font-size:10.5px;color:#7C8288;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
 .madDatos{display:flex;gap:14px;flex-wrap:wrap;text-align:right}
@@ -36,10 +41,11 @@ export default function Madrid() {
   const [partido, setPartido] = useState(null);
   const [orden, setOrden] = useState('inmuebles');
   const [busqueda, setBusqueda] = useState('');
+  const [sel, setSel] = useState(null);
 
   useEffect(() => {
     traerDiputadosMadrid()
-      .then(d => { setDiputados(d); setEstado(d.length ? 'listo' : 'vacio'); })
+      .then(d => { setDiputados(d.map(x => ({ ...x, mandato_id: x.id_asamblea }))); setEstado(d.length ? 'listo' : 'vacio'); })
       .catch(() => setEstado('error'));
   }, []);
 
@@ -55,6 +61,13 @@ export default function Madrid() {
   }, [diputados]);
 
   const leidas = diputados.filter(d => d.url_declaracion).length;
+
+  const escanos = useMemo(() => {
+    const puesto = new Map(partidos.map((p, i) => [p.siglas, i]));
+    return [...diputados].sort((a, b) =>
+      (puesto.get(a.partido_siglas ?? 'SIN PARTIDO') - puesto.get(b.partido_siglas ?? 'SIN PARTIDO')) ||
+      a.nombre_completo.localeCompare(b.nombre_completo, 'es'));
+  }, [diputados, partidos]);
 
   const lista = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -85,15 +98,26 @@ export default function Madrid() {
 
       {estado === 'listo' && (
         <>
-          <div className="madPartidos">
-            <button className="chip" data-on={partido ? '0' : '1'} onClick={() => setPartido(null)}>Todos {diputados.length}</button>
-            {partidos.map(p => (
-              <button key={p.siglas} className="chip" data-on={partido === p.siglas ? '1' : '0'}
-                onClick={() => setPartido(partido === p.siglas ? null : p.siglas)}>
-                <span style={{ width: 8, height: 8, borderRadius: 8, background: p.color, display: 'inline-block' }} />
-                {p.siglas} {p.n}
-              </button>
-            ))}
+          <div className="hero madHemi">
+            <div className="madPartidos" style={{ marginTop: 0 }}>
+              <button className="chip" data-on={partido ? '0' : '1'} onClick={() => setPartido(null)}>Todos {diputados.length}</button>
+              {partidos.map(p => (
+                <button key={p.siglas} className="chip" data-on={partido === p.siglas ? '1' : '0'}
+                  onClick={() => setPartido(partido === p.siglas ? null : p.siglas)}>
+                  <span style={{ width: 8, height: 8, borderRadius: 8, background: p.color, display: 'inline-block' }} />
+                  {p.siglas} {p.n}
+                </button>
+              ))}
+            </div>
+            <Hemiciclo
+              diputados={escanos}
+              resaltado={partido ? d => (d.partido_siglas ?? 'SIN PARTIDO') === partido : null}
+              seleccionado={sel?.id_asamblea}
+              onSeleccionar={setSel}
+            />
+            <div className="em" style={{ fontSize: 10, color: '#8E959C', marginTop: 6 }}>
+              Escaños agrupados por número de diputados de cada grupo, no por ideología: la Asamblea no publica cómo vota cada diputado.
+            </div>
           </div>
 
           <div className="madOrden">
@@ -106,7 +130,9 @@ export default function Madrid() {
 
           <div className="tarjeta" style={{ border: 0, background: 'transparent', boxShadow: 'none' }}>
             {lista.map(d => (
-              <div key={d.id_asamblea} className="madFila">
+              <div key={d.id_asamblea} className="madFila" role="button" tabIndex={0}
+                onClick={() => setSel(d)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(d); } }}>
                 <span style={{ width: 4, height: 30, background: d.color, borderRadius: 2 }} />
                 <div style={{ minWidth: 0 }}>
                   <div className="madNombre">
@@ -133,9 +159,9 @@ export default function Madrid() {
                     </div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
-                    <a className="em" href={d.url_ficha} target="_blank" rel="noopener noreferrer">ficha ↗</a>
+                    <a className="em" href={d.url_ficha} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>ficha ↗</a>
                     {d.url_declaracion && (
-                      <a className="em" href={d.url_declaracion} target="_blank" rel="noopener noreferrer">
+                      <a className="em" href={d.url_declaracion} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                         declaración{d.fecha_declaracion ? ` ${d.fecha_declaracion.split('-').reverse().join('/')}` : ''} ↗
                       </a>
                     )}
@@ -153,6 +179,12 @@ export default function Madrid() {
             La Asamblea no publica en su web ni en datos abiertos cómo vota cada diputado: su página de votaciones está vacía.
           </p>
         </>
+      )}
+
+      {sel && (
+        <Suspense fallback={null}>
+          <FichaMadrid d={sel} onCerrar={() => setSel(null)} />
+        </Suspense>
       )}
     </div>
   );
