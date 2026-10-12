@@ -12,12 +12,12 @@ const OCULTO = process.argv.includes('--oculto');
 const PAUSA_MS = 4000;
 
 const PAGINAS = [
-  `${BASE}/diputados`,
-  `${BASE}/composicion/diputados/regimen-economico-social/lista-general-bienes`,
-  `${BASE}/actividad/leyes-y-resoluciones`,
-  `${BASE}/organos/pleno/informacion-pleno`,
-  `${BASE}/servicios/datos-abiertos`,
-  `${BASE}/transparencia`
+  `${BASE}/composicion/diputados`,
+  `${BASE}/composicion/grupos-parlamentarios`,
+  `${BASE}/actividad/votaciones`,
+  `${BASE}/composicion/diputados/ficha-del-diputado?diputado=2026`,
+  `${BASE}/composicion/diputados/regimen-economico-social/lista-general-retribuciones`,
+  `${BASE}/servicios/datos-abiertos`
 ];
 
 const CLAVES = /bien|declara|inter[eé]s|actividad|retribu|votaci|voto|diario|sesi[oó]n|pleno|datos.abiertos|opendata|iniciativ|boam|ley|resoluci|\.pdf|\.json|\.csv|\.xml|\.xlsx?|rss|api/i;
@@ -80,7 +80,7 @@ async function guardarPagina(page: Page, url: string): Promise<Enlace[]> {
   console.log(`  texto ${texto.length} caracteres, enlaces ${lista.length}, interesantes ${utiles.length}`);
   for (const e of utiles.slice(0, 40)) console.log(`    ${e.texto || '(sin texto)'}  ->  ${e.href}`);
   console.log('  primeras lineas:');
-  console.log(texto.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 25).map(l => '    ' + l.slice(0, 160)).join('\n'));
+  console.log(texto.split('\n').map(l => l.trim()).filter(Boolean).slice(20, 120).map(l => '    ' + l.slice(0, 160)).join('\n'));
   return lista;
 }
 
@@ -125,7 +125,33 @@ async function main() {
   }
 
   const unicos = [...new Map(todos.map(e => [e.href, e])).values()].filter(e => e.href.startsWith(BASE));
-  const ficha = unicos.find(e => /\/diputados\/[^/?#]+\/?$/i.test(e.href) && !/lista|regimen/i.test(e.href));
+  const relevantes = unicos.filter(e => /composicion|votaci|opendata|ficha|grupo|\.csv|\.xlsx?|\.json|\.xml/i.test(e.href) && !/#$/.test(e.href));
+  await writeFile(join(SALIDA, 'enlaces.txt'), relevantes.map(e => `${e.texto}\t${e.href}`).join('\n'));
+  console.log(`\n=== ENLACES RELEVANTES (${relevantes.length}), tambien en enlaces.txt`);
+  for (const e of relevantes) console.log(`    ${e.texto || '(sin texto)'}  ->  ${e.href}`);
+
+  const votacion = unicos.find(e => /votaci/i.test(e.href) && /[?&](id|votacion|p_p_id)=/i.test(e.href) && !/NumeroDePagina/i.test(e.href));
+  if (votacion) {
+    console.log(`\n=== DETALLE DE VOTACION ${votacion.texto}: ${votacion.href}`);
+    if (await cargar(page, votacion.href)) await guardarPagina(page, votacion.href);
+    await esperar(PAUSA_MS);
+  } else console.log('\n=== DETALLE DE VOTACION: no encuentro enlace');
+
+  const datos = unicos.filter(e => /opendata.*\.csv/i.test(e.href));
+  for (const d of datos.slice(0, 12)) {
+    console.log(`\n=== CSV ${d.href}`);
+    try {
+      const res = await page.context().request.get(d.href, { timeout: 60000 });
+      const txt = (await res.body()).toString('latin1');
+      await writeFile(join(SALIDA, nombreFichero(d.href, '')), txt);
+      const lineas = txt.split(/\r?\n/);
+      console.log(`  estado ${res.status()}  ${lineas.length} lineas`);
+      console.log(lineas.slice(0, 4).map(l => '    ' + l.slice(0, 400)).join('\n'));
+    } catch (e) { console.log(`  fallo: ${(e as Error).message.split('\n')[0]}`); }
+    await esperar(1500);
+  }
+
+  const ficha = unicos.find(e => /ficha-del-diputado\?diputado=\d+/i.test(e.href) && !/diputado=2026\b/.test(e.href));
   if (ficha) {
     console.log(`\n=== FICHA ${ficha.texto}: ${ficha.href}`);
     if (await cargar(page, ficha.href)) await guardarPagina(page, ficha.href);
