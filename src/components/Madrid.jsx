@@ -5,8 +5,9 @@ import { traerDiputadosMadrid, traerHallazgosMadrid } from '../lib/cliente.js';
 
 const FichaMadrid = lazy(() => import('./FichaMadrid.jsx'));
 const LeyesMadrid = lazy(() => import('./LeyesMadrid.jsx'));
+const PartidosMadrid = lazy(() => import('./PartidosMadrid.jsx'));
 
-const SECCIONES = [['diputados', 'Diputados'], ['leyes', 'Leyes']];
+const SECCIONES = [['diputados', 'Diputados'], ['leyes', 'Leyes'], ['partidos', 'Partidos']];
 
 const estilos = `
 .madCab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 4px}
@@ -110,9 +111,15 @@ export default function Madrid() {
         </Suspense>
       )}
 
-      {seccion === 'diputados' && estado === 'cargando' && <p className="pie">Cargando diputados…</p>}
-      {seccion === 'diputados' && estado === 'error' && <p className="pie">No se pueden leer los datos de la Asamblea ahora mismo.</p>}
-      {seccion === 'diputados' && estado === 'vacio' && <p className="pie">Todavía no hay datos de la Asamblea de Madrid cargados.</p>}
+      {seccion === 'partidos' && estado === 'listo' && (
+        <Suspense fallback={<p className="pie">Cargando partidos…</p>}>
+          <PartidosMadrid diputados={diputados} partidos={partidos} />
+        </Suspense>
+      )}
+
+      {seccion !== 'leyes' && estado === 'cargando' && <p className="pie">Cargando diputados…</p>}
+      {seccion !== 'leyes' && estado === 'error' && <p className="pie">No se pueden leer los datos de la Asamblea ahora mismo.</p>}
+      {seccion !== 'leyes' && estado === 'vacio' && <p className="pie">Todavía no hay datos de la Asamblea de Madrid cargados.</p>}
 
       {seccion === 'diputados' && estado === 'listo' && (
         <>

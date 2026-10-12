@@ -955,6 +955,16 @@ export function traerLeyesMadrid() {
   });
 }
 
+export function traerIniciativasResumenMadrid() {
+  return recordar('iniciativasResumenMadrid', async () => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('v_asamblea_iniciativas_resumen')
+      .select('siglas, tipo_siglas, presentadas, no_admitidas, retiradas, votadas, aprobadas');
+    if (error) throw error;
+    return data ?? [];
+  });
+}
+
 export function traerDocumentosMadrid(idAsamblea) {
   return recordar(`documentosMadrid:${idAsamblea}`, async () => {
     if (!supabase) return [];
