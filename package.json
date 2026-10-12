@@ -72,6 +72,7 @@
     "sondear:asamblea": "node --import tsx scripts/sondear-asamblea.ts",
     "asamblea": "node --env-file=.env --import tsx scripts/asamblea.ts",
     "asamblea:asistencia": "node --env-file=.env --import tsx scripts/asamblea-asistencia.ts",
+    "asamblea:iniciativas": "node --env-file=.env --import tsx scripts/asamblea-iniciativas.ts",
     "cargos": "node --env-file=.env --import tsx scripts/asignar-cargos.ts",
     "cargos:candidatos": "node --env-file=.env --import tsx scripts/asignar-cargos.ts --candidatos",
     "cargos:auto": "node --env-file=.env --import tsx scripts/cargar-cargos.ts",
