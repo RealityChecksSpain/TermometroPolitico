@@ -32,22 +32,47 @@ async function resultados(page: Page): Promise<{ hallados: Hallado[]; siguiente:
   return { hallados, siguiente: sig?.href ?? null };
 }
 
+async function fijar(page: Page, sufijo: string, valor: string): Promise<boolean> {
+  const cambiado = await page.evaluate(([suf, val]) => {
+    const el = [...document.querySelectorAll('select')].find(s => s.name.endsWith(suf)) as HTMLSelectElement | undefined;
+    if (!el) return false;
+    if (el.value === val) return true;
+    el.value = val;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }, [sufijo, valor]);
+  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  await esperar(PAUSA_MS);
+  return cambiado;
+}
+
+async function valorDe(page: Page, sufijo: string) {
+  return page.evaluate(suf => ([...document.querySelectorAll('select')].find(s => s.name.endsWith(suf)) as HTMLSelectElement | undefined)?.value ?? null, sufijo);
+}
+
 async function buscarTipo(page: Page, tipo: string): Promise<Hallado[]> {
   if (!(await cargar(page, BUSCADOR))) throw new Error('No carga el buscador de iniciativas');
-  await page.selectOption('select[name$="_legislatura"]', '13');
-  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await esperar(PAUSA_MS);
-  await page.selectOption('select[name$="_tipo"]', tipo);
-  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-  await esperar(PAUSA_MS);
-  const boton = page.locator('form:has(select[name$="_tipo"]) [type=submit], form:has(select[name$="_tipo"]) button').first();
+  if ((await valorDe(page, '_legislatura')) !== '13') await fijar(page, '_legislatura', '13');
+  await fijar(page, '_tipo', tipo);
+  console.log(`  ${tipo}: legislatura ${await valorDe(page, '_legislatura')}, tipo ${await valorDe(page, '_tipo')}`);
+  const boton = page.locator('form:has(select[name$="_tipo"])').locator('button:visible, input[type=submit]:visible').filter({ hasText: /buscar/i }).first();
+  const botones = await page.locator('form:has(select[name$="_tipo"])').locator('button:visible, input[type=submit]:visible').allInnerTexts().catch(() => []);
+  console.log(`  botones del formulario: ${botones.map(b => b.trim()).filter(Boolean).join(' | ') || '(ninguno visible)'}`);
   if (await boton.count()) {
     await Promise.all([page.waitForLoadState('domcontentloaded').catch(() => {}), boton.click()]);
   } else {
-    await page.locator('select[name$="_tipo"]').press('Enter');
+    await page.evaluate(() => {
+      const f = ([...document.querySelectorAll('select')].find(s => s.name.endsWith('_tipo')) as HTMLSelectElement | undefined)?.form;
+      if (f) (f.requestSubmit ? f.requestSubmit() : f.submit());
+    });
   }
   await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await esperar(PAUSA_MS);
+  const muestra = (await resultados(page)).hallados.slice(0, 3).map(h => h.clave).join(', ');
+  console.log(`  primeros resultados: ${muestra || '(ninguno)'}`);
+  const sig = (await enlaces(page)).find(e => /^siguiente$/i.test(e.texto) && !e.href.endsWith('#'));
+  if (sig) console.log(`  parámetros de la página 2: ${decodeURIComponent(sig.href.split('FormValues=')[1] ?? '').slice(0, 400)}`);
 
   const todos = new Map<string, Hallado>();
   let pagina = 1;
