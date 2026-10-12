@@ -938,6 +938,23 @@ export function traerDiputadosMadrid() {
   });
 }
 
+export function traerLeyesMadrid() {
+  return recordar('leyesMadrid', async () => {
+    if (!supabase) return [];
+    const filas = [];
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await supabase.from('v_asamblea_leyes')
+        .select('clave, tipo_siglas, tipo, exp_reg, exp_ano, num_ley, asunto, organo, estado, resultado, fecha, autor')
+        .order('fecha', { ascending: false, nullsFirst: false }).order('clave')
+        .range(desde, desde + 999);
+      if (error) throw error;
+      filas.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    return filas;
+  });
+}
+
 export function traerDocumentosMadrid(idAsamblea) {
   return recordar(`documentosMadrid:${idAsamblea}`, async () => {
     if (!supabase) return [];

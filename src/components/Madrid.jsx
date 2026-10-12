@@ -4,6 +4,9 @@ import Hemiciclo from './Hemiciclo.jsx';
 import { traerDiputadosMadrid, traerHallazgosMadrid } from '../lib/cliente.js';
 
 const FichaMadrid = lazy(() => import('./FichaMadrid.jsx'));
+const LeyesMadrid = lazy(() => import('./LeyesMadrid.jsx'));
+
+const SECCIONES = [['diputados', 'Diputados'], ['leyes', 'Leyes']];
 
 const estilos = `
 .madCab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 4px}
@@ -42,6 +45,7 @@ export default function Madrid() {
   const [orden, setOrden] = useState('inmuebles');
   const [busqueda, setBusqueda] = useState('');
   const [sel, setSel] = useState(null);
+  const [seccion, setSeccion] = useState('diputados');
 
   useEffect(() => {
     traerDiputadosMadrid()
@@ -59,6 +63,8 @@ export default function Madrid() {
     }
     return [...m.values()].sort((a, b) => b.n - a.n);
   }, [diputados]);
+
+  const colores = useMemo(() => new Map(partidos.map(p => [p.siglas, p.color])), [partidos]);
 
   const leidas = diputados.filter(d => d.url_declaracion).length;
 
@@ -81,7 +87,7 @@ export default function Madrid() {
   }, [diputados, partido, orden, busqueda]);
 
   return (
-    <div className="solo1" data-seccion="diputados">
+    <div className="solo1" data-seccion={seccion}>
       <style>{estilos}</style>
       <div className="madCab">
         <h2 className="t1">Asamblea de Madrid</h2>
@@ -90,13 +96,25 @@ export default function Madrid() {
         </span>
       </div>
 
-      <Hallazgos traer={traerHallazgosMadrid} />
+      <nav className="nav" aria-label="Secciones de la Asamblea de Madrid">
+        {SECCIONES.map(([k, t]) => (
+          <button key={k} className="navb" data-on={seccion === k ? '1' : '0'} onClick={() => setSeccion(k)}>{t}</button>
+        ))}
+      </nav>
 
-      {estado === 'cargando' && <p className="pie">Cargando diputados…</p>}
-      {estado === 'error' && <p className="pie">No se pueden leer los datos de la Asamblea ahora mismo.</p>}
-      {estado === 'vacio' && <p className="pie">Todavía no hay datos de la Asamblea de Madrid cargados.</p>}
+      <Hallazgos traer={traerHallazgosMadrid} onIr={s => setSeccion(s === 'leyes' ? 'leyes' : 'diputados')} />
 
-      {estado === 'listo' && (
+      {seccion === 'leyes' && (
+        <Suspense fallback={<p className="pie">Cargando iniciativas…</p>}>
+          <LeyesMadrid colores={colores} />
+        </Suspense>
+      )}
+
+      {seccion === 'diputados' && estado === 'cargando' && <p className="pie">Cargando diputados…</p>}
+      {seccion === 'diputados' && estado === 'error' && <p className="pie">No se pueden leer los datos de la Asamblea ahora mismo.</p>}
+      {seccion === 'diputados' && estado === 'vacio' && <p className="pie">Todavía no hay datos de la Asamblea de Madrid cargados.</p>}
+
+      {seccion === 'diputados' && estado === 'listo' && (
         <>
           <div className="hero madHemi">
             <div className="madPartidos" style={{ marginTop: 0 }}>
