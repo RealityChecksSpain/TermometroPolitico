@@ -21,7 +21,9 @@ const VOTADAS = [
   { k: 'cumplida', color: VERDE, corto: 'Cumplidas', largo: 'La votó a favor y salió una norma.' },
   { k: 'apoyada_no_decisiva', color: AZUL, corto: 'Solo paso previo', largo: 'La apoyó y salió, pero en un paso que no aprueba ninguna ley: una toma en consideración (solo admite la ley a trámite), una proposición no de ley o una moción. No cuenta como cumplida.' },
   { k: 'apoyada_sin_aprobar', color: MOSTAZA, corto: 'Apoyó, no salió', largo: 'La apoyó y la votación no salió adelante.' },
-  { k: 'contradicha', color: ROJO, corto: 'Votó en contra', largo: 'Votó lo contrario de lo que prometió.' }
+  { k: 'contradicha', color: ROJO, corto: 'Votó en contra', largo: 'Votó lo contrario de lo que prometió.' },
+  { k: 'abstencion', color: GRIS, corto: 'Se abstuvo', largo: 'Llegó a votarse y el partido se abstuvo.' },
+  { k: 'se_opuso_a_lo_contrario', color: '#5B4A8A', corto: 'Contra lo contrario', largo: 'Su promesa no llegó a votarse; votó en contra de una propuesta que iba en sentido opuesto. Coherente, pero no es haberla apoyado.' }
 ];
 
 const FILTROS = [
@@ -356,7 +358,9 @@ function Pasado({ partido, filtro }) {
     { k: 'cumplida', titulo: 'Logros', vacio: 'Ninguna promesa verificable acabó en una norma aprobada con su voto.' },
     { k: 'contradicha', titulo: 'Votó en contra', vacio: 'No votó en contra de ninguna de sus promesas verificables.' },
     { k: 'apoyada_no_decisiva', titulo: 'Solo paso previo', vacio: 'Ninguna.' },
-    { k: 'apoyada_sin_aprobar', titulo: 'Apoyó, no salió', vacio: 'Ninguna.' }
+    { k: 'apoyada_sin_aprobar', titulo: 'Apoyó, no salió', vacio: 'Ninguna.' },
+    { k: 'abstencion', titulo: 'Se abstuvo', vacio: 'Ninguna.' },
+    { k: 'se_opuso_a_lo_contrario', titulo: 'Contra lo contrario', vacio: 'Ninguna.' }
   ];
   const [todas, setTodas] = useState(null);
   useEffect(() => {
@@ -406,7 +410,7 @@ function Pasado({ partido, filtro }) {
           {filas.length} en total · desliza dentro del recuadro para verlas todas
         </div>
       )}
-      {pestana === 'apoyada_no_decisiva' && (
+      {(pestana === 'apoyada_no_decisiva' || pestana === 'se_opuso_a_lo_contrario') && (
         <div style={{ fontSize: 12.5, lineHeight: 1.45, background: PAPEL, border: `2px solid ${NEGRO}`, padding: '8px 10px' }}>
           {est.largo}
         </div>

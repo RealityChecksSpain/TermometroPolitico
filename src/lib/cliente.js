@@ -436,7 +436,7 @@ export function traerPromesasVotadas(partido) {
       base.select('id, texto, estado, norma_titular, norma_fecha')
         .eq('partido', partido)
         .eq('verificable', true)
-        .in('estado', ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'contradicha']));
+        .in('estado', ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'contradicha', 'abstencion', 'se_opuso_a_lo_contrario']));
     if (error) throw error;
     const porEstado = {};
     for (const f of data ?? []) {

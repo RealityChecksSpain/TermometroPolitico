@@ -16,10 +16,12 @@ const ESTADO = {
   apoyada_no_decisiva: { icono: '◑', color: '#3F6E8C', fondo: '#E4EEF4', texto: 'la apoyó en un paso previo, no en la votación final' },
   apoyada_sin_aprobar: { icono: '◐', color: '#8A6D1F', fondo: '#F6EFDC', texto: 'la apoyó, no salió' },
   contradicha: { icono: '✕', color: '#9E1B32', fondo: '#FBE9EC', texto: 'votó lo contrario' },
+  abstencion: { icono: '–', color: '#6B6F75', fondo: '#ECECE6', texto: 'se abstuvo' },
+  se_opuso_a_lo_contrario: { icono: '⇄', color: '#5B4A8A', fondo: '#ECE8F4', texto: 'votó en contra de lo contrario; su promesa no llegó a votarse' },
   pendiente: { icono: '○', color: '#8E9299', fondo: '#F1F1EC', texto: 'sin votación aún' }
 };
 
-const ORDEN = ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'contradicha', 'pendiente'];
+const ORDEN = ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'abstencion', 'contradicha', 'se_opuso_a_lo_contrario', 'pendiente'];
 
 const MUESTRA_MINIMA = 10;
 
@@ -33,6 +35,8 @@ function desdeResumen(f) {
     apoyada_no_decisiva: Number(f.apoyada_no_decisiva ?? 0),
     apoyada_sin_aprobar: Number(f.apoyada_sin_aprobar ?? 0),
     contradicha: Number(f.contradicha ?? 0),
+    abstencion: Number(f.abstencion ?? 0),
+    se_opuso_a_lo_contrario: Number(f.se_opuso_a_lo_contrario ?? 0),
     pendiente: Number(f.pendiente ?? 0),
     total,
     juzgadas,
@@ -63,13 +67,13 @@ function Estado({ pr }) {
 
 function contar(filas) {
   const verificables = (filas ?? []).filter(x => x.verificable);
-  const n = { cumplida: 0, apoyada_no_decisiva: 0, apoyada_sin_aprobar: 0, contradicha: 0, pendiente: 0 };
+  const n = { cumplida: 0, apoyada_no_decisiva: 0, apoyada_sin_aprobar: 0, contradicha: 0, abstencion: 0, se_opuso_a_lo_contrario: 0, pendiente: 0 };
   for (const x of verificables) {
     if (n[x.estado] === undefined) n.pendiente++;
     else n[x.estado]++;
   }
   const total = verificables.length;
-  const juzgadas = total - n.pendiente;
+  const juzgadas = total - n.pendiente - n.se_opuso_a_lo_contrario;
   const intentadas = n.cumplida + n.apoyada_no_decisiva + n.apoyada_sin_aprobar;
   return {
     ...n, total, juzgadas, intentadas,
@@ -120,12 +124,16 @@ function frase(p, c) {
   if (c.apoyada_no_decisiva) trozos.push(`apoyó ${c.apoyada_no_decisiva} en votaciones que no aprueban ninguna norma`);
   if (c.apoyada_sin_aprobar) trozos.push(`apoyó ${c.apoyada_sin_aprobar} sin que salieran adelante`);
   if (c.contradicha) trozos.push(`votó en contra de ${c.contradicha}`);
+  if (c.abstencion) trozos.push(`se abstuvo en ${c.abstencion}`);
   if (!trozos.length) return `${c.juzgadas} compromisos ya votados, sin correspondencia clara.`;
   const cola = trozos.length > 1
     ? `${trozos.slice(0, -1).join(', ')} y ${trozos[trozos.length - 1]}`
     : trozos[0];
   const aviso = c.juzgadas < MUESTRA_MINIMA ? ' Muestra pequeña.' : '';
-  return `De ${c.juzgadas} compromisos ya votados, ${siglasPartido(p.siglas)} ${cola}.${aviso}`;
+  const contrario = c.se_opuso_a_lo_contrario
+    ? ` Además, en ${c.se_opuso_a_lo_contrario} votó en contra de propuestas opuestas a lo que prometió, sin que su promesa llegara a votarse.`
+    : '';
+  return `De ${c.juzgadas} compromisos ya votados, ${siglasPartido(p.siglas)} ${cola}.${aviso}${contrario}`;
 }
 
 export default function Partidos({ onDiputados }) {
