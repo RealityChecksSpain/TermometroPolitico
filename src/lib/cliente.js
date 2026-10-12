@@ -944,7 +944,7 @@ export function traerLeyesMadrid() {
     const filas = [];
     for (let desde = 0; ; desde += 1000) {
       const { data, error } = await supabase.from('v_asamblea_leyes')
-        .select('clave, tipo_siglas, tipo, exp_reg, exp_ano, num_ley, asunto, organo, estado, resultado, fecha, autor')
+        .select('*')
         .order('fecha', { ascending: false, nullsFirst: false }).order('clave')
         .range(desde, desde + 999);
       if (error) throw error;

@@ -166,7 +166,11 @@ export default function LeyesMadrid({ colores }) {
                   {l.tipo_siglas !== 'PNL' && l.num_ley && l.num_ley !== '-' && <span>Ley {l.num_ley}</span>}
                   {l.tipo_siglas === 'PNL' && l.organo && l.organo !== '-' && <span>{l.organo}</span>}
                   {l.fecha && <span>{fecha(l.fecha)}</span>}
+                  {l.url && <a href={l.url} target="_blank" rel="noopener noreferrer" style={{ color: '#3C63A0' }}>expediente ↗</a>}
                 </div>
+                {l.firmantes && abierta === l.clave && (
+                  <div className="em" style={{ fontSize: 10.5, color: '#4A5057', marginTop: 4 }}>Firman: {l.firmantes}</div>
+                )}
               </div>
             </div>
           );
