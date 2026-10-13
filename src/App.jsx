@@ -43,6 +43,11 @@ ${cssBauhaus(ES)}
 .app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .hero{border:3px solid ${ES.negro};border-radius:0;box-shadow:6px 6px 0 ${ES.c}}
 .app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .t1{font-family:'Archivo Variable','Archivo',system-ui,sans-serif;font-weight:800;letter-spacing:-.02em}
 .app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .nota{background:${ES.crema};border-left:4px solid ${ES.b}}
+.notaPlegable summary{cursor:pointer;list-style:none;font-family:'DM Mono',ui-monospace,monospace;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;display:inline-flex;gap:8px}
+.notaPlegable summary::-webkit-details-marker{display:none}
+.notaPlegable summary::after{content:'+'}
+.notaPlegable[open] summary::after{content:'−'}
+.notaPlegable[open] summary{margin-bottom:8px}
 .app[data-camara="espana"] .navb[data-on="1"]{color:${ES.a};border-top-color:${ES.a};border-bottom-color:${ES.a}}
 `;
 
@@ -1000,7 +1005,8 @@ export default function App() {
               </div>
 
               {orden === 'patrimonio' && (
-                <div className="nota">
+                <details className="nota notaPlegable">
+                  <summary>Cómo se calcula el dinero declarado</summary>
                   Dinero declarado aproximado: depósitos + valores + planes − deuda.
                   No incluye el valor de inmuebles (el PDF no lo trae).
                   Cifras &gt;10 M o depósitos &gt;5 M se marcan para revisión (errores de coma/punto).
@@ -1008,11 +1014,12 @@ export default function App() {
                   {diputados.filter(d => d.bienes_outlier).length
                     ? ` · ${diputados.filter(d => d.bienes_outlier).length} en revisión`
                     : ''}. Ninguna la ha comprobado una persona.
-                </div>
+                </details>
               )}
 
               {(orden === 'inmuebles' || orden === 'inmuebles_todos') && (
-                <div className="nota">
+                <details className="nota notaPlegable">
+                  <summary>Cómo se cuentan los inmuebles</summary>
                   Bienes inmuebles declarados, contados por unidades y no por filas: «2 VIVIENDAS» = 2,
                   «13 FINCAS RÚSTICAS» = 13, «vivienda, plaza de garaje y trastero» = 3. Incluye viviendas,
                   parcelas y fincas, locales y naves, garajes y trasteros. Cada diputado lleva debajo su
@@ -1022,15 +1029,16 @@ export default function App() {
                     : ' Este orden suma los propios y los que figuran a nombre de una sociedad no cotizada del diputado, que se declaran por unidades aunque la cuota sea parcial. Abre la ficha para ver el desglose y el porcentaje.'}
                   {' '}Ahora: {diputados.filter(d => (d.n_casas ?? d.n_inmuebles) != null).length} con dato,
                   {' '}{diputados.filter(d => d.n_inmuebles_propios != null).length} con desglose.
-                </div>
+                </details>
               )}
 
               {orden === 'vehiculos' && (
-                <div className="nota">
+                <details className="nota notaPlegable">
+                  <summary>Qué vehículos se cuentan</summary>
                   Coches, motos, embarcaciones y aeronaves del PDF. Abre la ficha para ver el detalle
                   (p. ej. «Jeep Commander», «BMW R80RT»).
                   {' '}Ahora: {diputados.filter(d => (d.n_vehiculos ?? 0) > 0 || d.vehiculos_detalle).length} con vehículos.
-                </div>
+                </details>
               )}
 
               {orden === 'ausencias' && ausentesConCargo.length > 0 && (
