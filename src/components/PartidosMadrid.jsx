@@ -8,7 +8,7 @@ const estilos = `
 .pmTabla th:first-child,.pmTabla td:first-child{text-align:left}
 .pmTabla td{padding:8px;border-bottom:1px solid #EFECE2;text-align:right;font-variant-numeric:tabular-nums;vertical-align:top}
 .pmTabla td:first-child{color:#4A5057;max-width:230px}
-.pmTabla .pmGrupo td{background:#F8F6EE;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#7C8288;font-weight:600}
+.pmTabla .pmGrupo td{background:#E3EAF2;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#7C8288;font-weight:600}
 .pmSub{display:block;font-size:10.5px;color:#7C8288}
 `;
 

@@ -1,30 +1,42 @@
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import Hallazgos from './Hallazgos.jsx';
+import { useReducedMotion } from 'framer-motion';
 import Hemiciclo from './Hemiciclo.jsx';
-import { traerDiputadosMadrid, traerHallazgosMadrid } from '../lib/cliente.js';
+import MadridInicio from './MadridInicio.jsx';
+import { Marco, PALETAS, cssBauhaus } from './Bauhaus.jsx';
+import { traerDiputadosMadrid } from '../lib/cliente.js';
+import { useTelefono } from '../lib/pantalla.js';
 
 const FichaMadrid = lazy(() => import('./FichaMadrid.jsx'));
 const LeyesMadrid = lazy(() => import('./LeyesMadrid.jsx'));
 const PartidosMadrid = lazy(() => import('./PartidosMadrid.jsx'));
 
-const SECCIONES = [['diputados', 'Diputados'], ['leyes', 'Leyes'], ['partidos', 'Partidos']];
+const SECCIONES = [['inicio', 'Inicio'], ['diputados', 'Diputados'], ['leyes', 'Leyes'], ['partidos', 'Partidos']];
+const P = PALETAS.madrid;
 
 const estilos = `
-.madCab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 4px}
-.madPartidos{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 10px}
-.madOrden{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
-.madHemi{margin:14px 0 4px}
-.madFila{cursor:pointer;display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;
-padding:10px 12px;border-top:1px solid #E3DFD1}
-.madFila:last-child{border-bottom:1px solid #E3DFD1}
-.madFila:hover{background:#F8F6EE}
-.madNombre{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.madMeta{font-size:10.5px;color:#7C8288;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
-.madDatos{display:flex;gap:14px;flex-wrap:wrap;text-align:right}
-.madDatos a{color:#3C63A0;font-size:10.5px}
-.madDudosa{font-size:9.5px;color:#8A6D1F;background:#F6E7B0;padding:1px 5px;border-radius:2px;margin-left:6px}
-.madBusca{width:100%;max-width:320px;padding:8px 10px;border:1px solid #E3DFD1;border-radius:2px;font-size:13px;background:#fff}
-@media(max-width:600px){.madDatos{gap:10px}.madFila{grid-template-columns:4px minmax(0,1fr)}.madDatos{grid-column:2;justify-content:flex-start;text-align:left}}
+${cssBauhaus(P)}
+.madrid .navb[data-on="1"]{color:${P.a};border-top-color:${P.a};border-bottom-color:${P.a}}
+.madrid .nav{background:rgba(227,234,242,.95)}
+@media(min-width:900px){.madrid .nav{background:none}}
+.madHemi .bh-chip[data-on='1']{background:${P.b};color:${P.negro}}
+.madPartidos{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.madOrden{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.madHemi{background:${P.a};padding:16px 14px 12px;border-bottom:3px solid ${P.negro}}
+@media(min-width:900px){.madHemi{padding:24px 30px 16px}}
+.madFila{cursor:pointer;display:grid;grid-template-columns:6px minmax(0,1fr) auto;gap:12px;align-items:center;
+padding:11px 8px;border-top:2px solid ${P.negro};transition:background .2s}
+.madFila:last-child{border-bottom:2px solid ${P.negro}}
+.madFila:hover{background:${P.crema}}
+.madNombre{font-size:15px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.madMeta{font-size:10.5px;color:${P.gris};margin-top:3px;overflow:hidden;text-overflow:ellipsis}
+.madDatos{display:flex;gap:16px;flex-wrap:wrap;text-align:right}
+.madDatos a{color:${P.c};font-size:10.5px}
+.madDato{font-family:'Archivo Variable','Archivo',system-ui,sans-serif;font-weight:800;font-size:22px;line-height:1}
+.madUnidad{font-family:'DM Mono',ui-monospace,monospace;font-size:9.5px;color:${P.gris};text-transform:uppercase;letter-spacing:.05em}
+.madDudosa{font-size:9.5px;color:${P.negro};background:${P.b};padding:1px 5px;margin-left:6px;border:1.5px solid ${P.negro}}
+.madBusca{max-width:320px;padding:8px 10px;font-size:14px;box-shadow:3px 3px 0 ${P.negro}}
+.madPie{font-size:12px;color:${P.gris};line-height:1.55;margin:16px 0 0}
+@media(max-width:600px){.madDatos{gap:12px}.madFila{grid-template-columns:6px minmax(0,1fr)}.madDatos{grid-column:2;justify-content:flex-start;text-align:left}}
 `;
 
 const ORDENES = [
@@ -40,13 +52,25 @@ function numero(v) {
 }
 
 export default function Madrid() {
+  const quieto = useReducedMotion();
+  const estrecho = useTelefono();
   const [diputados, setDiputados] = useState([]);
   const [estado, setEstado] = useState('cargando');
   const [partido, setPartido] = useState(null);
   const [orden, setOrden] = useState('inmuebles');
   const [busqueda, setBusqueda] = useState('');
   const [sel, setSel] = useState(null);
-  const [seccion, setSeccion] = useState('diputados');
+  const [seccion, setSeccion] = useState('inicio');
+
+  useEffect(() => {
+    const raiz = document.documentElement;
+    const previo = [raiz.style.background, document.body.style.background];
+    raiz.style.background = P.crema;
+    document.body.style.background = P.crema;
+    return () => { raiz.style.background = previo[0]; document.body.style.background = previo[1]; };
+  }, []);
+
+  const ir = s => { setSeccion(s); window.scrollTo?.({ top: 0, behavior: quieto ? 'auto' : 'smooth' }); };
 
   useEffect(() => {
     traerDiputadosMadrid()
@@ -88,46 +112,48 @@ export default function Madrid() {
   }, [diputados, partido, orden, busqueda]);
 
   return (
-    <div className="solo1" data-seccion={seccion}>
+    <div className="solo1 madrid" data-seccion={seccion}>
       <style>{estilos}</style>
-      <div className="madCab">
-        <h2 className="t1">Asamblea de Madrid</h2>
-        <span className="em" style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: '#7C8288' }}>
-          XIII legislatura{diputados.length ? ` · ${diputados.length} escaños` : ''}
-        </span>
-      </div>
 
       <nav className="nav" aria-label="Secciones de la Asamblea de Madrid">
         {SECCIONES.map(([k, t]) => (
-          <button key={k} className="navb" data-on={seccion === k ? '1' : '0'} onClick={() => setSeccion(k)}>{t}</button>
+          <button key={k} className="navb" data-on={seccion === k ? '1' : '0'} onClick={() => ir(k)}>{t}</button>
         ))}
       </nav>
 
-      <Hallazgos traer={traerHallazgosMadrid} onIr={s => setSeccion(s === 'leyes' ? 'leyes' : 'diputados')} />
+      {seccion === 'inicio' && <MadridInicio diputados={diputados} onFicha={setSel} onIr={ir} />}
 
       {seccion === 'leyes' && (
-        <Suspense fallback={<p className="pie">Cargando iniciativas…</p>}>
-          <LeyesMadrid colores={colores} />
-        </Suspense>
+        <Marco p={P} quieto={quieto} estrecho={estrecho} antetitulo="Asamblea de Madrid · XIII legislatura" titulo="Leyes y proposiciones no de ley">
+          <div className="bh-cuerpo">
+            <Suspense fallback={<p className="madPie">Cargando iniciativas…</p>}>
+              <LeyesMadrid colores={colores} />
+            </Suspense>
+          </div>
+        </Marco>
       )}
 
       {seccion === 'partidos' && estado === 'listo' && (
-        <Suspense fallback={<p className="pie">Cargando partidos…</p>}>
-          <PartidosMadrid diputados={diputados} partidos={partidos} />
-        </Suspense>
+        <Marco p={P} quieto={quieto} estrecho={estrecho} antetitulo="Asamblea de Madrid · XIII legislatura" titulo="Los cuatro grupos, cara a cara">
+          <div className="bh-cuerpo">
+            <Suspense fallback={<p className="madPie">Cargando partidos…</p>}>
+              <PartidosMadrid diputados={diputados} partidos={partidos} />
+            </Suspense>
+          </div>
+        </Marco>
       )}
 
-      {seccion !== 'leyes' && estado === 'cargando' && <p className="pie">Cargando diputados…</p>}
-      {seccion !== 'leyes' && estado === 'error' && <p className="pie">No se pueden leer los datos de la Asamblea ahora mismo.</p>}
-      {seccion !== 'leyes' && estado === 'vacio' && <p className="pie">Todavía no hay datos de la Asamblea de Madrid cargados.</p>}
+      {seccion !== 'leyes' && estado === 'cargando' && <p className="madPie">Cargando diputados…</p>}
+      {seccion !== 'leyes' && estado === 'error' && <p className="madPie">No se pueden leer los datos de la Asamblea ahora mismo.</p>}
+      {seccion !== 'leyes' && estado === 'vacio' && <p className="madPie">Todavía no hay datos de la Asamblea de Madrid cargados.</p>}
 
       {seccion === 'diputados' && estado === 'listo' && (
-        <>
-          <div className="hero madHemi">
+        <Marco p={P} quieto={quieto} estrecho={estrecho} antetitulo={`Asamblea de Madrid · ${diputados.length} escaños`} titulo="Quién se sienta en la Asamblea">
+          <div className="madHemi">
             <div className="madPartidos" style={{ marginTop: 0 }}>
-              <button className="chip" data-on={partido ? '0' : '1'} onClick={() => setPartido(null)}>Todos {diputados.length}</button>
+              <button className="bh-chip" data-on={partido ? '0' : '1'} onClick={() => setPartido(null)}>Todos {diputados.length}</button>
               {partidos.map(p => (
-                <button key={p.siglas} className="chip" data-on={partido === p.siglas ? '1' : '0'}
+                <button key={p.siglas} className="bh-chip" data-on={partido === p.siglas ? '1' : '0'}
                   onClick={() => setPartido(partido === p.siglas ? null : p.siglas)}>
                   <span style={{ width: 8, height: 8, borderRadius: 8, background: p.color, display: 'inline-block' }} />
                   {p.siglas} {p.n}
@@ -140,20 +166,21 @@ export default function Madrid() {
               seleccionado={sel?.id_asamblea}
               onSeleccionar={setSel}
             />
-            <div className="em" style={{ fontSize: 10, color: '#8E959C', marginTop: 6 }}>
+            <div className="em" style={{ fontSize: 10, color: '#C9D6E6', marginTop: 6 }}>
               Escaños agrupados por número de diputados de cada grupo, no por ideología: la Asamblea no publica cómo vota cada diputado.
             </div>
           </div>
 
+          <div className="bh-cuerpo">
           <div className="madOrden">
             {ORDENES.map(([k, t]) => (
-              <button key={k} className="chip" data-on={orden === k ? '1' : '0'} onClick={() => setOrden(k)}>{t}</button>
+              <button key={k} className="bh-chip" data-on={orden === k ? '1' : '0'} onClick={() => setOrden(k)}>{t}</button>
             ))}
-            <input className="madBusca" placeholder="Buscar diputado" value={busqueda}
+            <input className="bh-input madBusca" placeholder="Buscar diputado" value={busqueda}
               onChange={e => setBusqueda(e.target.value)} aria-label="Buscar diputado de la Asamblea" />
           </div>
 
-          <div className="tarjeta" style={{ border: 0, background: 'transparent', boxShadow: 'none' }}>
+          <div>
             {lista.map(d => (
               <div key={d.id_asamblea} className="madFila" role="button" tabIndex={0}
                 onClick={() => setSel(d)}
@@ -170,17 +197,17 @@ export default function Madrid() {
                 </div>
                 <div className="madDatos">
                   <div>
-                    <div className="dato" style={{ fontSize: 20 }}>{numero(d.n_inmuebles_equivalentes)}</div>
-                    <span className="datoUnidad">propiedades</span>
+                    <div className="madDato">{numero(d.n_inmuebles_equivalentes)}</div>
+                    <span className="madUnidad">propiedades</span>
                   </div>
                   <div>
-                    <div className="dato" style={{ fontSize: 20 }}>{numero(d.n_viviendas_equivalentes)}</div>
-                    <span className="datoUnidad">viviendas</span>
+                    <div className="madDato">{numero(d.n_viviendas_equivalentes)}</div>
+                    <span className="madUnidad">viviendas</span>
                   </div>
                   {d.plenos_convocado > 0 && d.plenos_faltados != null && (
                     <div title={`Faltó a ${d.plenos_faltados} de los ${d.plenos_convocado} Plenos celebrados desde su alta`}>
-                      <div className="dato" style={{ fontSize: 20 }}>{d.plenos_faltados}</div>
-                      <span className="datoUnidad">faltas a Pleno</span>
+                      <div className="madDato">{d.plenos_faltados}</div>
+                      <span className="madUnidad">faltas a Pleno</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
@@ -196,14 +223,15 @@ export default function Madrid() {
             ))}
           </div>
 
-          <p className="pie" style={{ color: '#7C8288', marginTop: 14 }}>
+          <p className="madPie">
             Fuente: fichas y declaraciones de bienes publicadas por la Asamblea de Madrid. {leidas} de {diputados.length} declaraciones leídas.
             Las declaraciones son escaneos y las lee un modelo de lenguaje; cada cifra enlaza a su PDF original para comprobarla.
             Cada propiedad cuenta por la parte que declara poseer: media casa es 0,5. Las de lectura dudosa no entran en los hallazgos.
             Las faltas salen de la lista oficial de asistentes a cada Pleno que publica la Asamblea en datos abiertos y cuentan solo los Plenos posteriores al alta de cada diputado. A la presidenta y a los consejeros no se les cuentan faltas: la lista oficial no los recoge en las sesiones ordinarias y daría ausencias que no son. Los senadores pueden faltar por la agenda del Senado: su cargo aparece junto al nombre.
             La Asamblea no publica en su web ni en datos abiertos cómo vota cada diputado: su página de votaciones está vacía.
           </p>
-        </>
+          </div>
+        </Marco>
       )}
 
       {sel && (

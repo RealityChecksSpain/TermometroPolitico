@@ -3,15 +3,15 @@ import { traerLeyesMadrid } from '../lib/cliente.js';
 
 const estilos = `
 .lmTabla{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 16px}
-.lmTabla th{font-weight:500;color:#7C8288;font-size:10px;text-transform:uppercase;letter-spacing:.06em;text-align:right;padding:6px 8px;border-bottom:1px solid #E3DFD1}
+.lmTabla th{font-weight:600;color:#121A24;font-size:10px;text-transform:uppercase;letter-spacing:.06em;text-align:right;padding:6px 8px;border-bottom:3px solid #121A24}
 .lmTabla th:first-child,.lmTabla td:first-child{text-align:left}
 .lmTabla td{padding:7px 8px;border-bottom:1px solid #EFECE2;text-align:right;font-variant-numeric:tabular-nums}
-.lmFila{padding:11px 0;border-top:1px solid #E3DFD1;display:grid;grid-template-columns:4px minmax(0,1fr);gap:10px}
-.lmFila:last-child{border-bottom:1px solid #E3DFD1}
+.lmFila{padding:11px 0;border-top:2px solid #121A24;display:grid;grid-template-columns:4px minmax(0,1fr);gap:10px}
+.lmFila:last-child{border-bottom:2px solid #121A24}
 .lmAsunto{font-size:13.5px;line-height:1.45;color:#14161A;cursor:pointer;background:none;border:0;padding:0;text-align:left;font-family:inherit}
 .lmCorto{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .lmMeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:10.5px;color:#7C8288;margin-top:5px}
-.lmEstado{font-size:10px;padding:1px 6px;border-radius:2px;text-transform:uppercase;letter-spacing:.04em}
+.lmEstado{font-size:10px;padding:1px 6px;border:1.5px solid #121A24;text-transform:uppercase;letter-spacing:.04em}
 .lmFiltros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
 `;
 
@@ -112,7 +112,7 @@ export default function LeyesMadrid({ colores }) {
       <style>{estilos}</style>
       <div className="lmFiltros">
         {TIPOS.map(([k, t]) => (
-          <button key={k} className="chip" data-on={tipo === k ? '1' : '0'} onClick={() => { setTipo(k); setAutor(null); }}>{t}</button>
+          <button key={k} className="bh-chip" data-on={tipo === k ? '1' : '0'} onClick={() => { setTipo(k); setAutor(null); }}>{t}</button>
         ))}
       </div>
 
@@ -122,7 +122,7 @@ export default function LeyesMadrid({ colores }) {
         </thead>
         <tbody>
           {resumen.map(r => (
-            <tr key={r.autor} style={{ cursor: 'pointer', background: autor === r.autor ? '#F8F6EE' : 'transparent' }}
+            <tr key={r.autor} style={{ cursor: 'pointer', background: autor === r.autor ? '#E3EAF2' : 'transparent' }}
               onClick={() => setAutor(autor === r.autor ? null : r.autor)}>
               <td>
                 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 8, background: color(r.autor), marginRight: 7 }} />
@@ -138,10 +138,10 @@ export default function LeyesMadrid({ colores }) {
 
       <div className="lmFiltros">
         {RESULTADOS.map(([k, t]) => (
-          <button key={k} className="chip" data-on={resultado === k ? '1' : '0'} onClick={() => setResultado(k)}>{t}</button>
+          <button key={k} className="bh-chip" data-on={resultado === k ? '1' : '0'} onClick={() => setResultado(k)}>{t}</button>
         ))}
-        {autor && <button className="chip" data-on="1" onClick={() => setAutor(null)}>{autorCorto(autor === 'SIN AUTOR' ? null : autor)} ×</button>}
-        <input className="madBusca" placeholder="Buscar en el asunto" value={busqueda}
+        {autor && <button className="bh-chip" data-on="1" onClick={() => setAutor(null)}>{autorCorto(autor === 'SIN AUTOR' ? null : autor)} ×</button>}
+        <input className="bh-input madBusca" placeholder="Buscar en el asunto" value={busqueda}
           onChange={e => setBusqueda(e.target.value)} aria-label="Buscar iniciativa de la Asamblea" />
       </div>
 
@@ -177,7 +177,7 @@ export default function LeyesMadrid({ colores }) {
         })}
       </div>
       {lista.length > cuantas && (
-        <button className="chip" style={{ marginTop: 12 }} onClick={() => setCuantas(c => c + 60)}>
+        <button className="bh-chip" style={{ marginTop: 12 }} onClick={() => setCuantas(c => c + 60)}>
           Ver más ({lista.length - cuantas} restantes)
         </button>
       )}

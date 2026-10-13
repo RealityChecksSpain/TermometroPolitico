@@ -239,6 +239,7 @@ cursor:pointer;color:${C.tinta}}
 .camaraSel button{background:transparent;border:none;padding:6px 12px;font-size:11px;font-weight:600;
 letter-spacing:.08em;text-transform:uppercase;color:${C.tinta};cursor:pointer;min-height:32px}
 .camaraSel button[data-on="1"]{background:${C.tinta};color:${C.papel}}
+.camaraSel button[data-on="1"][data-camara="madrid"]{background:#1B3A63;color:#F4F7FB}
 @media(hover:none){.camaraSel button{min-height:44px;padding:8px 14px}}
 @media(min-width:701px){.cabeceraTitulo{gap:12px}.cabeceraTitulo img{width:64px;height:64px}}
 .filaLey{display:block;width:100%;text-align:left;cursor:pointer;padding:12px;background:transparent;border:none}
@@ -695,7 +696,7 @@ export default function App() {
             Lente Democrática
           </button>
           <div className="camaraSel em" role="group" aria-label="Elegir parlamento">
-            <button data-on={camara === 'madrid' ? '1' : '0'} aria-pressed={camara === 'madrid'}
+            <button data-on={camara === 'madrid' ? '1' : '0'} data-camara="madrid" aria-pressed={camara === 'madrid'}
               onClick={() => elegirCamara('madrid')}>Madrid</button>
             <button data-on={camara === 'espana' ? '1' : '0'} aria-pressed={camara === 'espana'}
               onClick={() => elegirCamara('espana')}>España</button>
