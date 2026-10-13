@@ -54,11 +54,16 @@ const todas = await traerTodo<any>((a, b) =>
   db().from('v_promesas').select('id, texto, partido, siglas')
     .eq('verificable', true).order('id').range(a, b));
 
+const descartadas = await traerTodo<any>((a, b) =>
+  db().from('promesa_votacion_descartada').select('promesa_id, votacion_id').order('promesa_id').range(a, b));
+const parDescartado = new Set(descartadas.map((d: any) => `${d.promesa_id}|${d.votacion_id}`));
+
 const pendientes = todas.filter((p: any) => !hechas.has(p.id));
 
 console.log(`\nModelo: ${modeloActivo()}`);
 console.log(`Promesas verificables: ${todas?.length ?? 0}`);
 console.log(`Pendientes: ${pendientes.length}`);
+console.log(`Pares descartados que no se vuelven a proponer: ${parDescartado.size}`);
 console.log(`Tiempo estimado: ~${Math.round((pendientes.length * 2.3) / 60)} min\n`);
 
 if (!pendientes.length) {
@@ -66,15 +71,20 @@ if (!pendientes.length) {
   process.exit(0);
 }
 
-let emparejadas = 0, sinCorrespondencia = 0, sinCandidatas = 0;
+let emparejadas = 0, sinCorrespondencia = 0, sinCandidatas = 0, quitadas = 0;
 const errores = new Map<string, number>();
 
 const progreso = await procesarLote(
   pendientes,
   async (p: any, cadencia: Cadencia) => {
-    const { data: candidatas } = await db().rpc('candidatas_para_promesa', {
-      p_promesa_id: p.id, p_limite: 6
+    const { data: todasCandidatas } = await db().rpc('candidatas_para_promesa', {
+      p_promesa_id: p.id, p_limite: 10
     });
+    const candidatas = (todasCandidatas ?? []).filter((c: any) => {
+      const fuera = parDescartado.has(`${p.id}|${c.votacion_id}`);
+      if (fuera) quitadas++;
+      return !fuera;
+    }).slice(0, 6);
 
     if (!candidatas?.length) { sinCandidatas++; return true; }
 
@@ -85,7 +95,7 @@ const progreso = await procesarLote(
     }
 
     const idx = r.datos.votacion_indice;
-    if (typeof idx !== 'number' || idx < 0 || idx >= candidatas.length || r.datos.relacion === 'ninguna') {
+    if (typeof idx !== 'number' || idx < 0 || idx >= candidatas.length || !['desarrolla', 'contradice'].includes(r.datos.relacion)) {
       sinCorrespondencia++;
       return true;
     }
@@ -104,6 +114,7 @@ const progreso = await procesarLote(
       promesa_id: p.id,
       votacion_id: c.votacion_id,
       coherente,
+      relacion: r.datos.relacion,
       similitud: c.similitud,
       justificacion: String(r.datos.justificacion ?? '').slice(0, 300),
       modelo: r.modelo ?? modeloActivo(),
@@ -127,6 +138,7 @@ console.log('\nRESULTADO');
 console.log(`  emparejadas con votacion: ${emparejadas}`);
 console.log(`  sin correspondencia:      ${sinCorrespondencia}`);
 console.log(`  sin candidatas:           ${sinCandidatas}`);
+console.log(`  candidatas descartadas:   ${quitadas}`);
 console.log(`  fallidas:                 ${progreso.fallidos}`);
 console.log(`  omitidas por cuota:       ${progreso.omitidos}`);
 
@@ -136,7 +148,13 @@ if (errores.size > 0) {
     .forEach(([e, n]) => console.log(`  ${String(n).padStart(4)}  ${String(e).slice(0, 120)}`));
 }
 
+const { data: juicios, error: eJuicio } = await db().rpc('recalcular_juicio_promesas');
+console.log(eJuicio ? `\nrecalcular_juicio_promesas FALLÓ: ${eJuicio.message}` : `\nJuicios recalculados: ${juicios}`);
+
 await refrescarMetricas();
-console.log('\nComprueba: select * from mv_coherencia order by pct_coherencia desc;\n');
+
+const { data: caches, error: eCaches } = await db().rpc('crear_caches');
+console.log(eCaches ? `crear_caches FALLÓ: ${eCaches.message}` : `Cachés: ${JSON.stringify(caches)}`);
+console.log('\nComprueba: select estado, count(*) from v_promesa_estado group by 1;\n');
 
 export {};
