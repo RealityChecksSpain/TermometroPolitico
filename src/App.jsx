@@ -24,6 +24,27 @@ import {
   traerEjes, traerCobertura, traerFacetas, traerCcaa, traerCoherencia, traerDestacadas, traerLideres
 } from './lib/cliente.js';
 import { VOTO } from './lib/paleta.js';
+import { Marco, PALETAS, cssBauhaus } from './components/Bauhaus.jsx';
+
+const ES = PALETAS.espana;
+const CABECERAS = {
+  leyes: ['Congreso de los Diputados', 'Lo que se vota y quién lo vota'],
+  diputados: ['Congreso de los Diputados', 'Quién se sienta en el Congreso'],
+  partidos: ['Congreso de los Diputados', 'Lo que prometen y lo que hacen'],
+  siguiendo: ['Tu lista', 'Lo que sigues']
+};
+const ESTILO_ESPANA = `
+${cssBauhaus(ES)}
+.app[data-camara="espana"] .bh-marco{margin:6px 0 18px}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .tarjeta{background:${ES.papel};border:3px solid ${ES.negro};border-radius:0;box-shadow:6px 6px 0 ${ES.negro}}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .chip{font-family:'DM Mono',ui-monospace,monospace;font-weight:500;background:${ES.papel};color:${ES.negro};border:2px solid ${ES.negro};box-shadow:2px 2px 0 ${ES.negro};transition:transform .15s ease,box-shadow .15s ease}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .chip:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 ${ES.negro}}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .chip[data-on="1"]{background:${ES.negro};color:${ES.papel};border-color:${ES.negro}}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .hero{border:3px solid ${ES.negro};border-radius:0;box-shadow:6px 6px 0 ${ES.c}}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .t1{font-family:'Archivo Variable','Archivo',system-ui,sans-serif;font-weight:800;letter-spacing:-.02em}
+.app[data-camara="espana"] [data-seccion]:not([data-seccion="ejes"]) .nota{background:${ES.crema};border-left:4px solid ${ES.b}}
+.app[data-camara="espana"] .navb[data-on="1"]{color:${ES.a};border-top-color:${ES.a};border-bottom-color:${ES.a}}
+`;
 
 const C = {
   papel: '#F3F1E8', superficie: '#FFFFFF', pizarra: '#18211E',
@@ -686,7 +707,8 @@ export default function App() {
   return (
     <>
       <style>{estilos}</style>
-      <div className="e app">
+      <style>{ESTILO_ESPANA}</style>
+      <div className="e app" data-camara={camara}>
 
         <div className="cabecera">
           <button onClick={() => { setSeccion('inicio'); setVotacionSel(null); }}
@@ -719,6 +741,11 @@ export default function App() {
             </button>
           ))}
         </nav>
+
+        {CABECERAS[seccion] && !votacionSel && (
+          <Marco key={`cab-${seccion}`} p={ES} estrecho={estrecho} formas sombra
+            antetitulo={CABECERAS[seccion][0]} titulo={CABECERAS[seccion][1]} />
+        )}
 
         <AnimatePresence mode="wait" initial={false}>
         <motion.div key={seccion} data-seccion={seccion}
