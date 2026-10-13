@@ -15,7 +15,9 @@ const INFORMES = resolve('../lente-verificacion');
 const PAUSA_MS = 4000;
 const MARCA = 'segunda lectura';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
-const MODELOS = [...new Set([...(process.env.MODELO_BIENES ?? '').split(',').map(s => s.trim()).filter(Boolean), 'gemini-flash-latest', 'gemini-2.0-flash'])];
+const lista = (v?: string) => (v ?? '').split(',').map(s => s.trim()).filter(Boolean);
+const MODELOS = [...new Set([...lista(process.env.MODELO_BIENES), ...lista(process.env.MODELO_IA), 'gemini-flash-latest', 'gemini-flash-lite-latest'])];
+const retirados = new Set<string>();
 
 const PROMPT = `Este PDF es una declaración de bienes patrimoniales de un cargo público español.
 Mira SOLO los apartados de bienes inmuebles: urbanos, rústicos, los que tiene en propiedad y los que tiene a través de sociedades.
@@ -42,11 +44,11 @@ type Caso = { camara: 'congreso' | 'madrid'; clave: string; nombre: string; part
 
 const esperar = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-async function preguntar(pdf: Buffer): Promise<{ juicio?: Juicio; modelo?: string; error?: string }> {
-  let error = '';
-  for (const modelo of MODELOS) {
+async function llamar(modelo: string, pdf: Buffer): Promise<{ juicio?: Juicio; error?: string; reintentar?: boolean }> {
+  try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, {
       method: 'POST',
+      signal: AbortSignal.timeout(180000),
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': CLAVE },
       body: JSON.stringify({
         contents: [{ parts: [{ inline_data: { mime_type: 'application/pdf', data: pdf.toString('base64') } }, { text: PROMPT }] }],
@@ -54,19 +56,35 @@ async function preguntar(pdf: Buffer): Promise<{ juicio?: Juicio; modelo?: strin
       })
     });
     if (!res.ok) {
-      error = `${modelo}: HTTP ${res.status} ${(await res.text()).slice(0, 160)}`;
-      if (res.status === 429) await esperar(30000);
-      continue;
+      const cuerpo = (await res.text()).replace(/\s+/g, ' ').slice(0, 160);
+      if (res.status === 404 || /no longer available|NOT_FOUND/i.test(cuerpo)) {
+        if (!retirados.has(modelo)) console.log(`  modelo retirado por Google, se descarta: ${modelo}`);
+        retirados.add(modelo);
+        return { error: `${modelo}: retirado` };
+      }
+      return { error: `${modelo}: HTTP ${res.status} ${cuerpo}`, reintentar: res.status === 429 || res.status >= 500 };
     }
     const cuerpo = await res.json();
     const texto = (cuerpo.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('');
-    try {
-      return { juicio: JSON.parse(texto.replace(/```json|```/g, '').trim()), modelo };
-    } catch {
-      error = `${modelo}: respuesta no es JSON`;
+    return { juicio: JSON.parse(texto.replace(/```json|```/g, '').trim()) };
+  } catch (e) {
+    return { error: `${modelo}: ${(e as Error).name === 'TimeoutError' ? 'sin respuesta en 3 minutos' : (e as Error).message}`, reintentar: true };
+  }
+}
+
+async function preguntar(pdf: Buffer): Promise<{ juicio?: Juicio; modelo?: string; error?: string }> {
+  const errores: string[] = [];
+  for (const modelo of MODELOS) {
+    if (retirados.has(modelo)) continue;
+    for (let intento = 1; intento <= 2; intento++) {
+      const r = await llamar(modelo, pdf);
+      if (r.juicio) return { juicio: r.juicio, modelo };
+      errores.push(r.error!);
+      if (!r.reintentar) break;
+      await esperar(intento * 20000);
     }
   }
-  return { error };
+  return { error: errores.join(' / ') || 'no queda ningún modelo disponible' };
 }
 
 async function casosCongreso(): Promise<Caso[]> {
@@ -117,10 +135,14 @@ async function pdfDe(c: Caso): Promise<Buffer | null> {
     try { return await readFile(c.local!); } catch { return null; }
   }
   if (!c.url) return null;
-  const r = await fetch(c.url, { headers: { 'User-Agent': UA } });
-  if (!r.ok) return null;
-  const buf = Buffer.from(await r.arrayBuffer());
-  return buf.subarray(0, 4).toString() === '%PDF' ? buf : null;
+  try {
+    const r = await fetch(c.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(60000) });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.subarray(0, 4).toString() === '%PDF' ? buf : null;
+  } catch {
+    return null;
+  }
 }
 
 async function anotar(c: Caso, nota: string, dudosa: boolean) {
@@ -147,7 +169,8 @@ async function main() {
     ...(SOLO === 'madrid' ? [] : await casosCongreso()),
     ...(SOLO === 'congreso' ? [] : await casosMadrid())
   ].filter(c => !String(c.dudas ?? '').includes(MARCA)).slice(0, LIMITE);
-  console.log(`Declaraciones con cero inmuebles sin segunda lectura: ${casos.length}\n`);
+  console.log(`Declaraciones con cero inmuebles sin segunda lectura: ${casos.length}`);
+  console.log(`Modelos, por orden: ${MODELOS.join(', ')}\n`);
 
   const informe = ['camara,partido,nombre,resultado,filas,explicacion,modelo,url'];
   const cuenta = { vacia: 0, con_inmuebles: 0, ilegible: 0, sin_pdf: 0, fallo: 0 };
