@@ -148,13 +148,12 @@ if (errores.size > 0) {
     .forEach(([e, n]) => console.log(`  ${String(n).padStart(4)}  ${String(e).slice(0, 120)}`));
 }
 
-const { data: juicios, error: eJuicio } = await db().rpc('recalcular_juicio_promesas');
-console.log(eJuicio ? `\nrecalcular_juicio_promesas FALLÓ: ${eJuicio.message}` : `\nJuicios recalculados: ${juicios}`);
-
 await refrescarMetricas();
 
-const { data: caches, error: eCaches } = await db().rpc('crear_caches');
-console.log(eCaches ? `crear_caches FALLÓ: ${eCaches.message}` : `Cachés: ${JSON.stringify(caches)}`);
-console.log('\nComprueba: select estado, count(*) from v_promesa_estado group by 1;\n');
+console.log('\nLos emparejamientos nuevos todavía no cuentan: no tienen juicio.');
+console.log('1. Revísalos con la consulta de pares sin juicio y descarta los que no traten la misma medida.');
+console.log('2. Después, en el SQL Editor de Supabase (desde aquí no se puede: borra sin WHERE y pide permisos de propietario):');
+console.log('     select recalcular_juicio_promesas();');
+console.log('     select crear_caches();\n');
 
 export {};
