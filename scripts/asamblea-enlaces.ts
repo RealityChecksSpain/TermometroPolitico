@@ -66,8 +66,18 @@ async function valorDe(page: Page, sufijo: string) {
 }
 
 async function buscarTipo(page: Page, tipo: string): Promise<Hallado[]> {
-  if (!(await cargar(page, BUSCADOR))) throw new Error('No carga el buscador de iniciativas');
-  await esperar(PAUSA_MS);
+  for (let intento = 1; ; intento++) {
+    if (await cargar(page, BUSCADOR)) {
+      await esperar(PAUSA_MS);
+      if ((await valorDe(page, '_tipo')) !== null) break;
+    }
+    if (intento >= 3) {
+      console.log(`  ${tipo}: el buscador llega sin formulario tras ${intento} intentos. Paro este tipo.`);
+      return [];
+    }
+    console.log(`  ${tipo}: el buscador llega sin formulario, reintento ${intento + 1}`);
+    await esperar(PAUSA_MS * 3);
+  }
   if ((await valorDe(page, '_legislatura')) !== '13') await fijar(page, '_legislatura', '13');
   await fijar(page, '_tipo', tipo);
   console.log(`  ${tipo}: legislatura ${await valorDe(page, '_legislatura')}, tipo ${await valorDe(page, '_tipo')}`);
