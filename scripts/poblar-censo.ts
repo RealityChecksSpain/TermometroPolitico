@@ -222,6 +222,7 @@ async function cargar() {
   const aMano = await partidosPuestosAMano(legislaturaId);
   const respetados: string[] = [];
 
+  const slugsActivos = new Set<string>();
   let insertados = 0;
   let conPartido = 0;
   const gruposHuerfanos = new Map<string, number>();
@@ -238,6 +239,7 @@ async function cargar() {
 
     const { apellidos, nombre } = partes;
     const slug = slugificar(apellidos, nombre);
+    if (fila.__activo) slugsActivos.add(slug);
 
     const { data: politico, error } = await db()
       .from('politicos')
@@ -306,6 +308,16 @@ async function cargar() {
   }
 
   console.log(`\nMandatos cargados: ${insertados}`);
+  console.log(`En el fichero de activos del Congreso: ${slugsActivos.size}`);
+
+  const { data: sinBaja } = await db().from('mandatos').select('id_externo')
+    .eq('legislatura_id', legislaturaId).is('fecha_baja', null);
+  const fantasmas = (sinBaja ?? []).map(m => m.id_externo).filter(x => x && !slugsActivos.has(x));
+  if (fantasmas.length) {
+    console.log(`\nATENCIÓN: ${fantasmas.length} mandatos siguen sin fecha de baja y no están en el fichero de activos del Congreso.`);
+    console.log('No se tocan solos. Compruébalos en la web del Congreso y ponles fecha_baja:');
+    fantasmas.slice(0, 40).forEach(f => console.log('  ' + f));
+  }
   console.log(`Con partido asignado: ${conPartido}`);
 
   if (respetados.length > 0) {
