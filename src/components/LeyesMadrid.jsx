@@ -182,14 +182,21 @@ export default function LeyesMadrid({ colores }) {
         </button>
       )}
 
-      <p className="pie" style={{ color: '#7C8288', marginTop: 14 }}>
+      <details className="bh-mas">
+
+        <summary>Cómo se calcula y de dónde sale</summary>
+
+        <div>
         Fuente: catálogo de expedientes y autoría por grupo de los datos abiertos de la Asamblea de Madrid, XIII legislatura. El asunto es el texto literal del expediente.
         «Votadas» son las que tienen resultado de tramitación aprobada o rechazada; el resto siguen pendientes, decayeron, se retiraron o no se admitieron.
         Los proyectos de ley los presenta el Gobierno regional; las proposiciones de ley y las proposiciones no de ley, los grupos.
         Las iniciativas legislativas populares y de ayuntamientos no se atribuyen a ningún grupo aunque el fichero las asigne a uno.
         La fecha es la que da el expediente en los datos abiertos.
         La Asamblea no publica cómo vota cada diputado ni cada grupo: el resultado es el de la cámara, donde el PP tiene mayoría absoluta desde 2023.
-      </p>
+
+        </div>
+
+      </details>
     </div>
   );
 }

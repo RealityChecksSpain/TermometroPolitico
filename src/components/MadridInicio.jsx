@@ -121,7 +121,7 @@ export default function MadridInicio({ diputados, onFicha, onIr }) {
       </Marco>
 
       <motion.div initial={quieto ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-        <Hallazgos traer={traerHallazgosMadrid} onIr={s => onIr(s === 'leyes' ? 'leyes' : 'diputados')} />
+        <Hallazgos paleta="madrid" traer={traerHallazgosMadrid} onIr={s => onIr(s === 'leyes' ? 'leyes' : 'diputados')} />
       </motion.div>
     </div>
   );

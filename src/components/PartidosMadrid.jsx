@@ -140,14 +140,21 @@ export default function PartidosMadrid({ diputados, partidos }) {
         </table>
       </div>
 
-      <p className="pie" style={{ color: '#7C8288' }}>
+      <details className="bh-mas">
+
+        <summary>Cómo se calcula y de dónde sale</summary>
+
+        <div>
         Patrimonio: la última declaración de bienes de cada diputado publicada por la Asamblea, leída por un modelo de lenguaje; las de lectura dudosa no entran.
         Cada propiedad cuenta por la parte que declara poseer: media casa es 0,5. Quien deja vacías las tablas de inmuebles cuenta como cero.
         El patrimonio líquido no valora casas ni coches, porque la declaración no pone su valor. Se da la mediana y no la media para que una sola declaración muy alta, o mal leída, no mueva la cifra del grupo.
         Faltas: lista oficial de asistentes a cada Pleno celebrado desde el alta de cada diputado; a la presidenta y a los consejeros no se les cuentan.
         Iniciativas: datos abiertos de la Asamblea; las presentadas por varios grupos a la vez y las iniciativas populares o municipales no se atribuyen a ninguno.
         La Mesa decide qué se admite a trámite y los datos abiertos no dicen el motivo de cada inadmisión. Las aprobaciones son el resultado de la cámara, donde el PP tiene mayoría absoluta desde 2023: la Asamblea no publica cómo vota cada grupo.
-      </p>
+
+        </div>
+
+      </details>
     </div>
   );
 }

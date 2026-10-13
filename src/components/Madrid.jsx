@@ -223,13 +223,16 @@ export default function Madrid() {
             ))}
           </div>
 
-          <p className="madPie">
+          <details className="bh-mas">
+            <summary>Cómo se calcula y de dónde sale</summary>
+            <div>
             Fuente: fichas y declaraciones de bienes publicadas por la Asamblea de Madrid. {leidas} de {diputados.length} declaraciones leídas.
             Las declaraciones son escaneos y las lee un modelo de lenguaje; cada cifra enlaza a su PDF original para comprobarla.
             Cada propiedad cuenta por la parte que declara poseer: media casa es 0,5. Las de lectura dudosa no entran en los hallazgos.
             Las faltas salen de la lista oficial de asistentes a cada Pleno que publica la Asamblea en datos abiertos y cuentan solo los Plenos posteriores al alta de cada diputado. A la presidenta y a los consejeros no se les cuentan faltas: la lista oficial no los recoge en las sesiones ordinarias y daría ausencias que no son. Los senadores pueden faltar por la agenda del Senado: su cargo aparece junto al nombre.
             La Asamblea no publica en su web ni en datos abiertos cómo vota cada diputado: su página de votaciones está vacía.
-          </p>
+            </div>
+          </details>
           </div>
         </Marco>
       )}

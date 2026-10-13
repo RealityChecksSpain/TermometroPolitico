@@ -43,6 +43,13 @@ export function cssBauhaus(p) {
 .bh-tarjeta:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 ${p.negro}; }
 .bh-cifra { font-size: 40px; }
 @media (max-width: 640px) { .bh-cifra { font-size: 28px; } }
+.bh-mas { margin-top: 22px; border-top: 2px solid ${p.negro}; padding-top: 12px; }
+.bh-mas summary { cursor: pointer; list-style: none; font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; display: inline-flex; gap: 8px; align-items: center; }
+.bh-mas summary::-webkit-details-marker { display: none; }
+.bh-mas summary::after { content: '+'; }
+.bh-mas[open] summary::after { content: '−'; }
+.bh-mas > div { font-size: 12.5px; line-height: 1.7; color: ${p.gris}; margin-top: 10px; max-width: 75ch; display: grid; gap: 8px; }
 .bh-lista > * { border-top: 2px solid ${p.negro}; }
 .bh-lista > *:last-child { border-bottom: 2px solid ${p.negro}; }
 @media (prefers-reduced-motion: reduce) { .bh * { transition: none !important; animation: none !important; } }

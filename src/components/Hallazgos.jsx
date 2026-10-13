@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { traerHallazgos } from '../lib/cliente.js';
 import { Entrada, SALIDA } from './Movimiento.jsx';
 import Explica from './Explica.jsx';
+import { PALETAS } from './Bauhaus.jsx';
 
 const TEMAS = {
   promesas: { nombre: 'Promesas', color: '#C88A1E' },
@@ -20,6 +21,30 @@ const TEMAS = {
 const MAXIMO = 10;
 
 const estilos = `
+.hallazgos.bhH{background:var(--h-fondo);border:3px solid var(--h-negro);border-radius:0;box-shadow:10px 10px 0 var(--h-negro);
+padding:22px 22px 20px;margin:8px 0 34px}
+@media(min-width:701px){.hallazgos.bhH{padding:28px 32px 24px}}
+@media(max-width:700px){.hallazgos.bhH{box-shadow:6px 6px 0 var(--h-negro)}}
+.bhH .hallazgosCab{border-bottom:2px solid var(--h-papel);padding-bottom:12px;margin-bottom:20px}
+.bhH .rotulo{color:var(--h-acento);font-weight:700}
+.bhH .hallazgosNav button{border:2px solid var(--h-papel);color:var(--h-papel);border-radius:0;width:30px;height:30px}
+.bhH .hallazgosNav .contador{color:var(--h-papel)}
+.bhH .hallazgoTitular{font-family:'Archivo Variable','Archivo',system-ui,sans-serif;font-weight:800;letter-spacing:-.02em;
+color:var(--h-papel);font-size:clamp(20px,2.6vw,30px);line-height:1.12}
+.bhH .hallazgoDetalle{color:var(--h-papel);opacity:.86;font-size:14.5px;line-height:1.65;margin-top:14px;max-width:62ch}
+.bhH .hallazgosPuntos button{border-radius:0;height:8px;width:8px;background:var(--h-papel);opacity:.35}
+.bhH .hallazgosPuntos button[data-on="1"]{background:var(--h-acento);opacity:1;width:22px}
+.bhH .hallazgoVerTodos{border:2px solid var(--h-papel);color:var(--h-papel);border-radius:0;font-family:'DM Mono',ui-monospace,monospace}
+.bhH .hallazgoEnlace{border:2px solid var(--h-papel);color:var(--h-papel);border-radius:0}
+.bhH .hallazgoEnlace:hover{background:var(--h-negro);border-color:var(--h-acento)}
+.bhH .hallazgoEnlaceFecha{color:var(--h-acento)}
+.hallazgoFuente{margin-top:14px;color:var(--h-papel)}
+.hallazgoFuente summary{cursor:pointer;font-family:'DM Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;
+text-transform:uppercase;opacity:.8;list-style:none;display:inline-flex;gap:6px;align-items:center}
+.hallazgoFuente summary::-webkit-details-marker{display:none}
+.hallazgoFuente summary::after{content:'+';font-weight:700}
+.hallazgoFuente[open] summary::after{content:'−'}
+.hallazgoFuente .hallazgoBase{color:var(--h-papel);opacity:.75;font-size:11.5px;line-height:1.6;margin-top:8px;max-width:70ch}
 .hallazgoVerTodos{margin-left:auto;margin-top:12px;background:none;border:1px solid #3A4048;
 border-radius:2px;color:#9AA4AC;font-size:10.5px;padding:4px 9px;cursor:pointer;
 display:inline-flex;align-items:center;justify-content:center}
@@ -93,7 +118,18 @@ function utilizable(h) {
   return true;
 }
 
-export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
+function Fuente({ texto }) {
+  if (!texto) return null;
+  return (
+    <details className="hallazgoFuente" onClick={e => e.stopPropagation()}>
+      <summary>De dónde sale</summary>
+      <span className="hallazgoBase">{texto}</span>
+    </details>
+  );
+}
+
+export default function Hallazgos({ onIr, onLey, traer = traerHallazgos, paleta = 'espana' }) {
+  const P = PALETAS[paleta] ?? PALETAS.espana;
   const reducido = useReducedMotion();
   const [lista, setLista] = useState([]);
   const [i, setI] = useState(0);
@@ -152,7 +188,8 @@ export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
 
   return (
     <Entrada desde={18}>
-      <section className="hallazgos"
+      <section className="hallazgos bhH"
+        style={{ '--h-fondo': P.a, '--h-negro': P.negro, '--h-papel': P.papel, '--h-acento': P.b }}
         onMouseEnter={() => setPausa(true)}
         onMouseLeave={() => setPausa(false)}
         aria-live="polite">
@@ -166,7 +203,7 @@ export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
               transition={{ type: 'spring', stiffness: 320, damping: 24 }}
               style={{
                 fontSize: 9.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
-                color: '#F3F1E8', background: tema.color, padding: '3px 8px', borderRadius: 2
+                color: '#F3F1E8', background: tema.color, padding: '3px 8px', border: `2px solid ${P.negro}`
               }}>{tema.nombre}</motion.span>
           )}
           <div className="hallazgosNav">
@@ -179,15 +216,15 @@ export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
         {verTodos ? (
           <div>
             {lista.map((x, n) => (
-              <div key={x.titular} style={{ borderTop: n ? '1px solid #2C3339' : 'none', padding: '11px 0' }}>
+              <div key={x.titular} style={{ borderTop: n ? `2px solid ${P.papel}` : 'none', padding: '16px 0' }}>
               <button className="hallazgoCuerpo"
                 onClick={abrir(x.seccion)}
                 style={{ minHeight: 0, padding: 0 }}>
                 {x.aviso && <span className="hallazgoAviso">{x.aviso}</span>}
-                <span className="ed hallazgoTitular" style={{ fontSize: 15.5 }}>{x.titular}</span>
+                <span className="ed hallazgoTitular" style={{ fontSize: 18 }}>{x.titular}</span>
                 <span className="hallazgoDetalle" style={{ fontSize: 12.5 }}>{x.detalle}</span>
-                {baseDe(x) && <span className="hallazgoBase">{baseDe(x)}</span>}
               </button>
+              <Fuente texto={baseDe(x)} />
               <Enlaces h={x} onLey={onLey} />
               </div>
             ))}
@@ -202,11 +239,12 @@ export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
                 {h.aviso && <span className="hallazgoAviso">{h.aviso}</span>}
                 <span className="ed hallazgoTitular" style={{ display: 'block' }}>{h.titular}</span>
                 <span className="hallazgoDetalle" style={{ display: 'block' }}>{h.detalle}</span>
-                {base && <span className="hallazgoBase">{base}</span>}
               </motion.span>
             </AnimatePresence>
           </button>
         )}
+
+        {!verTodos && <Fuente key={`f-${h.titular}`} texto={base} />}
 
         {!verTodos && <Enlaces key={h.titular} h={h} onLey={onLey} />}
 
@@ -225,7 +263,7 @@ export default function Hallazgos({ onIr, onLey, traer = traerHallazgos }) {
         </div>
 
         {descartados > 0 && (
-          <div className="em" style={{ fontSize: 10, color: '#6C737B', marginTop: 10, lineHeight: 1.5 }}>
+          <div className="em" style={{ fontSize: 10, color: P.papel, opacity: 0.6, marginTop: 12, lineHeight: 1.5 }}>
             {descartados === 1
               ? 'Un hallazgo no se enseña porque no trae el dato en que se apoya.'
               : `${descartados} hallazgos no se enseñan porque no traen el dato en que se apoyan.`}
