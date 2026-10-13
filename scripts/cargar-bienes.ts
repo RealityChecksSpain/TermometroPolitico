@@ -455,6 +455,15 @@ for (let i = 0; i < cola.length; i++) {
     d.inmuebles_detalle_sociedad
   );
   const pat = patrimonioLiquido(d);
+  const sinInmuebles = [d.inmuebles_detalle, d.inmuebles_detalle_propios, d.inmuebles_detalle_sociedad].every(vacio)
+    && [d.inmuebles_urbanos, d.inmuebles_rusticos].every(v => vacio(v) || Number(v) === 0);
+  if (sinInmuebles && d.confianza !== 'baja') {
+    Object.assign(inm, {
+      n_inmuebles: 0, n_inmuebles_propios: 0, n_inmuebles_sociedad: 0, n_inmuebles_equivalentes: 0,
+      n_viviendas: 0, n_suelo: 0, n_anejos: 0, n_productivos: 0, n_otros_bienes: 0
+    });
+    d.dudas = [...(d.dudas ?? []), 'sin inmuebles declarados: las tablas de inmuebles están vacías'];
+  }
 
   const fila: Record<string, any> = {
     mandato_id: m.id,
@@ -498,6 +507,7 @@ for (let i = 0; i < cola.length; i++) {
     introducido_at: new Date().toISOString(),
     verificado: false
   };
+  if (sinInmuebles && d.confianza !== 'baja') Object.assign(fila, { n_viviendas_propias: 0, n_viviendas_equivalentes: 0 });
 
   const revisadoEl: string | null = (m as any).previo?.inmuebles_revisado ?? null;
   const revisados = Boolean(revisadoEl);
