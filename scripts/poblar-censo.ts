@@ -194,8 +194,18 @@ async function cargar() {
   const legislaturaId = exigirEnv('LEGISLATURA_ACTIVA_ID');
   const { activos, baja } = await localizarFicheros();
 
+  const filasActivas = await descargarJson(activos);
+  if (filasActivas.length < 300 && !process.argv.includes('--forzar')) {
+    console.log(`\nEl fichero de activos del Congreso solo trae ${filasActivas.length} diputados.`);
+    console.log('Con las Cortes disueltas solo siguen activos los miembros de la Diputación Permanente: cargarlo daría de baja a todos los demás.');
+    console.log('No se ha tocado nada. Si de verdad quieres cargarlo, añade --forzar.\n');
+    process.exit(1);
+  }
+  const { data: legislatura } = await db().from('legislaturas').select('fecha_fin').eq('id', legislaturaId).maybeSingle();
+  const disolucion = legislatura?.fecha_fin ? String(legislatura.fecha_fin).slice(0, 10) : null;
+
   const filas = [
-    ...(await descargarJson(activos)).map(f => ({ ...f, __activo: true })),
+    ...filasActivas.map(f => ({ ...f, __activo: true })),
     ...(baja ? (await descargarJson(baja)).map(f => ({ ...f, __activo: false })) : [])
   ];
   console.log(`Registros a procesar: ${filas.length}`);
@@ -294,7 +304,11 @@ async function cargar() {
         circunscripcion: leer(fila, F.circunscripcion),
         id_externo: slug,
         fecha_alta: aIso(leer(fila, F.alta)) ?? '2023-08-17',
-        fecha_baja: fila.__activo ? null : aIso(leer(fila, F.baja))
+        fecha_baja: (() => {
+          if (fila.__activo) return null;
+          const baja = aIso(leer(fila, F.baja));
+          return disolucion && baja && baja >= disolucion ? null : baja;
+        })()
       },
       { onConflict: 'legislatura_id,id_externo' }
     );
