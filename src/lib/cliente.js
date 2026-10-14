@@ -915,8 +915,8 @@ export async function traerMaterias() {
 export function traerHallazgosMadrid() {
   return recordar('hallazgosMadrid', async () => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('v_asamblea_hallazgos').select('*')
-      .order('relevancia', { ascending: false }).order('orden');
+    const { data, error } = await leerConRespaldo('mv_asamblea_hallazgos', 'v_asamblea_hallazgos', q => q.select('*')
+      .order('relevancia', { ascending: false }).order('orden'));
     if (error) throw error;
     return (data ?? []).filter(h => h.titular);
   }).catch(e => {
@@ -929,8 +929,8 @@ export function traerDiputadosMadrid() {
   return recordar('diputadosMadrid', async () => {
     if (!supabase) return [];
     const [{ data, error }, asistencia] = await Promise.all([
-      supabase.from('v_asamblea_diputados').select('*').eq('activo', true).order('nombre_completo'),
-      supabase.from('v_asamblea_asistencia').select('id_asamblea, plenos_convocado, plenos_asistidos, plenos_faltados, telematicos')
+      leerConRespaldo('mv_asamblea_diputados', 'v_asamblea_diputados', q => q.select('*').eq('activo', true).order('nombre_completo')),
+      leerConRespaldo('mv_asamblea_asistencia', 'v_asamblea_asistencia', q => q.select('id_asamblea, plenos_convocado, plenos_asistidos, plenos_faltados, telematicos'))
     ]);
     if (error) throw error;
     const faltas = new Map((asistencia.error ? [] : asistencia.data ?? []).map(a => [a.id_asamblea, a]));
@@ -941,25 +941,18 @@ export function traerDiputadosMadrid() {
 export function traerLeyesMadrid() {
   return recordar('leyesMadrid', async () => {
     if (!supabase) return [];
-    const filas = [];
-    for (let desde = 0; ; desde += 1000) {
-      const { data, error } = await supabase.from('v_asamblea_leyes')
-        .select('*')
-        .order('fecha', { ascending: false, nullsFirst: false }).order('clave')
-        .range(desde, desde + 999);
-      if (error) throw error;
-      filas.push(...(data ?? []));
-      if (!data || data.length < 1000) break;
-    }
-    return filas;
+    const { data, error } = await leerTodoConRespaldo('mv_asamblea_leyes', 'v_asamblea_leyes', q => q.select('*')
+      .order('fecha', { ascending: false, nullsFirst: false }).order('clave'));
+    if (error) throw error;
+    return data ?? [];
   });
 }
 
 export function traerIniciativasResumenMadrid() {
   return recordar('iniciativasResumenMadrid', async () => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('v_asamblea_iniciativas_resumen')
-      .select('siglas, tipo_siglas, presentadas, no_admitidas, retiradas, votadas, aprobadas');
+    const { data, error } = await leerConRespaldo('mv_asamblea_iniciativas_resumen', 'v_asamblea_iniciativas_resumen', q => q
+      .select('siglas, tipo_siglas, presentadas, no_admitidas, retiradas, votadas, aprobadas'));
     if (error) throw error;
     return data ?? [];
   });

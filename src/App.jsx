@@ -561,6 +561,7 @@ export default function App() {
       setError('Configuracion en .env:\n\n' + problemasConfig.map(p => '  - ' + p).join('\n'));
       return;
     }
+    if (camara === 'madrid') return;
     let vivo = true;
     const cargar = (clave, leer, poner) => {
       Promise.resolve()
@@ -591,7 +592,7 @@ export default function App() {
     cargar('coherencia', traerCoherencia, setCoherencia);
     cargar('destacadas', () => traerDestacadas(4), setDestacadas);
     return () => { vivo = false; };
-  }, [intento]);
+  }, [intento, camara]);
 
   const reintentar = clave => {
     setListo(l => ({ ...l, [clave]: false }));
