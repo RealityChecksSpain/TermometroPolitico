@@ -1,5 +1,5 @@
 import { exigirEnv } from './supabase';
-import { modelosDisponibles, Cadencia } from './gemini';
+import { modelosDisponibles, Cadencia, ESPERA_IA_MS } from './gemini';
 import { UA } from './descubrir';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { sanearDeclaracion } from './euros.js';
@@ -195,22 +195,28 @@ async function llamarModelo(
   parts: object[],
   conEsquema = true
 ): Promise<{ ok: true; datos: DeclaracionLeida } | { ok: false; error: string }> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: 0,
-          maxOutputTokens: 4096,
-          responseMimeType: 'application/json',
-          ...(conEsquema && process.env.SIN_ESQUEMA !== 'true' ? { responseSchema: ESQUEMA } : {})
-        }
-      })
-    }
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave },
+        signal: AbortSignal.timeout(ESPERA_IA_MS),
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 4096,
+            responseMimeType: 'application/json',
+            ...(conEsquema && process.env.SIN_ESQUEMA !== 'true' ? { responseSchema: ESQUEMA } : {})
+          }
+        })
+      }
+    );
+  } catch (e) {
+    return { ok: false, error: `${modelo}: ${(e as Error)?.name === 'TimeoutError' ? `sin respuesta en ${Math.round(ESPERA_IA_MS / 1000)} s` : String(e)}` };
+  }
 
   if (!res.ok) {
     const cuerpo = (await res.text()).slice(0, 280).replace(/\s+/g, ' ');
@@ -265,7 +271,8 @@ export async function revalidarCifrasAnomalas(
   motivo: string
 ): Promise<{ ok: boolean; datos?: DeclaracionLeida; error?: string }> {
   const clave = exigirEnv('GEMINI_API_KEY');
-  const r = await fetch(url, { headers: { 'User-Agent': UA } });
+  const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(60000) }).catch(() => null);
+  if (!r) return { ok: false, error: 'el PDF no respondió en 60 s' };
   if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
   const buf = Buffer.from(await r.arrayBuffer());
   const { texto } = await textoDelPdf(buf);
@@ -311,6 +318,7 @@ export async function revalidarCifrasAnomalas(
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave },
+        signal: AbortSignal.timeout(ESPERA_IA_MS),
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
@@ -321,9 +329,9 @@ export async function revalidarCifrasAnomalas(
           }
         })
       }
-    );
-    if (!res.ok) {
-      if (res.status === 404) retirados.add(modelo);
+    ).catch(() => null);
+    if (!res || !res.ok) {
+      if (res?.status === 404) retirados.add(modelo);
       continue;
     }
     const cuerpo = await res.json();
@@ -359,7 +367,8 @@ export async function revalidarCifrasAnomalas(
 type Lectura = { ok: boolean; datos?: DeclaracionLeida; error?: string; modelo?: string };
 
 export async function leerDeclaracion(url: string): Promise<Lectura> {
-  const r = await fetch(url, { headers: { 'User-Agent': UA } });
+  const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(60000) }).catch(() => null);
+  if (!r) return { ok: false, error: 'El PDF no respondió en 60 s' };
   if (!r.ok) return { ok: false, error: `El PDF devolvio HTTP ${r.status}` };
   return leerDeclaracionPdf(Buffer.from(await r.arrayBuffer()));
 }

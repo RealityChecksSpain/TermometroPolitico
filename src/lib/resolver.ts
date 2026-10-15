@@ -104,6 +104,7 @@ async function porAnthropic(nombre: string, candidatos: Candidato[]) {
   const modelo = modeloAnthropic();
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(20000),
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': exigirEnv('ANTHROPIC_API_KEY'),
@@ -134,6 +135,7 @@ async function porGemini(nombre: string, candidatos: Candidato[]) {
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`,
     {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: {
         'Content-Type': 'application/json',
         'x-goog-api-key': exigirEnv('GEMINI_API_KEY')

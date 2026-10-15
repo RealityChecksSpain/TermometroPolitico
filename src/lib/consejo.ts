@@ -1,4 +1,4 @@
-import { Cadencia, preguntar as preguntarGemini } from './gemini';
+import { Cadencia, ESPERA_IA_MS, preguntar as preguntarGemini } from './gemini';
 
 export type Proveedor = 'gemini' | 'anthropic' | 'groq' | 'mistral' | 'cerebras' | 'openrouter' | 'deepseek' | 'openai' | 'compatible';
 
@@ -93,6 +93,7 @@ async function preguntarAnthropic(modelo: string, prompt: string, reintentos = 2
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
+        signal: AbortSignal.timeout(ESPERA_IA_MS),
         headers: {
           'content-type': 'application/json',
           'x-api-key': clave,
@@ -158,6 +159,7 @@ async function preguntarCompatible(
       await esperarTurno(proveedor);
       const res = await fetch(url, {
         method: 'POST',
+        signal: AbortSignal.timeout(ESPERA_IA_MS),
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${clave}`
@@ -257,7 +259,7 @@ export async function listarModelos(proveedor: Proveedor): Promise<{ ok: boolean
   } else cabeceras.authorization = `Bearer ${clave}`;
 
   try {
-    const res = await fetch(destino, { headers: cabeceras });
+    const res = await fetch(destino, { headers: cabeceras, signal: AbortSignal.timeout(60000) });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 160)}` };
     const cuerpo = await res.json();
     const bruto: any[] = cuerpo?.data ?? cuerpo?.models ?? [];

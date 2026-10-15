@@ -1,5 +1,7 @@
 import { exigirEnv } from './supabase.js';
 
+export const ESPERA_IA_MS = Number(process.env.ESPERA_IA_MS ?? 180000);
+
 export interface LimitesTier {
   rpm: number;
   rpd: number;
@@ -147,6 +149,7 @@ export async function preguntar<T>(
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave },
+            signal: AbortSignal.timeout(ESPERA_IA_MS),
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
@@ -162,7 +165,7 @@ export async function preguntar<T>(
           }
         );
       } catch (e) {
-        ultimoError = `${modelo}: ${e}`;
+        ultimoError = `${modelo}: ${(e as Error)?.name === 'TimeoutError' ? `sin respuesta en ${Math.round(ESPERA_IA_MS / 1000)} s` : e}`;
         await new Promise(r => setTimeout(r, 2000 * (intento + 1)));
         continue;
       }
