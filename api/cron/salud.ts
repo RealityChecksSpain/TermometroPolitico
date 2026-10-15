@@ -85,7 +85,21 @@ export default async function handler(req: any, res?: any): Promise<Response | u
         );
       }
     }
-    const caches = { cachesSinRefrescar: viejas, ...(avisoCaches ? { avisoCaches } : {}) };
+    const revision = await db().from('v_revision_pendiente').select('camara, puesto, nombre, partido, pdf').order('camara').order('puesto');
+    const sinRevisar = revision.error ? [] : (revision.data ?? []) as any[];
+    let avisoRevision: string | null = null;
+    if (sinRevisar.length && conCorreo) {
+      avisoRevision = await enviar(
+        `Lente Democratica: hallazgo de propiedades retenido, ${sinRevisar.length} declaracion(es) sin revisar`,
+        `${sinRevisar.map(f => `${plano(f.camara)} · puesto ${plano(f.puesto)} · ${plano(f.nombre)} (${plano(f.partido)}) · ${plano(f.pdf)}`).join('\n')}\n\nEl hallazgo con nombres no se publica hasta que estas declaraciones esten revisadas a mano.`
+      );
+    }
+    const caches = {
+      cachesSinRefrescar: viejas,
+      ...(avisoCaches ? { avisoCaches } : {}),
+      revisionPendiente: sinRevisar.length,
+      ...(avisoRevision ? { avisoRevision } : {})
+    };
 
     if (rotos.length > 0) {
       const detalle = rotos.map(l => `${l.objeto}: ${plano(l.error)}`).join('\n');

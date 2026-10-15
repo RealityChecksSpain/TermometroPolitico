@@ -44,7 +44,21 @@ export async function refrescarMetricas(): Promise<boolean> {
       console.error('');
     }
   }
-  return (await refrescarCaches()) && ok;
+  const cachesOk = await refrescarCaches();
+  await avisarRevisionPendiente();
+  return cachesOk && ok;
+}
+
+export async function avisarRevisionPendiente(): Promise<void> {
+  const { data, error } = await db().from('v_revision_pendiente').select('camara, puesto, nombre, partido, pdf').order('camara').order('puesto');
+  if (error) {
+    if (error.code !== 'PGRST205' && error.code !== '42P01') console.error(`  No se puede leer v_revision_pendiente (${error.message}).`);
+    return;
+  }
+  if (!data?.length) return;
+  console.log('\n  HALLAZGO DE PROPIEDADES CON NOMBRES RETENIDO. Falta revisar a mano:');
+  for (const f of data as any[]) console.log(`    ${f.camara} · puesto ${f.puesto} · ${f.nombre} (${f.partido}) · ${f.pdf ?? 'sin PDF'}`);
+  console.log('');
 }
 
 async function refrescarCachesDeGolpe(): Promise<boolean> {
