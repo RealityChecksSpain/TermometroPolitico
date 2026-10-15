@@ -124,10 +124,9 @@ function ultimaDeBienes(f: Ficha) {
 async function leerBienes(page: Page, f: Ficha): Promise<string> {
   const decl = ultimaDeBienes(f);
   if (!decl) return 'sin declaración de bienes publicada';
-  if (!RELEER) {
-    const { data } = await db().from('asamblea_bienes').select('url_declaracion').eq('id_asamblea', f.id).maybeSingle();
-    if (data?.url_declaracion === decl.url) return 'ya leída';
-  }
+  const { data: previa } = await db().from('asamblea_bienes').select('url_declaracion, inmuebles_revisado').eq('id_asamblea', f.id).maybeSingle();
+  const misma = previa?.url_declaracion === decl.url;
+  if (!RELEER && misma) return 'ya leída';
   const buf = await bajarPdf(page, decl.url);
   if (!buf) return `no se pudo bajar ${decl.url}`;
   await writeFile(join(COPIAS, `${f.id}-${decl.url.split('/').pop()}`), buf);
@@ -187,7 +186,12 @@ async function leerBienes(page: Page, f: Ficha): Promise<string> {
     modelo: lectura.modelo ?? null,
     leido_at: new Date().toISOString()
   };
-  const { error } = await db().from('asamblea_bienes').upsert(fila, { onConflict: 'id_asamblea' });
+  const conservar = misma && Boolean(previa?.inmuebles_revisado);
+  const guardar: Record<string, unknown> = { ...fila, inmuebles_revisado: conservar ? previa?.inmuebles_revisado : null };
+  if (conservar) {
+    for (const k of Object.keys(guardar)) if ((k.startsWith('inmuebles_') && k !== 'inmuebles_revisado') || k.startsWith('n_')) delete guardar[k];
+  }
+  const { error } = await db().from('asamblea_bienes').upsert(guardar, { onConflict: 'id_asamblea' });
   if (error) return `error al guardar: ${error.message}`;
   return `leída (${fila.confianza}): ${inm.n_inmuebles ?? '?'} inmuebles, ${inm.n_viviendas_equivalentes ?? '?'} viviendas equivalentes`;
 }

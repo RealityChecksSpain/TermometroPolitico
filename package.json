@@ -64,6 +64,7 @@
     "verificar:vacias": "node --env-file=.env --import tsx scripts/verificar-vacias.ts",
     "inmuebles:revisados": "node --env-file=.env --import tsx scripts/inmuebles-revisados.ts",
     "inmuebles:recontar": "node --env-file=.env --import tsx scripts/recontar-inmuebles.ts",
+    "inmuebles:revisados:madrid": "node --env-file=.env --import tsx scripts/inmuebles-revisados-madrid.ts",
     "bienes:pdfs": "node --env-file=.env --import tsx scripts/descargar-declaraciones.ts",
     "refrescar": "node --env-file=.env --import tsx scripts/refrescar.ts",
     "viviendas:propias": "node --env-file=.env --import tsx scripts/viviendas-propias.ts",
