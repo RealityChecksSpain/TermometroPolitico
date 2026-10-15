@@ -1,5 +1,5 @@
 const TIPO =
-  /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|plaza(?:s)?(?:\s+(?:de\s+)?(?:gara(?:j|g)e(?:s)?|aparcamiento(?:s)?))?|gara(?:j|g)e(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
+  /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|plaza(?:s)?(?:\s+(?:de\s+)?(?:gara(?:j|g)e(?:s)?|aparcamiento(?:s)?))?|gara(?:j|g)e(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|suelo(?:s)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
 
 const MARCA_SOCIEDAD =
   /\b(?:s\.?\s?l\.?\s?u|s\.?\s?l|s\.?\s?a)\b\.?|sociedad(?!\s+(?:de\s+)?gananciales)|mercantil|participaciones?\s+sociales|acciones|cotiza/i;
@@ -8,7 +8,7 @@ const SIN_PORCENTAJE = /\bsin\s+porcentaje\b/i;
 
 const FILAS = /[;\n|]+/;
 
-const CORTE = /(?<![\d.,])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|garage|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|terreno|bodega|cochera))/i;
+const CORTE = /(?<![\d.,/])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|garage|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|suelo|terreno|bodega|cochera))/i;
 
 function legible(s) {
   return String(s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
@@ -23,7 +23,7 @@ function normalizar(s) {
 }
 
 const CATEGORIA = [
-  ['suelo', /finca|parcela|solar|terreno|monte|cultivo|rustic/i],
+  ['suelo', /finca|parcela|solar|suelo|terreno|monte|cultivo|rustic/i],
   ['vivienda', /viviend|casa|piso|apartamento|chalet|estudio/i],
   ['anejo', /garaje|garage|aparcamiento|trastero|cochera|plaza/i],
   ['productivo', /local|nave|oficina|almacen|bodega|edificio/i]
@@ -81,7 +81,7 @@ function itemsDeTrozo(original, fila) {
       porcentaje: pct,
       sinPorcentaje,
       sociedad,
-      categoria: categoriaDe(trozo),
+      categoria: categoriaDe(tipo) === 'otro' ? categoriaDe(trozo) : categoriaDe(tipo),
       esVivienda: ES_VIVIENDA.test(tipo)
     });
     return out;
@@ -89,7 +89,7 @@ function itemsDeTrozo(original, fila) {
 
   const menciones = [...trozo.matchAll(new RegExp(`\\b(${TIPO.source})\\b`, 'gi'))];
   if (menciones.length === 0) {
-    if (/propiedad|herencia|%|provincia|madrid|barcelona|leon|almeria|coruna|sevilla|valencia/i.test(trozo) && trozo.length > 12) {
+    if (/propiedad|herencia|inmueble|rustic|urban|%|provincia|madrid|barcelona|leon|almeria|coruna|sevilla|valencia/i.test(trozo) && trozo.length > 12) {
       out.push({ qty: 1, texto: original, porcentaje: pct, sinPorcentaje, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
     }
     return out;
