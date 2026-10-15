@@ -38,14 +38,18 @@ export default function MadridInicio({ diputados, onFicha, onIr }) {
 
   const cifras = useMemo(() => {
     const pp = diputados.filter(d => d.partido_siglas === 'PP').length;
-    const leidas = diputados.filter(d => d.url_declaracion).length;
     const cuatro = diputados.filter(d => d.url_declaracion && d.fiable && Number(d.n_viviendas_equivalentes) >= 4).length;
     const pnl = resumen.filter(r => r.tipo_siglas === 'PNL');
     const opo = pnl.filter(r => r.siglas !== 'PP');
     const votadasOpo = opo.reduce((s, r) => s + r.votadas, 0);
     const aprobadasOpo = opo.reduce((s, r) => s + r.aprobadas, 0);
     const ppPnl = pnl.find(r => r.siglas === 'PP');
-    return { pp, total: diputados.length, leidas, cuatro, votadasOpo, aprobadasOpo, ppPnl };
+    const propl = resumen.filter(r => r.tipo_siglas === 'PROPL' && r.siglas);
+    const leyesOpo = propl.filter(r => r.siglas !== 'PP');
+    const leyesVotadasOpo = leyesOpo.reduce((s, r) => s + Number(r.votadas ?? 0), 0);
+    const leyesAprobadasOpo = leyesOpo.reduce((s, r) => s + Number(r.aprobadas ?? 0), 0);
+    const ppLeyes = propl.find(r => r.siglas === 'PP');
+    return { pp, total: diputados.length, cuatro, votadasOpo, aprobadasOpo, ppPnl, leyesVotadasOpo, leyesAprobadasOpo, ppLeyes };
   }, [diputados, resumen]);
 
   const resultados = useMemo(() => {
@@ -125,8 +129,12 @@ export default function MadridInicio({ diputados, onFicha, onIr }) {
           <Cifra fondo={P.b} tinta={P.negro} valor={cifras.votadasOpo ? `${cifras.aprobadasOpo} de ${cifras.votadasOpo}` : '—'}
             texto="proposiciones no de ley de la oposición aprobadas"
             pie={cifras.ppPnl ? `Del PP: ${cifras.ppPnl.aprobadas} de ${cifras.ppPnl.votadas}` : ''} />
-          <Cifra fondo={P.c} tinta="#FFFFFF" valor={String(cifras.cuatro)} texto="diputados declaran el equivalente a cuatro o más viviendas" pie="A su nombre, contando la parte que poseen" />
-          <Cifra fondo={P.papel} tinta={P.negro} valor={`${cifras.leidas} de ${cifras.total || 135}`} texto="declaraciones de bienes leídas" pie="Cada cifra enlaza a su PDF oficial" />
+          <Cifra fondo={P.c} tinta="#FFFFFF" valor={String(cifras.cuatro)}
+            texto={cifras.cuatro === 1 ? 'diputado declara el equivalente a cuatro o más viviendas' : 'diputados declaran el equivalente a cuatro o más viviendas'}
+            pie="A su nombre, contando la parte que poseen" />
+          <Cifra fondo={P.papel} tinta={P.negro} valor={cifras.leyesVotadasOpo ? `${cifras.leyesAprobadasOpo} de ${cifras.leyesVotadasOpo}` : '—'}
+            texto="leyes propuestas por la oposición aprobadas"
+            pie={cifras.ppLeyes ? `Del PP: ${cifras.ppLeyes.aprobadas} de ${cifras.ppLeyes.votadas}` : ''} />
         </div>
       </Marco>
 
