@@ -1,12 +1,14 @@
 const TIPO =
-  /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|plaza(?:s)?(?:\s+de\s+(?:garaje(?:s)?|aparcamiento(?:s)?))?|garaje(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
+  /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|plaza(?:s)?(?:\s+(?:de\s+)?(?:gara(?:j|g)e(?:s)?|aparcamiento(?:s)?))?|gara(?:j|g)e(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
 
 const MARCA_SOCIEDAD =
   /\b(?:s\.?\s?l\.?\s?u|s\.?\s?l|s\.?\s?a)\b\.?|sociedad(?!\s+(?:de\s+)?gananciales)|mercantil|participaciones?\s+sociales|acciones|cotiza/i;
 
 const SIN_PORCENTAJE = /\bsin\s+porcentaje\b/i;
 
-const CORTE = /[;\n|]+|(?<![\d.,])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|terreno|bodega|cochera))/i;
+const FILAS = /[;\n|]+/;
+
+const CORTE = /(?<![\d.,])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|garage|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|terreno|bodega|cochera))/i;
 
 function legible(s) {
   return String(s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
@@ -23,7 +25,7 @@ function normalizar(s) {
 const CATEGORIA = [
   ['suelo', /finca|parcela|solar|terreno|monte|cultivo|rustic/i],
   ['vivienda', /viviend|casa|piso|apartamento|chalet|estudio/i],
-  ['anejo', /garaje|aparcamiento|trastero|cochera|plaza/i],
+  ['anejo', /garaje|garage|aparcamiento|trastero|cochera|plaza/i],
   ['productivo', /local|nave|oficina|almacen|bodega|edificio/i]
 ];
 
@@ -41,10 +43,15 @@ function categoriaDe(texto) {
 }
 
 function porcentajeDe(trozo) {
-  const m = String(trozo).match(/(\d{1,3}(?:[.,]\d+)?)\s*%/);
-  if (!m) return null;
-  const v = Number(String(m[1]).replace(',', '.'));
-  return Number.isFinite(v) && v > 0 && v <= 100 ? v : null;
+  const t = String(trozo);
+  const m = t.match(/(\d{1,3}(?:[.,]\d+)?)\s*%/);
+  if (m) {
+    const v = Number(String(m[1]).replace(',', '.'));
+    return Number.isFinite(v) && v > 0 && v <= 100 ? v : null;
+  }
+  const f = t.match(/(?:^|[^\d/])([1-9])\s*\/\s*([1-9]\d?)(?![\d/])/);
+  if (f && Number(f[1]) < Number(f[2])) return (100 * Number(f[1])) / Number(f[2]);
+  return null;
 }
 
 function origenDe(trozo) {
@@ -55,53 +62,95 @@ function sinPorcentajeDe(trozo, pct) {
   return pct == null && SIN_PORCENTAJE.test(trozo);
 }
 
+const ES_VIVIENDA = /viviend|casa|piso|apartamento|chalet|estudio/i;
+
+function itemsDeTrozo(original, fila) {
+  const trozo = normalizar(original);
+  const propio = porcentajeDe(trozo);
+  const pct = propio ?? fila.pct;
+  const sociedad = origenDe(trozo) ?? fila.sociedad;
+  const sinPorcentaje = pct == null && (SIN_PORCENTAJE.test(trozo) || fila.sinPorcentaje);
+  const out = [];
+
+  const conNum = trozo.match(new RegExp(`^(\\d{1,3})\\s+(${TIPO.source})\\b`, 'i'));
+  if (conNum) {
+    const tipo = conNum[2];
+    out.push({
+      qty: Math.min(80, Number(conNum[1])),
+      texto: original,
+      porcentaje: pct,
+      sinPorcentaje,
+      sociedad,
+      categoria: categoriaDe(trozo),
+      esVivienda: ES_VIVIENDA.test(tipo)
+    });
+    return out;
+  }
+
+  const menciones = [...trozo.matchAll(new RegExp(`\\b(${TIPO.source})\\b`, 'gi'))];
+  if (menciones.length === 0) {
+    if (/propiedad|herencia|%|provincia|madrid|barcelona|leon|almeria|coruna|sevilla|valencia/i.test(trozo) && trozo.length > 12) {
+      out.push({ qty: 1, texto: original, porcentaje: pct, sinPorcentaje, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
+    }
+    return out;
+  }
+  for (const m of menciones) {
+    out.push({
+      qty: 1,
+      texto: menciones.length > 1 ? `${m[1]} — ${original}` : original,
+      porcentaje: pct,
+      sinPorcentaje,
+      sociedad,
+      categoria: categoriaDe(m[1]),
+      esVivienda: ES_VIVIENDA.test(m[1])
+    });
+  }
+  return out;
+}
+
+function desgloseDeFila(resto, original, fila) {
+  const out = [];
+  for (const parte of resto.split(CORTE).map(t => t.trim()).filter(Boolean)) {
+    const trozo = normalizar(parte);
+    const propio = porcentajeDe(trozo);
+    const pct = propio ?? fila.pct;
+    const sociedad = origenDe(trozo) ?? fila.sociedad;
+    const sinPorcentaje = pct == null && (SIN_PORCENTAJE.test(trozo) || fila.sinPorcentaje);
+    const cabeza = trozo.match(new RegExp(`^(\\d{1,3})\\s+(?=${TIPO.source})`, 'i'));
+    const menciones = [...trozo.matchAll(new RegExp(`\\b(${TIPO.source})\\b`, 'gi'))];
+    menciones.forEach((m, i) => out.push({
+      qty: i === 0 && cabeza ? Math.min(80, Number(cabeza[1])) : 1,
+      texto: `${m[1]} — ${original}`,
+      porcentaje: pct,
+      sinPorcentaje,
+      sociedad,
+      categoria: categoriaDe(m[1]),
+      esVivienda: ES_VIVIENDA.test(m[1])
+    }));
+  }
+  return out;
+}
+
 export function parsearInmueblesDetalle(detalle) {
   if (!detalle) return [];
-  const trozos = legible(detalle)
-    .split(CORTE)
-    .map(t => t.trim())
-    .filter(Boolean);
-
   const out = [];
-  for (const original of trozos) {
-    const trozo = normalizar(original);
-    const pct = porcentajeDe(trozo);
-    const sociedad = origenDe(trozo);
-    const sinPorcentaje = sinPorcentajeDe(trozo, pct);
+  for (const original of legible(detalle).split(FILAS).map(t => t.trim()).filter(Boolean)) {
+    const normal = normalizar(original);
+    const pct = porcentajeDe(normal);
+    const fila = { pct, sociedad: origenDe(normal), sinPorcentaje: sinPorcentajeDe(normal, pct) };
 
-    const conNum = trozo.match(new RegExp(`^(\\d{1,3})\\s+(${TIPO.source})\\b`, 'i'));
-    if (conNum) {
-      const qty = Math.min(80, Number(conNum[1]));
-      const tipo = conNum[2];
-      out.push({
-        qty,
-        texto: original,
-        porcentaje: pct,
-        sinPorcentaje,
-        sociedad,
-        categoria: categoriaDe(trozo),
-        esVivienda: /viviend|casa|piso|apartamento|chalet|estudio/i.test(tipo)
-      });
-      continue;
-    }
-
-    const menciones = [...trozo.matchAll(new RegExp(`\\b(${TIPO.source})\\b`, 'gi'))];
-    if (menciones.length === 0) {
-      if (/propiedad|herencia|%|provincia|madrid|barcelona|leon|almeria|coruna|sevilla|valencia/i.test(trozo) && trozo.length > 12) {
-        out.push({ qty: 1, texto: original, porcentaje: pct, sinPorcentaje, sociedad, categoria: categoriaDe(trozo), esVivienda: false });
+    const total = normal.match(new RegExp(`^(\\d{1,3})\\s+(?=${TIPO.source})`, 'i'));
+    if (total) {
+      const alternativa = desgloseDeFila(original.replace(/^\s*\d{1,3}\s+/, ''), original, fila);
+      const suma = alternativa.reduce((a, it) => a + it.qty, 0);
+      if (alternativa.length > 1 && suma === Number(total[1])) {
+        out.push(...alternativa);
+        continue;
       }
-      continue;
     }
-    for (const m of menciones) {
-      out.push({
-        qty: 1,
-        texto: menciones.length > 1 ? `${m[1]} — ${original}` : original,
-        porcentaje: pct,
-        sinPorcentaje,
-        sociedad,
-        categoria: categoriaDe(m[1]),
-        esVivienda: /viviend|casa|piso|apartamento|chalet|estudio/i.test(m[1])
-      });
+
+    for (const trozo of original.split(CORTE).map(t => t.trim()).filter(Boolean)) {
+      out.push(...itemsDeTrozo(trozo, fila));
     }
   }
   return out;
