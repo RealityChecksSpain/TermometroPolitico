@@ -1,5 +1,5 @@
 const TIPO =
-  /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|plaza(?:s)?(?:\s+(?:de\s+)?(?:gara(?:j|g)e(?:s)?|aparcamiento(?:s)?))?|gara(?:j|g)e(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|suelo(?:s)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
+  /(?:vivienda(?:s)?|casa(?:s)?|chalet(?:s|es)?|finca(?:s)?(?:\s+(?:urbana(?:s)?|rustica(?:s)?))?|parcela(?:s)?|(?:plaza|pza)(?:s)?\.?(?:\s+(?:de\s+)?(?:gara(?:j|g)e(?:s)?|aparcamiento(?:s)?))?|gara(?:j|g)e(?:s)?|aparcamiento(?:s)?|local(?:es)?(?:\s+comercial(?:es)?)?|nave(?:s)?(?:\s+industrial(?:es)?)?|almacen(?:es)?|oficina(?:s)?|edificio(?:s)?|piso(?:s)?|apartamento(?:s)?|estudio(?:s)?|trastero(?:s)?|solar(?:es)?|suelo(?:s)?|terreno(?:s)?|bodega(?:s)?|cochera(?:s)?)/i;
 
 const MARCA_SOCIEDAD =
   /\b(?:s\.?\s?l\.?\s?u|s\.?\s?l|s\.?\s?a)\b\.?|sociedad(?!\s+(?:de\s+)?gananciales)|mercantil|participaciones?\s+sociales|acciones|cotiza/i;
@@ -8,7 +8,7 @@ const SIN_PORCENTAJE = /\bsin\s+porcentaje\b/i;
 
 const FILAS = /[;\n|]+/;
 
-const CORTE = /(?<![\d.,/])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|garaje|garage|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|suelo|terreno|bodega|cochera))/i;
+const CORTE = /(?<![\d.,/])(?=\d{1,3}\s+(?:viviend|casa|chalet|finca|parcela|plaza|pza|garaje|garage|aparcamiento|local|nave|almac[eé]n|oficina|edificio|piso|apartamento|estudio|trastero|solar|suelo|terreno|bodega|cochera))/i;
 
 function legible(s) {
   return String(s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
@@ -25,7 +25,7 @@ function normalizar(s) {
 const CATEGORIA = [
   ['suelo', /finca|parcela|solar|suelo|terreno|monte|cultivo|rustic/i],
   ['vivienda', /viviend|casa|piso|apartamento|chalet|estudio/i],
-  ['anejo', /garaje|garage|aparcamiento|trastero|cochera|plaza/i],
+  ['anejo', /garaje|garage|aparcamiento|trastero|cochera|plaza|pza/i],
   ['productivo', /local|nave|oficina|almacen|bodega|edificio/i]
 ];
 
@@ -139,8 +139,8 @@ export function parsearInmueblesDetalle(detalle) {
     const pct = porcentajeDe(normal);
     const fila = { pct, sociedad: origenDe(normal), sinPorcentaje: sinPorcentajeDe(normal, pct) };
 
-    const total = normal.match(new RegExp(`^(\\d{1,3})\\s+(?=${TIPO.source})`, 'i'));
-    if (total) {
+    const total = normal.match(new RegExp(`^(\\d{1,3})\\s+(${TIPO.source})\\b`, 'i'));
+    if (total && !/s$/i.test(total[2].split(/\s+/)[0])) {
       const alternativa = desgloseDeFila(original.replace(/^\s*\d{1,3}\s+/, ''), original, fila);
       const suma = alternativa.reduce((a, it) => a + it.qty, 0);
       if (alternativa.length > 1 && suma === Number(total[1])) {
