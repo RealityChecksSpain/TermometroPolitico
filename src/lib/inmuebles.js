@@ -51,6 +51,7 @@ function porcentajeDe(trozo) {
   }
   const f = t.match(/(?:^|[^\d/])([1-9])\s*\/\s*([1-9]\d?)(?![\d/])/);
   if (f && Number(f[1]) < Number(f[2])) return (100 * Number(f[1])) / Number(f[2]);
+  if (/(?<!\bno\s+)\bganancial(?:es)?\b/i.test(t)) return 50;
   return null;
 }
 
