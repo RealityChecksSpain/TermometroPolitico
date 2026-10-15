@@ -21,10 +21,20 @@ export default function MadridInicio({ diputados, onFicha, onIr }) {
   const [leyes, setLeyes] = useState([]);
   const [resumen, setResumen] = useState([]);
 
+  const [pedirLeyes, setPedirLeyes] = useState(false);
+
   useEffect(() => {
-    traerLeyesMadrid().then(setLeyes).catch(() => setLeyes([]));
     traerIniciativasResumenMadrid().then(setResumen).catch(() => setResumen([]));
   }, []);
+
+  useEffect(() => {
+    if (!pedirLeyes) return;
+    traerLeyesMadrid().then(setLeyes).catch(() => setLeyes([]));
+  }, [pedirLeyes]);
+
+  useEffect(() => {
+    if (q.trim().length >= 3) setPedirLeyes(true);
+  }, [q]);
 
   const cifras = useMemo(() => {
     const pp = diputados.filter(d => d.partido_siglas === 'PP').length;
@@ -56,7 +66,7 @@ export default function MadridInicio({ diputados, onFicha, onIr }) {
           <label htmlFor="busca-madrid" className="bh-mono" style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 8 }}>
             Busca un diputado o una iniciativa
           </label>
-          <input id="busca-madrid" className="bh-input" value={q} onChange={e => setQ(e.target.value)}
+          <input id="busca-madrid" className="bh-input" value={q} onChange={e => setQ(e.target.value)} onFocus={() => setPedirLeyes(true)}
             placeholder="Un nombre, o un tema: vivienda, sanidad, Metro, impuestos…" autoComplete="off" />
 
           {resultados && (
