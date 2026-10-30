@@ -1040,3 +1040,13 @@ export function traerVotacionesDeExpedienteAndalucia(expediente, legislatura) {
       .sort((a, b) => String(a.fecha ?? '').localeCompare(String(b.fecha ?? '')) || (a.numero ?? 0) - (b.numero ?? 0));
   });
 }
+
+export function traerIniciativaMadrid(clave) {
+  return recordar(`iniciativaMadrid:${clave}`, async () => {
+    if (!supabase || !clave) return null;
+    const { data, error } = await leerConRespaldo('mv_parl_iniciativas', 'v_parl_iniciativas', q => q.select('*')
+      .eq('camara', 'asamblea-madrid').eq('expediente', clave).limit(1));
+    if (error) throw error;
+    return data?.[0] ?? null;
+  });
+}

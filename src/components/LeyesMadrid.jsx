@@ -9,6 +9,7 @@ const estilos = `
 .lmFila{padding:11px 0;border-top:2px solid #121A24;display:grid;grid-template-columns:4px minmax(0,1fr);gap:10px}
 .lmFila:last-child{border-bottom:2px solid #121A24}
 .lmAsunto{font-size:13.5px;line-height:1.45;color:#14161A;cursor:pointer;background:none;border:0;padding:0;text-align:left;font-family:inherit}
+.lmAsunto:hover{text-decoration:underline}
 .lmCorto{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .lmMeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:10.5px;color:#7C8288;margin-top:5px}
 .lmEstado{font-size:10px;padding:1px 6px;border:1.5px solid #121A24;text-transform:uppercase;letter-spacing:.04em}
@@ -57,14 +58,13 @@ function autorCorto(a) {
   return a;
 }
 
-export default function LeyesMadrid({ colores }) {
+export default function LeyesMadrid({ colores, onAbrir }) {
   const [leyes, setLeyes] = useState([]);
   const [estado, setEstado] = useState('cargando');
   const [tipo, setTipo] = useState('leyes');
   const [autor, setAutor] = useState(null);
   const [resultado, setResultado] = useState('todas');
   const [busqueda, setBusqueda] = useState('');
-  const [abierta, setAbierta] = useState(null);
   const [cuantas, setCuantas] = useState(40);
 
   useEffect(() => {
@@ -154,9 +154,7 @@ export default function LeyesMadrid({ colores }) {
             <div key={l.clave} className="lmFila">
               <span style={{ width: 4, background: color(l.autor), borderRadius: 2 }} />
               <div style={{ minWidth: 0 }}>
-                <button className={`lmAsunto${abierta === l.clave ? '' : ' lmCorto'}`}
-                  onClick={() => setAbierta(abierta === l.clave ? null : l.clave)}
-                  aria-expanded={abierta === l.clave}>
+                <button className="lmAsunto lmCorto" onClick={() => onAbrir(l)}>
                   {l.asunto ?? 'Sin asunto en los datos'}
                 </button>
                 <div className="lmMeta em">
@@ -168,9 +166,6 @@ export default function LeyesMadrid({ colores }) {
                   {l.fecha && <span>{fecha(l.fecha)}</span>}
                   {l.url && <a href={l.url} target="_blank" rel="noopener noreferrer" style={{ color: '#3C63A0' }}>expediente ↗</a>}
                 </div>
-                {l.firmantes && abierta === l.clave && (
-                  <div className="em" style={{ fontSize: 10.5, color: '#4A5057', marginTop: 4 }}>Firman: {l.firmantes}</div>
-                )}
               </div>
             </div>
           );
@@ -193,6 +188,7 @@ export default function LeyesMadrid({ colores }) {
         Las iniciativas legislativas populares y de ayuntamientos no se atribuyen a ningún grupo aunque el fichero las asigne a uno.
         La fecha es la que da el expediente en los datos abiertos.
         La Asamblea no publica cómo vota cada diputado ni cada grupo: el resultado es el de la cámara, donde el PP tiene mayoría absoluta desde 2023.
+        Al abrir una iniciativa, «Qué dice» y «Si esto te afecta» son un resumen automático de su texto oficial (la ley publicada en el Boletín de la Asamblea si se aprobó; si no, el texto presentado), hecho con un modelo de lenguaje con reglas fijas: solo lo que dice el texto, sin valorar. Los colectivos se eligen de una lista cerrada, la misma que en el Congreso.
 
         </div>
 

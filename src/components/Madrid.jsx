@@ -8,6 +8,7 @@ import { useTelefono } from '../lib/pantalla.js';
 
 const FichaMadrid = lazy(() => import('./FichaMadrid.jsx'));
 const LeyesMadrid = lazy(() => import('./LeyesMadrid.jsx'));
+const IniciativaMadrid = lazy(() => import('./IniciativaMadrid.jsx'));
 const PartidosMadrid = lazy(() => import('./PartidosMadrid.jsx'));
 
 const SECCIONES = [['inicio', 'Inicio'], ['diputados', 'Diputados'], ['leyes', 'Leyes'], ['partidos', 'Partidos']];
@@ -61,6 +62,8 @@ export default function Madrid() {
   const [busqueda, setBusqueda] = useState('');
   const [sel, setSel] = useState(null);
   const [seccion, setSeccion] = useState('inicio');
+  const [ley, setLey] = useState(null);
+  const [scrollLista, setScrollLista] = useState(0);
 
   useEffect(() => {
     const raiz = document.documentElement;
@@ -70,7 +73,18 @@ export default function Madrid() {
     return () => { raiz.style.background = previo[0]; document.body.style.background = previo[1]; };
   }, []);
 
-  const ir = s => { setSeccion(s); window.scrollTo?.({ top: 0, behavior: quieto ? 'auto' : 'smooth' }); };
+  const ir = s => { setLey(null); setSeccion(s); window.scrollTo?.({ top: 0, behavior: quieto ? 'auto' : 'smooth' }); };
+
+  const abrirLey = l => {
+    setScrollLista(window.scrollY ?? 0);
+    setLey(l);
+    window.scrollTo?.({ top: 0, behavior: 'auto' });
+  };
+
+  const cerrarLey = () => {
+    setLey(null);
+    requestAnimationFrame(() => window.scrollTo?.({ top: scrollLista, behavior: 'auto' }));
+  };
 
   useEffect(() => {
     traerDiputadosMadrid()
@@ -127,7 +141,10 @@ export default function Madrid() {
         <Marco p={P} quieto={quieto} estrecho={estrecho} antetitulo="Asamblea de Madrid · XIII legislatura" titulo="Leyes y proposiciones no de ley">
           <div className="bh-cuerpo">
             <Suspense fallback={<p className="madPie">Cargando iniciativas…</p>}>
-              <LeyesMadrid colores={colores} />
+              <div style={{ display: ley ? 'none' : 'block' }}>
+                <LeyesMadrid colores={colores} onAbrir={abrirLey} />
+              </div>
+              {ley && <IniciativaMadrid key={ley.clave} ley={ley} colores={colores} onVolver={cerrarLey} />}
             </Suspense>
           </div>
         </Marco>
