@@ -483,3 +483,15 @@ export function resumenInmuebles(inm: InmuebleAnd[]) {
     valor_catastral_propio: Math.round(valor * 100) / 100
   };
 }
+
+export const COLOR_CONSEJO = '#727272';
+
+export function leerConsejeros(svg: string): Set<number> {
+  const salida = new Set<number>();
+  for (const bloque of svg.split('<a ').slice(1)) {
+    const codmie = bloque.match(/codmie=(\d+)/)?.[1];
+    const color = bloque.match(/fill:(#[0-9A-Fa-f]{6});fill-opacity:1;stroke/)?.[1];
+    if (codmie && color && color.toUpperCase() === COLOR_CONSEJO) salida.add(Number(codmie));
+  }
+  return salida;
+}

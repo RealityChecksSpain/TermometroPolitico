@@ -11,6 +11,10 @@ export const PALETAS = {
   madrid: {
     negro: '#121A24', crema: '#E3EAF2', papel: '#F4F7FB', gris: '#4F5B69',
     a: '#1B3A63', b: '#D6A03A', c: '#2C6DB0', d: '#5E93C4', e: '#9DC3E6', puntos: '#2C6DB0'
+  },
+  andalucia: {
+    negro: '#10201A', crema: '#E3F0E7', papel: '#F6FBF7', gris: '#4D5E55',
+    a: '#007A33', b: '#E7B32E', c: '#0E5C34', d: '#4FA36F', e: '#A9D6B8', puntos: '#007A33'
   }
 };
 

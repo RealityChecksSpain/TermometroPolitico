@@ -6,7 +6,7 @@ import { db, exigirEnv } from '../src/lib/supabase';
 import { refrescarCaches } from '../src/lib/metricas';
 import {
   BASE_AND, WEB_AND, CODIGO_GRUPO, SLUG_PARTIDO, pedir, pedirHtml, lineasPdf, llano, nombreDeListado,
-  leerListadoDiputados, leerFicha, leerVotaciones, leerDeclaraciones, resumenInmuebles, siglasDeGrupo,
+  leerListadoDiputados, leerFicha, leerConsejeros, leerVotaciones, leerDeclaraciones, resumenInmuebles, siglasDeGrupo,
   type DeclaracionAnd, type VotacionAnd
 } from '../src/lib/andalucia';
 
@@ -38,7 +38,13 @@ async function partidos(): Promise<Map<string, string>> {
 }
 
 async function enLotes(tabla: string, filas: any[], conflicto: string) {
-  if (SIMULAR) { console.log(`  [simulación] ${tabla}: ${filas.length} filas sin guardar`); return; }
+  if (SIMULAR) {
+    const ruta = join(CARPETA, 'simulacion', `${tabla}.json`);
+    const previas = existsSync(ruta) ? JSON.parse(await readFile(ruta, 'utf8')) : [];
+    await writeFile(ruta, JSON.stringify([...previas, ...filas]));
+    console.log(`  [simulación] ${tabla}: ${filas.length} filas sin guardar (copia en ${ruta})`);
+    return;
+  }
   for (let i = 0; i < filas.length; i += 500) {
     const { error } = await db().from(tabla).upsert(filas.slice(i, i + 500), { onConflict: conflicto });
     if (error) throw new Error(`${tabla}: ${error.message}`);
@@ -63,6 +69,8 @@ async function cargarDiputados(): Promise<DipCargado[]> {
   const listado = leerListadoDiputados(html, ACTUAL);
   console.log(`Diputados XIII en la web: ${listado.length} (${listado.filter(d => d.renuncia).length} renuncias)`);
   if (listado.filter(d => !d.renuncia).length < 100) throw new Error('El listado trae menos de 100 diputados en activo: no se carga nada.');
+  const consejeros = leerConsejeros(await pedirHtml(`${WEB_AND}/utilidades/graficos.do?contenido=pleno&codorg=0&nlegis=${ACTUAL}`));
+  console.log(`  en el Consejo de Gobierno: ${consejeros.size}`);
   const filas: any[] = [];
   for (const d of listado) {
     const url = `${WEB_AND}/composicionyfuncionamiento/diputadosysenadores.do?codmie=${d.codmie}&nlegis=${ACTUAL}&codorg=3&cirele=0&accion=Ver%20Diputados`;
@@ -83,6 +91,7 @@ async function cargarDiputados(): Promise<DipCargado[]> {
       escano: ficha?.escano ?? null,
       foto_url: `${WEB_AND}/fotografia.do?codmie=${d.codmie}&nlegis=${ACTUAL}`,
       url_ficha: url,
+      cargo: consejeros.has(d.codmie) ? 'Consejo de Gobierno de la Junta' : null,
       activo: !d.renuncia,
       actualizado_at: new Date().toISOString()
     });
@@ -193,7 +202,11 @@ async function cargarBienes(dips: DipCargado[]) {
     console.log(`  ${f.fuente}: ${decls.length} declaraciones, ${usadas} de diputados de la XIII`);
   };
   for (const f of FUENTES_CANDIDATOS) await leer(f, false);
-  const avisos = (await avisosBoja(2026)).sort((a, b) => Number(a.fuente.match(/\d+/)?.[0]) - Number(b.fuente.match(/\d+/)?.[0]));
+  const avisos: { fuente: string; url: string; fecha: string | null }[] = [];
+  for (let anyo = 2026; anyo <= new Date().getFullYear(); anyo++) {
+    const delAnyo = (await avisosBoja(anyo)).sort((a, b) => Number(a.fuente.match(/\d+/)?.[0]) - Number(b.fuente.match(/\d+/)?.[0]));
+    avisos.push(...delAnyo);
+  }
   for (const f of avisos) await leer(f, true);
   const sin = dips.filter(d => d.activo && !elegidas.has(d.id_externo));
   await enLotes('parl_bienes', [...elegidas.values()], 'camara,legislatura,id_externo');
@@ -299,6 +312,10 @@ async function main() {
   };
   console.log(`\nPARLAMENTO DE ANDALUCÍA  ${new Date().toISOString()}\n`);
   await mkdir(join(CARPETA, 'pdf'), { recursive: true });
+  if (SIMULAR) {
+    await mkdir(join(CARPETA, 'simulacion'), { recursive: true });
+    for (const t of ['parl_diputados', 'parl_bienes', 'parl_votaciones', 'parl_votos']) await writeFile(join(CARPETA, 'simulacion', `${t}.json`), '[]');
+  }
   const dips = hacer('diputados') || SIMULAR ? await cargarDiputados() : await diputadosGuardados();
   if (!dips.length) throw new Error('No hay diputados cargados. Corre antes npm run andalucia -- --solo-diputados');
   if (hacer('bienes')) await cargarBienes(dips);

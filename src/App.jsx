@@ -12,6 +12,7 @@ const Metodologia = lazy(() => import('./components/Metodologia.jsx'));
 const Descargas = lazy(() => import('./components/Descargas.jsx'));
 const Partidos = lazy(() => import('./components/Partidos.jsx'));
 const Madrid = lazy(() => import('./components/Madrid.jsx'));
+const Andalucia = lazy(() => import('./components/Andalucia.jsx'));
 import Inicio from './components/Inicio.jsx';
 const FeedPersonal = lazy(() => import('./components/FeedPersonal.jsx'));
 import AvatarPartido from './components/AvatarPartido.jsx';
@@ -266,6 +267,7 @@ cursor:pointer;color:${C.tinta}}
 letter-spacing:.08em;text-transform:uppercase;color:${C.tinta};cursor:pointer;min-height:32px}
 .camaraSel button[data-on="1"]{background:${C.tinta};color:${C.papel}}
 .camaraSel button[data-on="1"][data-camara="madrid"]{background:#1B3A63;color:#F4F7FB}
+.camaraSel button[data-on="1"][data-camara="andalucia"]{background:#007A33;color:#F6FBF7}
 @media(hover:none){.camaraSel button{min-height:44px;padding:8px 14px}}
 @media(min-width:701px){.cabeceraTitulo{gap:12px}.cabeceraTitulo img{width:64px;height:64px}}
 .filaLey{display:block;width:100%;text-align:left;cursor:pointer;padding:12px;background:transparent;border:none}
@@ -478,7 +480,9 @@ export default function App() {
   const [camara, setCamara] = useState(() => {
     try {
       if (window.location.hash === '#madrid') return 'madrid';
-      return localStorage.getItem('camara') === 'madrid' ? 'madrid' : 'espana';
+      if (window.location.hash === '#andalucia') return 'andalucia';
+      const guardada = localStorage.getItem('camara');
+      return guardada === 'madrid' || guardada === 'andalucia' ? guardada : 'espana';
     } catch {
       return 'espana';
     }
@@ -561,7 +565,7 @@ export default function App() {
       setError('Configuracion en .env:\n\n' + problemasConfig.map(p => '  - ' + p).join('\n'));
       return;
     }
-    if (camara === 'madrid') return;
+    if (camara !== 'espana') return;
     let vivo = true;
     const cargar = (clave, leer, poner) => {
       Promise.resolve()
@@ -726,6 +730,8 @@ export default function App() {
           <div className="camaraSel em" role="group" aria-label="Elegir parlamento">
             <button data-on={camara === 'madrid' ? '1' : '0'} data-camara="madrid" aria-pressed={camara === 'madrid'}
               onClick={() => elegirCamara('madrid')}>Madrid</button>
+            <button data-on={camara === 'andalucia' ? '1' : '0'} data-camara="andalucia" aria-pressed={camara === 'andalucia'}
+              onClick={() => elegirCamara('andalucia')}>Andalucía</button>
             <button data-on={camara === 'espana' ? '1' : '0'} aria-pressed={camara === 'espana'}
               onClick={() => elegirCamara('espana')}>España</button>
           </div>
@@ -736,6 +742,10 @@ export default function App() {
         {camara === 'madrid' ? (
           <Suspense fallback={<Cargando />}>
             <Madrid />
+          </Suspense>
+        ) : camara === 'andalucia' ? (
+          <Suspense fallback={<Cargando />}>
+            <Andalucia />
           </Suspense>
         ) : (<>
         <nav className="nav">
@@ -1213,7 +1223,9 @@ export default function App() {
         <div style={{ marginTop: 26, paddingTop: 12, borderTop: `1px solid ${C.linea}`, fontSize: 12, color: C.tenue, lineHeight: 1.9 }}>
           {camara === 'madrid'
             ? 'Fuente: Asamblea de Madrid, fichas de diputados y declaraciones de bienes publicadas.'
-            : 'Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.'}
+            : camara === 'andalucia'
+              ? 'Fuente: Parlamento de Andalucía (fichas, registro de votaciones del Pleno y Boletín Oficial) y BOJA.'
+              : 'Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.'}
           Aplicación independiente, sin vínculo con ninguna institución.{' '}
           <button onClick={() => { setSeccion('metodo'); setVotacionSel(null); }} style={{
             background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',

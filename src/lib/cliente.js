@@ -967,3 +967,46 @@ export function traerDocumentosMadrid(idAsamblea) {
     return data ?? [];
   });
 }
+
+const CAMARA_AND = 'parlamento-andalucia';
+
+export function traerDiputadosAndalucia() {
+  return recordar('diputadosAndalucia', async () => {
+    if (!supabase) return [];
+    const { data, error } = await leerConRespaldo('mv_parl_diputados', 'v_parl_diputados', q => q.select('*')
+      .eq('camara', CAMARA_AND).eq('legislatura', 13).order('nombre_completo'));
+    if (error) throw error;
+    return (data ?? []).map(d => ({ ...d, mandato_id: d.id_externo }));
+  });
+}
+
+export function traerVotacionesAndalucia(legislatura) {
+  return recordar(`votacionesAndalucia:${legislatura}`, async () => {
+    if (!supabase) return [];
+    const { data, error } = await leerTodoConRespaldo('mv_parl_votaciones', 'v_parl_votaciones', q => q.select('*')
+      .eq('camara', CAMARA_AND).eq('legislatura', legislatura).order('fecha', { ascending: false }));
+    if (error) throw error;
+    return data ?? [];
+  });
+}
+
+export function traerVotosVotacionAndalucia(id) {
+  return recordar(`votosVotacionAndalucia:${id}`, async () => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('parl_votos')
+      .select('escano, nombre, grupo, partido_siglas, id_externo, voto, delegado').eq('votacion_id', id);
+    if (error) throw error;
+    return data ?? [];
+  });
+}
+
+export function traerVotosDiputadoAndalucia(idExterno) {
+  return recordar(`votosDiputadoAndalucia:${idExterno}`, async () => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('parl_votos')
+      .select('voto, delegado, partido_siglas, votacion_id, parl_votaciones(fecha, titulo_general, titulo_particular, resultado, expediente, legislatura)')
+      .eq('id_externo', idExterno);
+    if (error) throw error;
+    return (data ?? []).sort((a, b) => String(b.parl_votaciones?.fecha ?? '').localeCompare(String(a.parl_votaciones?.fecha ?? '')));
+  });
+}
