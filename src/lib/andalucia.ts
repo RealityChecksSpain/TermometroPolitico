@@ -495,3 +495,120 @@ export function leerConsejeros(svg: string): Set<number> {
   }
   return salida;
 }
+
+export interface EnlaceAnd { texto: string; url: string }
+export interface TramiteAnd { fecha: string | null; descripcion: string; organo: string | null; enlaces: EnlaceAnd[] }
+export interface IniciativaAnd {
+  expediente: string;
+  legislatura: number;
+  tipo: string | null;
+  tipo_nombre: string | null;
+  proponente: string | null;
+  extracto: string | null;
+  procedimiento: string | null;
+  estado: string | null;
+  fecha_creacion: string | null;
+  comision: string | null;
+  materias_parlamento: string[];
+  tramites: TramiteAnd[];
+}
+
+function fechaIso(t: string | null | undefined): string | null {
+  const m = String(t ?? '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
+function textoLimpio(html: string): string {
+  return htmlTexto(html).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function campoFicha(html: string, etiqueta: RegExp): string | null {
+  const re = /<dt[^>]*>([\s\S]*?)<\/(?:dt|span)>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi;
+  for (const m of html.matchAll(re)) {
+    if (etiqueta.test(textoLimpio(m[1]))) return textoLimpio(m[2]) || null;
+  }
+  return null;
+}
+
+export function urlIniciativa(expediente: string): string {
+  return `${WEB_AND}/actividadparlamentaria/todaslasiniciativas/portipo.do?numexp=${encodeURIComponent(expediente)}`;
+}
+
+export function leerIniciativa(html: string, expediente: string): IniciativaAnd | null {
+  const inicio = html.indexOf('Expediente:');
+  if (inicio < 0) return null;
+  const corte = html.search(/Listas de tr(?:á|&aacute;)mites/i);
+  const cabeza = html.slice(inicio, corte > inicio ? corte : undefined);
+  const cuerpo = corte > inicio ? html.slice(corte) : '';
+  const tramites: TramiteAnd[] = [];
+  for (const trozo of cuerpo.split(/class="sep"/)) {
+    const fecha = campoFicha(trozo, /^Fecha:?$/i);
+    const descripcion = campoFicha(trozo, /^Descripci[oó]n:?$/i);
+    if (!fecha && !descripcion) continue;
+    const enlaces: EnlaceAnd[] = [];
+    for (const a of trozo.matchAll(/<a\s+href="([^"]*pdf\.do[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const url = a[1].replace(/&amp;/g, '&');
+      enlaces.push({ texto: textoLimpio(a[2]).replace(/\s*\(PDF[^)]*\)\s*$/i, ''), url: url.startsWith('http') ? url : `${BASE_AND}${url}` });
+    }
+    tramites.push({ fecha: fechaIso(fecha), descripcion: descripcion ?? '', organo: campoFicha(trozo, /^[ÓO]rgano tramitador:?$/i), enlaces });
+  }
+  const materias = (campoFicha(cabeza, /^Materias relacionadas:?$/i) ?? '').split(',').map(t => t.trim()).filter(Boolean);
+  const tipo = expediente.match(/\/([A-Z]+)-/)?.[1] ?? null;
+  return {
+    expediente,
+    legislatura: Number(expediente.match(/^(\d{1,2})-/)?.[1] ?? 0),
+    tipo,
+    tipo_nombre: campoFicha(cabeza, /^Tipo:?$/i),
+    proponente: campoFicha(cabeza, /^Proponente:?$/i),
+    extracto: campoFicha(cabeza, /^Extracto:?$/i),
+    procedimiento: campoFicha(cabeza, /^Procedimiento:?$/i),
+    estado: campoFicha(cabeza, /^Estado:?$/i),
+    fecha_creacion: fechaIso(campoFicha(cabeza, /^Fecha creaci[oó]n:?$/i)),
+    comision: campoFicha(cabeza, /^Comisi[oó]n dictaminante:?$/i),
+    materias_parlamento: materias,
+    tramites
+  };
+}
+
+export interface TextoElegido { url: string; fuente: string; clase: 'ley' | 'aprobado' | 'presentado' }
+
+const NO_ES_TEXTO = /enmienda|plazo|ordenaci[oó]n|criterio|rechazo|votos particulares|toma en consideraci|comparecencia|ponencia|dictamen|tramitaci[oó]n urgente/i;
+
+export function elegirTextos(tramites: TramiteAnd[]): TextoElegido[] {
+  const bopa = (t: TramiteAnd) => t.enlaces.filter(e => /tipodoc=bopa/i.test(e.url));
+  const salida: TextoElegido[] = [];
+  const meter = (t: TramiteAnd, clase: TextoElegido['clase']) => {
+    for (const e of bopa(t)) if (!salida.some(s => s.url === e.url)) salida.push({ url: e.url, fuente: e.texto, clase });
+  };
+  for (const t of tramites) if (/publicaci[oó]n de la ley\b/i.test(t.descripcion)) meter(t, 'ley');
+  for (const t of tramites) if (/publicaci[oó]n.*aprobad/i.test(t.descripcion) && !NO_ES_TEXTO.test(t.descripcion)) meter(t, 'aprobado');
+  for (const t of tramites) if (/^\s*publicaci[oó]n/i.test(t.descripcion) && !NO_ES_TEXTO.test(t.descripcion)) meter(t, 'presentado');
+  return salida;
+}
+
+const RUIDO_BOPA = /^\s*(?:cve:|BOPA_\d+_\d+\s*$|P[áa]g\.\s*\d+\s*$|BOLET[ÍI]N OFICIAL DEL PARLAMENTO DE ANDALUC[ÍI]A\s*$|N[úu]m\.\s*\d+.*LEGISLATURA|©\s*Parlamento de Andaluc|https?:\/\/www\.parlamentodeandalucia\.es|C\/ San Juan de Ribera|ISSN:|Tlf\.:)/i;
+const CABECERA_EXPEDIENTE = /^\s*\d{1,2}-\d{2}\/[A-Z]+-\d{6}\b/;
+
+export function textoDeExpediente(lineas: string[], expediente: string): string | null {
+  const limpias = lineas.filter(l => l !== '\f' && !RUIDO_BOPA.test(l));
+  const candidatos = limpias
+    .map((l, i) => ({ l, i }))
+    .filter(x => x.l.trim().startsWith(expediente));
+  for (const { i } of candidatos) {
+    const siguiente = limpias.slice(i + 1, i + 25).join(' ');
+    if (!/presentad[ao] por|a la mesa|orden de publicaci|ley \d+\/\d{4}|exposici[oó]n de motivos|pre[áa]mbulo|texto aprobado|aprobad[ao] por el pleno/i.test(siguiente)) continue;
+    let fin = limpias.length;
+    for (let j = i + 1; j < limpias.length; j++) {
+      if (CABECERA_EXPEDIENTE.test(limpias[j]) && !limpias[j].trim().startsWith(expediente)) { fin = j; break; }
+    }
+    let trozo = limpias.slice(i, fin);
+    while (trozo.length && !/[a-záéíóúñ]/.test(trozo[trozo.length - 1])) trozo = trozo.slice(0, -1);
+    const texto = trozo.map(l => l.trim()).join('\n')
+      .replace(/-\n(?=[a-záéíóúñü])/g, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    if (texto.length > 300) return texto;
+  }
+  return null;
+}

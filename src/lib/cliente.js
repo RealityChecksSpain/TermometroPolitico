@@ -1010,3 +1010,33 @@ export function traerVotosDiputadoAndalucia(idExterno) {
     return (data ?? []).sort((a, b) => String(b.parl_votaciones?.fecha ?? '').localeCompare(String(a.parl_votaciones?.fecha ?? '')));
   });
 }
+
+const COLUMNAS_INICIATIVA_AND = 'expediente, legislatura, tipo, proponente, estado, frase_corta, materia_nombre, materia_color';
+
+export function traerIniciativasAndalucia() {
+  return recordar('iniciativasAndalucia', async () => {
+    if (!supabase) return new Map();
+    const { data, error } = await leerTodoConRespaldo('mv_parl_iniciativas', 'v_parl_iniciativas', q => q.select(COLUMNAS_INICIATIVA_AND)
+      .eq('camara', CAMARA_AND).order('expediente'));
+    if (error) return new Map();
+    return new Map((data ?? []).map(i => [i.expediente, i]));
+  });
+}
+
+export function traerIniciativaAndalucia(expediente) {
+  return recordar(`iniciativaAndalucia:${expediente}`, async () => {
+    if (!supabase || !expediente) return null;
+    const { data, error } = await leerConRespaldo('mv_parl_iniciativas', 'v_parl_iniciativas', q => q.select('*')
+      .eq('camara', CAMARA_AND).eq('expediente', expediente).limit(1));
+    if (error) throw error;
+    return data?.[0] ?? null;
+  });
+}
+
+export function traerVotacionesDeExpedienteAndalucia(expediente, legislatura) {
+  return recordar(`votacionesExpedienteAndalucia:${expediente}`, async () => {
+    const todas = await traerVotacionesAndalucia(legislatura);
+    return todas.filter(v => v.expediente === expediente)
+      .sort((a, b) => String(a.fecha ?? '').localeCompare(String(b.fecha ?? '')) || (a.numero ?? 0) - (b.numero ?? 0));
+  });
+}

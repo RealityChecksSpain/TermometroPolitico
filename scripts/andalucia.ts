@@ -299,10 +299,13 @@ async function cargarVotos(leg: number, dips: DipCargado[]) {
       const t = (k: string) => v.totales[k]?.TOTAL ?? null;
       const si = t('TOTAL SI') ?? 0;
       const no = t('TOTAL NO') ?? 0;
+      const corta = new RegExp(`^${String(leg).slice(-1)}-(\\d{2}/)`);
+      const expediente = v.expediente && leg >= 10 ? v.expediente.replace(corta, `${leg}-$1`) : v.expediente;
+      const tituloGeneral = v.titulo_general && leg >= 10 ? v.titulo_general.replace(corta, `${leg}-$1`) : v.titulo_general;
       filasV.push({
         id, camara: CAMARA, legislatura: leg, sesion: v.sesion, numero: v.numero, protocolo: v.protocolo,
-        fecha: v.fecha ? `${v.fecha}+02:00` : null, expediente: v.expediente, tipo_iniciativa: v.tipo_iniciativa,
-        titulo_general: v.titulo_general, titulo_particular: v.titulo_particular,
+        fecha: v.fecha ? `${v.fecha}+02:00` : null, expediente, tipo_iniciativa: v.tipo_iniciativa,
+        titulo_general: tituloGeneral, titulo_particular: v.titulo_particular,
         si, no, abstencion: t('TOTAL ABSTENCIONES'), blanco: t('TOTAL BLANCOS'), ausentes: t('DIPUTADOS AUSENTES'),
         presentes: t('PRESENTES'), resultado: resultado(si, no), totales: v.totales, fuente_url: url,
         importada_at: new Date().toISOString()

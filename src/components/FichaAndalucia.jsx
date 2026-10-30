@@ -4,6 +4,7 @@ import AvatarPartido from './AvatarPartido.jsx';
 import { useBloqueoScroll, useTelefono } from '../lib/pantalla.js';
 import { traerVotosDiputadoAndalucia, traerVotacionesAndalucia } from '../lib/cliente.js';
 import { SENTIDO, tituloLegible, fechaCorta, euros, decimal } from '../lib/andalucia-web.js';
+import Edad from './EdadAndalucia.jsx';
 
 const C = { tinta: '#14161A', media: '#4A5057', tenue: '#7C8288', linea: '#DCE7DF', fondo: '#F4FAF6', enlace: '#0E5C34' };
 const TIPO = { V: 'Vivienda', L: 'Local', O: 'Otro inmueble urbano', R: 'Inmueble rústico' };
@@ -168,8 +169,9 @@ export default function FichaAndalucia({ d, onCerrar }) {
                 {distintos && <Cifra valor={distintos.length} etiqueta="veces votó distinto a su grupo" />}
               </div>
               {d.cargo && <div style={{ fontSize: 11.5, color: C.media, marginBottom: 6 }}>Está en el Consejo de Gobierno: falta al Pleno por la agenda del Gobierno.</div>}
-              <Lista titulo="Últimas votaciones" filas={votos.slice(0, 12).map(vo =>
-                `${fechaCorta(vo.parl_votaciones?.fecha)} · ${SENTIDO[vo.voto]?.texto ?? vo.voto}${vo.delegado ? ' (delegado)' : ''} · ${tituloLegible(vo.parl_votaciones).slice(0, 110)}`)} />
+              <Lista titulo="Últimas votaciones" filas={votos.slice(0, 12).map(vo => (
+                <><Edad legislatura={vo.parl_votaciones?.legislatura} /> {`${fechaCorta(vo.parl_votaciones?.fecha)} · ${SENTIDO[vo.voto]?.texto ?? vo.voto}${vo.delegado ? ' (delegado)' : ''} · ${tituloLegible(vo.parl_votaciones).slice(0, 110)}`}</>
+              ))} />
             </>
           )}
         </Bloque>

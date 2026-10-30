@@ -10,6 +10,7 @@ import { decimal, euros } from '../lib/andalucia-web.js';
 const FichaAndalucia = lazy(() => import('./FichaAndalucia.jsx'));
 const VotacionesAndalucia = lazy(() => import('./VotacionesAndalucia.jsx'));
 const PartidosAndalucia = lazy(() => import('./PartidosAndalucia.jsx'));
+const IniciativaAndalucia = lazy(() => import('./IniciativaAndalucia.jsx'));
 
 const SECCIONES = [['inicio', 'Inicio'], ['diputados', 'Diputados'], ['leyes', 'Leyes'], ['partidos', 'Partidos']];
 const P = PALETAS.andalucia;
@@ -69,6 +70,8 @@ export default function Andalucia() {
   const [busqueda, setBusqueda] = useState('');
   const [sel, setSel] = useState(null);
   const [seccion, setSeccion] = useState('inicio');
+  const [ley, setLey] = useState(null);
+  const [scrollLista, setScrollLista] = useState(0);
 
   useEffect(() => {
     const raiz = document.documentElement;
@@ -84,7 +87,19 @@ export default function Andalucia() {
       .catch(() => setEstado('error'));
   }, []);
 
-  const ir = s => { setSeccion(s); window.scrollTo?.({ top: 0, behavior: quieto ? 'auto' : 'smooth' }); };
+  const ir = s => { setLey(null); setSeccion(s); window.scrollTo?.({ top: 0, behavior: quieto ? 'auto' : 'smooth' }); };
+
+  const abrirLey = v => {
+    setScrollLista(seccion === 'leyes' ? window.scrollY ?? 0 : 0);
+    setSeccion('leyes');
+    setLey(v);
+    window.scrollTo?.({ top: 0, behavior: 'auto' });
+  };
+
+  const cerrarLey = () => {
+    setLey(null);
+    requestAnimationFrame(() => window.scrollTo?.({ top: scrollLista, behavior: 'auto' }));
+  };
 
   const diputados = useMemo(() => todos.filter(d => d.activo), [todos]);
 
@@ -140,13 +155,16 @@ export default function Andalucia() {
         ))}
       </nav>
 
-      {seccion === 'inicio' && <AndaluciaInicio diputados={diputados} partidos={partidos} onFicha={setSel} onIr={ir} />}
+      {seccion === 'inicio' && <AndaluciaInicio diputados={diputados} partidos={partidos} onFicha={setSel} onIr={ir} onLey={abrirLey} />}
 
       {seccion === 'leyes' && (
         <Marco p={P} quieto={quieto} estrecho={estrecho} antetitulo="Parlamento de Andalucía · votaciones del Pleno" titulo="Lo que se vota y quién lo vota">
           <div className="bh-cuerpo">
             <Suspense fallback={<p className="andPie">Cargando votaciones…</p>}>
-              <VotacionesAndalucia colores={colores} diputados={escanos} onFicha={setSel} />
+              <div style={{ display: ley ? 'none' : 'block' }}>
+                <VotacionesAndalucia colores={colores} onAbrir={abrirLey} />
+              </div>
+              {ley && <IniciativaAndalucia key={ley.id} votacion={ley} colores={colores} diputados={escanos} onVolver={cerrarLey} />}
             </Suspense>
           </div>
         </Marco>

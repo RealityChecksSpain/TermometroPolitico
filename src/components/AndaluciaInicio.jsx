@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Marco, Cifra, PALETAS, borde } from './Bauhaus.jsx';
 import { traerVotacionesAndalucia } from '../lib/cliente.js';
+import Edad from './EdadAndalucia.jsx';
 import { useTelefono } from '../lib/pantalla.js';
 import { TIPO_INICIATIVA, tituloLegible, fechaCorta, decimal } from '../lib/andalucia-web.js';
 
@@ -19,7 +20,7 @@ function normal(t) {
   return String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr }) {
+export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr, onLey }) {
   const quieto = useReducedMotion();
   const estrecho = useTelefono();
   const [q, setQ] = useState('');
@@ -96,15 +97,16 @@ export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr }) 
                 <div className="bh-mono" style={{ fontSize: 11, fontWeight: 700, marginBottom: 6 }}>Votaciones de la XIII · {resultados.totalVots}</div>
                 <div className="bh-lista">
                   {resultados.vots.map(v => (
-                    <div key={v.id} style={{ padding: '9px 2px' }}>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tituloLegible(v)}</div>
-                      <div className="bh-mono" style={{ fontSize: 10, textTransform: 'none', letterSpacing: 0, color: P.gris, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, color: v.resultado === 'aprobada' ? '#1F6B45' : v.resultado === 'rechazada' ? '#9A2F22' : P.gris }}>{v.resultado}</span>
+                    <button key={v.id} onClick={() => onLey(v)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '9px 2px', cursor: 'pointer', color: P.negro }}>
+                      <span style={{ fontSize: 13.5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{tituloLegible(v)}</span>
+                      <span className="bh-mono" style={{ fontSize: 10, textTransform: 'none', letterSpacing: 0, color: P.gris, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <Edad legislatura={v.legislatura} />
+                        <span style={{ fontWeight: 700, color: v.resultado === 'aprobada' ? '#1F6B45' : v.resultado === 'rechazada' ? '#9A2F22' : P.gris }}>{v.resultado === 'aprobada' ? 'ganó el sí' : v.resultado === 'rechazada' ? 'ganó el no' : v.resultado}</span>
                         <span>{TIPO_INICIATIVA[v.tipo_iniciativa] ?? v.tipo_iniciativa ?? ''}</span>
                         <span>{fechaCorta(v.fecha)}</span>
                         <span>{v.si} sí · {v.no} no · {v.abstencion ?? 0} abst.</span>
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   ))}
                   {!resultados.vots.length && <div style={{ padding: '9px 2px', fontSize: 13, color: P.gris }}>Ninguna votación con esas palabras.</div>}
                 </div>

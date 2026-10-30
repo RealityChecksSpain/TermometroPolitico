@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Hemiciclo, { LeyendaVoto } from './Hemiciclo.jsx';
+import Edad from './EdadAndalucia.jsx';
 import { PALETAS } from './Bauhaus.jsx';
-import { traerVotacionesAndalucia, traerVotosVotacionAndalucia } from '../lib/cliente.js';
-import { TIPO_INICIATIVA, SENTIDO, tituloLegible, fechaCorta } from '../lib/andalucia-web.js';
+import { traerVotacionesAndalucia, traerVotosVotacionAndalucia, traerIniciativasAndalucia } from '../lib/cliente.js';
+import { TIPO_INICIATIVA, SENTIDO, tituloLegible, fechaCorta, autoresDe, listaHumana } from '../lib/andalucia-web.js';
 
 const P = PALETAS.andalucia;
 
@@ -21,12 +22,13 @@ const estilos = `
 .vaTabla th:first-child,.vaTabla td:first-child{text-align:left}
 .vaDetGrid{display:grid;gap:10px}
 @media(min-width:900px){.vaDetGrid[data-hemi='1']{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}.vaDetGrid[data-hemi='1'] .vaTabla{margin-top:0}}
+.vaTitulo:hover{text-decoration:underline}
 .vaBusca{max-width:280px;padding:8px 10px;font-size:14px;box-shadow:3px 3px 0 ${P.negro}}
 `;
 
-const RESULTADOS = [['todas', 'Todas'], ['aprobada', 'Aprobadas'], ['rechazada', 'Rechazadas']];
+const RESULTADOS = [['todas', 'Todas'], ['aprobada', 'Ganó el sí'], ['rechazada', 'Ganó el no']];
 
-function Detalle({ v, diputados, colores, legislatura }) {
+export function VotosDeVotacion({ v, diputados, colores, legislatura }) {
   const [votos, setVotos] = useState(null);
   useEffect(() => {
     let vivo = true;
@@ -98,23 +100,39 @@ function Detalle({ v, diputados, colores, legislatura }) {
   );
 }
 
-export default function VotacionesAndalucia({ colores, diputados }) {
+export default function VotacionesAndalucia({ colores, onAbrir }) {
   const [legislatura, setLegislatura] = useState(13);
+  const [iniciativas, setIniciativas] = useState(new Map());
   const [todas, setTodas] = useState(null);
   const [tipo, setTipo] = useState(null);
   const [resultado, setResultado] = useState('todas');
   const [busqueda, setBusqueda] = useState('');
-  const [abierta, setAbierta] = useState(null);
   const [cuantas, setCuantas] = useState(40);
 
   useEffect(() => {
     let vivo = true;
     setTodas(null);
-    setAbierta(null);
     setCuantas(40);
     traerVotacionesAndalucia(legislatura).then(x => { if (vivo) setTodas(x); }).catch(() => { if (vivo) setTodas([]); });
     return () => { vivo = false; };
   }, [legislatura]);
+
+  useEffect(() => {
+    traerIniciativasAndalucia().then(setIniciativas).catch(() => {});
+  }, []);
+
+  const hermanas = useMemo(() => {
+    const m = new Map();
+    for (const v of todas ?? []) {
+      if (!v.expediente) continue;
+      const k = `${v.expediente}|${v.sesion}`;
+      const l = m.get(k) ?? [];
+      l.push(v);
+      m.set(k, l);
+    }
+    for (const l of m.values()) l.sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
+    return m;
+  }, [todas]);
 
   const tipos = useMemo(() => {
     const c = new Map();
@@ -157,15 +175,24 @@ export default function VotacionesAndalucia({ colores, diputados }) {
       <div>
         {lista.slice(0, cuantas).map(v => (
           <div key={v.id} className="vaFila">
-            <button className="vaTitulo" onClick={() => setAbierta(abierta === v.id ? null : v.id)} aria-expanded={abierta === v.id}>
+            <button className="vaTitulo" onClick={() => onAbrir(v)}>
               {tituloLegible(v)}
             </button>
             <div className="vaMeta em">
-              <span className="vaRes" style={{ background: v.resultado === 'aprobada' ? '#1F7A45' : v.resultado === 'rechazada' ? '#B23A2E' : P.gris }}>{v.resultado}</span>
+              <Edad legislatura={v.legislatura} />
+              <span className="vaRes" style={{ background: v.resultado === 'aprobada' ? '#1F7A45' : v.resultado === 'rechazada' ? '#B23A2E' : P.gris }}>{v.resultado === 'aprobada' ? 'ganó el sí' : v.resultado === 'rechazada' ? 'ganó el no' : v.resultado}</span>
               <span>{v.si} sí · {v.no} no · {v.abstencion ?? 0} abst.</span>
+              {(() => {
+                const l = hermanas.get(`${v.expediente}|${v.sesion}`);
+                return l && l.length > 1 && !v.titulo_particular ? <span>votación {l.indexOf(v) + 1} de {l.length} de este debate</span> : null;
+              })()}
+              {v.titulo_particular && <span style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.titulo_particular}</span>}
+            </div>
+            <div className="vaMeta em" style={{ marginTop: 3 }}>
+              {iniciativas.get(v.expediente)?.estado && <span>Iniciativa: <strong>{iniciativas.get(v.expediente).estado.toLowerCase()}</strong></span>}
+              {iniciativas.get(v.expediente)?.proponente && <span>De {listaHumana(autoresDe(iniciativas.get(v.expediente).proponente))}</span>}
               <span>{TIPO_INICIATIVA[v.tipo_iniciativa] ?? v.tipo_iniciativa ?? ''}</span>
               <span>{fechaCorta(v.fecha)}</span>
-              {v.titulo_particular && <span style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.titulo_particular}</span>}
             </div>
             {v.voto_grupos && (
               <div className="vaGrupos">
@@ -177,7 +204,6 @@ export default function VotacionesAndalucia({ colores, diputados }) {
                 ))}
               </div>
             )}
-            {abierta === v.id && <Detalle v={v} diputados={diputados} colores={colores} legislatura={legislatura} />}
           </div>
         ))}
       </div>
@@ -190,8 +216,10 @@ export default function VotacionesAndalucia({ colores, diputados }) {
         <div>
           <span>Fuente: registro electrónico de las votaciones del Pleno que publica el Parlamento de Andalucía en «Sentido del voto», con el voto de cada diputado. Para la versión definitiva, el propio Parlamento remite al Diario de Sesiones.</span>
           <span>Una misma iniciativa puede votarse varias veces: por puntos, enmiendas o artículos. Cada votación aparece por separado.</span>
-          <span>«Aprobada» o «rechazada» compara síes y noes. Algunas votaciones exigen una mayoría especial, como la absoluta; en ese caso, el Diario de Sesiones da el resultado oficial.</span>
+          <span>«Ganó el sí» o «ganó el no» compara síes y noes de esa votación. En un mismo debate puede haber varias (enmiendas, puntos o el texto completo) y el registro oficial no dice cuál es cuál: lo que pasó con la iniciativa lo dice su estado oficial («Iniciativa: aprobado»). Algunas votaciones exigen una mayoría especial, como la absoluta; en ese caso, el Diario de Sesiones da el resultado oficial.</span>
           <span>La postura de cada grupo es la de la mayoría de sus diputados que votaron. Quien delega el voto cuenta con el sentido que delegó.</span>
+          <span>Al abrir una votación: quién presentó la iniciativa, su estado y sus trámites salen de la ficha oficial del Parlamento. «Qué dice» y «Si esto te afecta» son un resumen automático del texto publicado en el Boletín Oficial del Parlamento de Andalucía, hecho con un modelo de lenguaje con reglas fijas: solo lo que dice el texto, sin valorar ni atribuir intenciones. Los colectivos se eligen de una lista cerrada, la misma que en el Congreso.</span>
+          <span>«Nueva» marca lo votado en la legislatura que empezó en 2026; «Anterior», lo de 2022 a 2026.</span>
         </div>
       </details>
     </div>
