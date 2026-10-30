@@ -7,6 +7,13 @@ import { TIPO_INICIATIVA, tituloLegible, fechaCorta, decimal } from '../lib/anda
 
 const P = PALETAS.andalucia;
 const MAYORIA = 55;
+const MUNICIPAL = /alcald|concejal|teniente|ayunt|ayto/i;
+const INICIO_MANDATO_MUNICIPAL = 2023;
+
+function anyoCargo(t) {
+  const m = String(t).match(/(\d{4})(?!.*\d{4})/);
+  return m ? Number(m[1]) : null;
+}
 
 function normal(t) {
   return String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -29,11 +36,14 @@ export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr }) 
     const enGobierno = new Map();
     for (const d of gobierno) enGobierno.set(d.partido_siglas, (enGobierno.get(d.partido_siglas) ?? 0) + 1);
     const cuatro = diputados.filter(d => Number(d.n_viviendas_equivalentes) >= 4).length;
-    const aprobadas = votaciones.filter(v => v.resultado === 'aprobada');
-    const conPPyVox = aprobadas.filter(v => v.voto_grupos?.PP === 'si' && v.voto_grupos?.VOX === 'si').length;
+    const municipales = diputados.filter(d => (Array.isArray(d.cargos_publicos) ? d.cargos_publicos : [])
+      .some(c => MUNICIPAL.test(c) && anyoCargo(c) >= INICIO_MANDATO_MUNICIPAL));
+    const porPartido = new Map();
+    for (const d of municipales) porPartido.set(d.partido_siglas, (porPartido.get(d.partido_siglas) ?? 0) + 1);
+    const municipalesPartidos = [...porPartido.entries()].sort((a, b) => b[1] - a[1]).map(([s, n]) => `${s} ${n}`).join(' · ');
     const socios = partidos.filter(p => enGobierno.has(p.siglas) && p.siglas !== primero?.siglas);
     const sumaGobierno = partidos.filter(p => enGobierno.has(p.siglas)).reduce((s, p) => s + p.n, 0);
-    return { total, primero, gobierno: gobierno.length, enGobierno: [...enGobierno.entries()].sort((a, b) => b[1] - a[1]), socios, sumaGobierno, cuatro, aprobadas: aprobadas.length, conPPyVox };
+    return { total, primero, gobierno: gobierno.length, enGobierno: [...enGobierno.entries()].sort((a, b) => b[1] - a[1]), socios, sumaGobierno, cuatro, municipales: municipales.length, municipalesPartidos };
   }, [diputados, partidos, votaciones]);
 
   const resultados = useMemo(() => {
@@ -120,9 +130,9 @@ export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr }) 
           <Cifra fondo={P.c} tinta="#FFFFFF" valor={String(cifras.cuatro)}
             texto={cifras.cuatro === 1 ? 'diputado declara el equivalente a cuatro o más viviendas' : 'diputados declaran el equivalente a cuatro o más viviendas'}
             pie="Contando solo la parte que poseen" />
-          <Cifra fondo={P.papel} tinta={P.negro} valor={cifras.aprobadas ? `${cifras.conPPyVox} de ${cifras.aprobadas}` : '—'}
-            texto="votaciones aprobadas en Pleno salieron con el sí de PP y VOX"
-            pie="Desde que empezó la XIII legislatura" />
+          <Cifra fondo={P.papel} tinta={P.negro} valor={String(cifras.municipales)}
+            texto={cifras.municipales === 1 ? 'diputado era alcalde o concejal cuando se presentó' : 'diputados eran alcaldes o concejales cuando se presentaron'}
+            pie={`Cargo del mandato municipal que empezó en ${INICIO_MANDATO_MUNICIPAL}, según su declaración de bienes${cifras.municipalesPartidos ? ` · ${cifras.municipalesPartidos}` : ''}`} />
         </div>
       </Marco>
     </div>
