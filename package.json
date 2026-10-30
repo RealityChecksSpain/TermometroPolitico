@@ -77,6 +77,7 @@
     "asamblea": "node --env-file=.env --import tsx scripts/asamblea.ts",
     "asamblea:asistencia": "node --env-file=.env --import tsx scripts/asamblea-asistencia.ts",
     "asamblea:enlaces": "node --env-file=.env --import tsx scripts/asamblea-enlaces.ts",
+    "asamblea:sondear:iniciativa": "node --env-file=.env --import tsx scripts/asamblea-sondear-iniciativa.ts",
     "asamblea:iniciativas": "node --env-file=.env --import tsx scripts/asamblea-iniciativas.ts",
     "andalucia": "node --env-file=.env --import tsx scripts/andalucia.ts",
     "andalucia:iniciativas": "node --env-file=.env --import tsx scripts/andalucia-iniciativas.ts",
