@@ -17,6 +17,21 @@ const estilos = `
 
 const MINIMO_XIII = 30;
 
+function Porcentaje({ x }) {
+  if (!x) return '—';
+  return (
+    <>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 90, height: 8, background: '#DCE7DF', position: 'relative', display: 'inline-block' }}>
+          <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${x.pct}%`, background: P.a }} />
+        </span>
+        <span style={{ minWidth: 38 }}>{x.pct} %</span>
+      </span>
+      <span className="paSub">{x.iguales} de {x.total}</span>
+    </>
+  );
+}
+
 export default function PartidosAndalucia({ diputados, partidos }) {
   const [xii, setXii] = useState(null);
   const [xiii, setXiii] = useState(null);
@@ -100,14 +115,14 @@ export default function PartidosAndalucia({ diputados, partidos }) {
       {!pares && <p style={{ fontSize: 12, color: P.gris }}>Cargando votaciones…</p>}
       {pares && (
         <div className="paCaja">
-          <table className="paTabla" style={{ minWidth: 420 }}>
+          <table className="paTabla" style={{ minWidth: 420, maxWidth: pocasXiii ? 620 : 820 }}>
             <thead><tr><th>Grupos</th><th>XII (2022-2026)</th>{!pocasXiii && <th>XIII (desde 2026)</th>}</tr></thead>
             <tbody>
               {pares.map(x => (
                 <tr key={x.k}>
                   <td>{x.a} y {x.b}</td>
-                  <td>{x.antes ? `${x.antes.pct} %` : '—'}<span className="paSub">{x.antes ? `${x.antes.iguales} de ${x.antes.total}` : ''}</span></td>
-                  {!pocasXiii && <td>{x.ahora ? `${x.ahora.pct} %` : '—'}<span className="paSub">{x.ahora ? `${x.ahora.iguales} de ${x.ahora.total}` : ''}</span></td>}
+                  <td><Porcentaje x={x.antes} /></td>
+                  {!pocasXiii && <td><Porcentaje x={x.ahora} /></td>}
                 </tr>
               ))}
             </tbody>

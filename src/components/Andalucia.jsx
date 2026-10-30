@@ -21,6 +21,16 @@ ${cssBauhaus(P)}
 @media(min-width:900px){.andalucia .nav{background:none}}
 .andHemi .bh-chip[data-on='1']{background:${P.b};color:${P.negro}}
 .andPartidos{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.andHemiGrid{display:grid;gap:4px}
+.andBloques{display:none}
+@media(min-width:900px){
+.andHemiGrid{grid-template-columns:minmax(0,1.45fr) minmax(230px,1fr);gap:28px;align-items:center}
+.andHemiDibujo{order:-1}
+.andHemiPanel .andPartidos{flex-direction:column;align-items:stretch;margin:0}
+.andHemiPanel .andPartidos .bh-chip{justify-content:space-between}
+.andBloques{display:grid;gap:10px;margin-top:16px;color:#E3F0E7;font-size:12.5px;line-height:1.45}
+.andBloques strong{display:block;font-family:'DM Mono',ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#B9D3C2;font-weight:700}
+}
 .andOrden{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
 .andHemi{background:${P.negro};padding:16px 14px 12px;border-bottom:3px solid ${P.negro}}
 @media(min-width:900px){.andHemi{padding:24px 30px 16px}}
@@ -91,6 +101,16 @@ export default function Andalucia() {
 
   const colores = useMemo(() => new Map(partidos.map(p => [p.siglas, p.color])), [partidos]);
 
+  const bloques = useMemo(() => {
+    const conGobierno = new Set(diputados.filter(d => d.cargo).map(d => d.partido_siglas));
+    if (!conGobierno.size) return null;
+    const gob = partidos.filter(p => conGobierno.has(p.siglas));
+    const opo = partidos.filter(p => !conGobierno.has(p.siglas));
+    const suma = l => l.reduce((t, p) => t + p.n, 0);
+    const nombres = l => l.map(p => p.siglas).join(', ').replace(/, ([^,]*)$/, ' y $1');
+    return { gob: nombres(gob), nGob: suma(gob), opo: nombres(opo), nOpo: suma(opo) };
+  }, [diputados, partidos]);
+
   const escanos = useMemo(() => {
     const puesto = new Map(partidos.map((p, i) => [p.siglas, i]));
     return [...diputados].sort((a, b) =>
@@ -149,22 +169,38 @@ export default function Andalucia() {
       {seccion === 'diputados' && estado === 'listo' && (
         <Marco p={P} quieto={quieto} estrecho={estrecho} antetitulo={`Parlamento de Andalucía · ${diputados.length} escaños`} titulo="Quién se sienta en el Parlamento">
           <div className="andHemi">
-            <div className="andPartidos" style={{ marginTop: 0 }}>
-              <button className="bh-chip" data-on={partido ? '0' : '1'} onClick={() => setPartido(null)}>Todos {diputados.length}</button>
-              {partidos.map(p => (
-                <button key={p.siglas} className="bh-chip" data-on={partido === p.siglas ? '1' : '0'}
-                  onClick={() => setPartido(partido === p.siglas ? null : p.siglas)}>
-                  <span style={{ width: 8, height: 8, borderRadius: 8, background: p.color, display: 'inline-block' }} />
-                  {p.siglas} {p.n}
-                </button>
-              ))}
+            <div className="andHemiGrid">
+              <div className="andHemiPanel">
+                <div className="andPartidos" style={{ marginTop: 0 }}>
+                  <button className="bh-chip" data-on={partido ? '0' : '1'} onClick={() => setPartido(null)}><span>Todos</span><span>{diputados.length}</span></button>
+                  {partidos.map(p => (
+                    <button key={p.siglas} className="bh-chip" data-on={partido === p.siglas ? '1' : '0'}
+                      onClick={() => setPartido(partido === p.siglas ? null : p.siglas)}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 8, background: p.color, display: 'inline-block' }} />
+                        {p.siglas}
+                      </span>
+                      <span>{p.n}</span>
+                    </button>
+                  ))}
+                </div>
+                {bloques && (
+                  <div className="andBloques">
+                    <div><strong>Gobiernan · {bloques.nGob} escaños</strong>{bloques.gob}</div>
+                    <div><strong>Oposición · {bloques.nOpo} escaños</strong>{bloques.opo}</div>
+                    <div><strong>Mayoría absoluta</strong>55 escaños</div>
+                  </div>
+                )}
+              </div>
+              <div className="andHemiDibujo">
+                <Hemiciclo
+                  diputados={escanos}
+                  resaltado={partido ? d => (d.partido_siglas ?? 'SIN GRUPO') === partido : null}
+                  seleccionado={sel?.mandato_id}
+                  onSeleccionar={setSel}
+                />
+              </div>
             </div>
-            <Hemiciclo
-              diputados={escanos}
-              resaltado={partido ? d => (d.partido_siglas ?? 'SIN GRUPO') === partido : null}
-              seleccionado={sel?.mandato_id}
-              onSeleccionar={setSel}
-            />
             <div className="em" style={{ fontSize: 10, color: '#B9D3C2', marginTop: 6 }}>
               Escaños agrupados por número de diputados de cada grupo, no por ideología.
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import Hemiciclo from './Hemiciclo.jsx';
+import Hemiciclo, { LeyendaVoto } from './Hemiciclo.jsx';
 import { PALETAS } from './Bauhaus.jsx';
 import { traerVotacionesAndalucia, traerVotosVotacionAndalucia } from '../lib/cliente.js';
 import { TIPO_INICIATIVA, SENTIDO, tituloLegible, fechaCorta } from '../lib/andalucia-web.js';
@@ -19,6 +19,8 @@ const estilos = `
 .vaTabla{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
 .vaTabla th,.vaTabla td{padding:5px 6px;border-bottom:1px solid #D5E2D9;text-align:right}
 .vaTabla th:first-child,.vaTabla td:first-child{text-align:left}
+.vaDetGrid{display:grid;gap:10px}
+@media(min-width:900px){.vaDetGrid[data-hemi='1']{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}.vaDetGrid[data-hemi='1'] .vaTabla{margin-top:0}}
 .vaBusca{max-width:280px;padding:8px 10px;font-size:14px;box-shadow:3px 3px 0 ${P.negro}}
 `;
 
@@ -56,28 +58,38 @@ function Detalle({ v, diputados, colores, legislatura }) {
 
   return (
     <div className="vaDetalle">
-      {conHemiciclo && (
-        <div style={{ background: P.negro, padding: '10px 10px 6px', marginBottom: 10 }}>
-          <Hemiciclo diputados={diputados} votos={mapaVotos} compacto />
+      <div className="vaDetGrid" data-hemi={conHemiciclo ? '1' : '0'}>
+        {conHemiciclo && (
+          <div style={{ background: P.negro, padding: '10px 10px 6px' }}>
+            <LeyendaVoto totales={{
+              si: mapaVotos.filter(x => x.voto === 'si').length,
+              no: mapaVotos.filter(x => x.voto === 'no').length,
+              abstencion: mapaVotos.filter(x => x.voto === 'abstencion').length,
+              no_vota: mapaVotos.filter(x => !['si', 'no', 'abstencion'].includes(x.voto)).length
+            }} />
+            <Hemiciclo diputados={diputados} votos={mapaVotos} compacto />
+          </div>
+        )}
+        <div>
+          <table className="vaTabla">
+            <thead><tr><th>Grupo</th><th>Sí</th><th>No</th><th>Abst.</th><th>Ausentes</th></tr></thead>
+            <tbody>
+              {resumen.grupos.map(g => (
+                <tr key={g.siglas}>
+                  <td><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 8, background: colores.get(g.siglas) ?? '#8E9299', marginRight: 6 }} />{g.siglas}</td>
+                  <td>{g.si}</td><td>{g.no}</td><td>{g.abstencion}</td><td>{g.ausente}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {resumen.distintos.length > 0 && (
+            <div style={{ fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
+              <strong>Votaron distinto a su grupo:</strong>{' '}
+              {resumen.distintos.map(vo => `${vo.nombre} (${vo.partido_siglas}, ${SENTIDO[vo.voto]?.texto.toLowerCase()})`).join('; ')}
+            </div>
+          )}
         </div>
-      )}
-      <table className="vaTabla">
-        <thead><tr><th>Grupo</th><th>Sí</th><th>No</th><th>Abst.</th><th>Ausentes</th></tr></thead>
-        <tbody>
-          {resumen.grupos.map(g => (
-            <tr key={g.siglas}>
-              <td><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 8, background: colores.get(g.siglas) ?? '#8E9299', marginRight: 6 }} />{g.siglas}</td>
-              <td>{g.si}</td><td>{g.no}</td><td>{g.abstencion}</td><td>{g.ausente}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {resumen.distintos.length > 0 && (
-        <div style={{ fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
-          <strong>Votaron distinto a su grupo:</strong>{' '}
-          {resumen.distintos.map(vo => `${vo.nombre} (${vo.partido_siglas}, ${SENTIDO[vo.voto]?.texto.toLowerCase()})`).join('; ')}
-        </div>
-      )}
+      </div>
       <div className="em" style={{ fontSize: 10.5, marginTop: 10, color: P.gris }}>
         {v.titulo_particular ? `${v.titulo_particular} · ` : ''}Votación {v.numero} de la sesión {v.sesion}.{' '}
         {v.fuente_url && <a href={v.fuente_url} target="_blank" rel="noopener noreferrer" style={{ color: P.c }}>registro oficial de la votación ↗</a>}

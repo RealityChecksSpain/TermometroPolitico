@@ -31,7 +31,9 @@ export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr }) 
     const cuatro = diputados.filter(d => Number(d.n_viviendas_equivalentes) >= 4).length;
     const aprobadas = votaciones.filter(v => v.resultado === 'aprobada');
     const conPPyVox = aprobadas.filter(v => v.voto_grupos?.PP === 'si' && v.voto_grupos?.VOX === 'si').length;
-    return { total, primero, gobierno: gobierno.length, enGobierno: [...enGobierno.entries()].sort((a, b) => b[1] - a[1]), cuatro, aprobadas: aprobadas.length, conPPyVox };
+    const socios = partidos.filter(p => enGobierno.has(p.siglas) && p.siglas !== primero?.siglas);
+    const sumaGobierno = partidos.filter(p => enGobierno.has(p.siglas)).reduce((s, p) => s + p.n, 0);
+    return { total, primero, gobierno: gobierno.length, enGobierno: [...enGobierno.entries()].sort((a, b) => b[1] - a[1]), socios, sumaGobierno, cuatro, aprobadas: aprobadas.length, conPPyVox };
   }, [diputados, partidos, votaciones]);
 
   const resultados = useMemo(() => {
@@ -107,10 +109,14 @@ export default function AndaluciaInicio({ diputados, partidos, onFicha, onIr }) 
         <div style={{ borderTop: borde(P), padding: estrecho ? 14 : '20px 24px 24px', display: 'grid', gridTemplateColumns: estrecho ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: estrecho ? 12 : 18 }}>
           <Cifra fondo={P.a} tinta="#FFFFFF" valor={primero ? `${primero.n} de ${cifras.total || 109}` : '—'}
             texto={primero ? `escaños son del ${primero.siglas}${faltan > 0 ? ': sin mayoría absoluta' : ': mayoría absoluta'}` : 'escaños'}
-            pie={faltan > 0 ? `Le faltan ${faltan} para los ${MAYORIA} de la mayoría absoluta` : 'Gobierna sin necesitar a ningún otro grupo'} />
+            pie={faltan > 0
+              ? (cifras.socios.length
+                ? `Gobierna en coalición con ${cifras.socios.map(p => p.siglas).join(' y ')}: juntos suman ${cifras.sumaGobierno} de ${cifras.total}`
+                : `Le faltan ${faltan} para los ${MAYORIA} de la mayoría absoluta`)
+              : 'Gobierna sin necesitar a ningún otro grupo'} />
           <Cifra fondo={P.b} tinta={P.negro} valor={String(cifras.gobierno)}
-            texto={cifras.gobierno === 1 ? 'diputado está en el Gobierno de la Junta' : 'diputados están en el Gobierno de la Junta'}
-            pie={cifras.enGobierno.map(([s, n]) => `${s} ${n}`).join(' · ')} />
+            texto={cifras.gobierno === 1 ? 'diputado forma parte también del Gobierno andaluz' : 'diputados forman parte también del Gobierno andaluz'}
+            pie={`Son miembros del Consejo de Gobierno de la Junta y a la vez votan en este Parlamento · ${cifras.enGobierno.map(([s, n]) => `${s} ${n}`).join(' · ')}`} />
           <Cifra fondo={P.c} tinta="#FFFFFF" valor={String(cifras.cuatro)}
             texto={cifras.cuatro === 1 ? 'diputado declara el equivalente a cuatro o más viviendas' : 'diputados declaran el equivalente a cuatro o más viviendas'}
             pie="Contando solo la parte que poseen" />

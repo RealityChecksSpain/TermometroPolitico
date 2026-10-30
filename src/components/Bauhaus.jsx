@@ -113,7 +113,7 @@ export function Marco({ p, antetitulo, titulo, accion, quieto, estrecho, formas 
             {antetitulo && <div className="bh-mono" style={{ fontSize: estrecho ? 11 : 12.5, fontWeight: 600 }}>{antetitulo}</div>}
             {titulo && <Titular texto={titulo} quieto={quieto} estrecho={estrecho} tam={estrecho ? 26 : 38} />}
           </div>
-          {accion}
+          {accion && <div style={{ position: 'relative' }}>{accion}</div>}
         </div>
       )}
       {formas && <Formas p={p} quieto={quieto} estrecho={estrecho} />}

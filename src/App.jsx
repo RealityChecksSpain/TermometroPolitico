@@ -1225,17 +1225,19 @@ export default function App() {
             ? 'Fuente: Asamblea de Madrid, fichas de diputados y declaraciones de bienes publicadas.'
             : camara === 'andalucia'
               ? 'Fuente: Parlamento de Andalucía (fichas, registro de votaciones del Pleno y Boletín Oficial) y BOJA.'
-              : 'Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.'}
+              : 'Fuente: Congreso de los Diputados, datos abiertos. Ley 37/2007.'}{' '}
           Aplicación independiente, sin vínculo con ninguna institución.{' '}
-          <button onClick={() => { setSeccion('metodo'); setVotacionSel(null); }} style={{
-            background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',
-            color: C.tinta, fontSize: 12, textDecoration: 'underline', fontFamily: 'inherit'
-          }}>Cómo se hace esto</button>
-          {' · '}
-          <button onClick={() => { setSeccion('datos'); setVotacionSel(null); }} style={{
-            background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',
-            color: C.tinta, fontSize: 12, textDecoration: 'underline', fontFamily: 'inherit'
-          }}>Descargar los datos</button>
+          {camara === 'espana' && (<>
+            <button onClick={() => { setSeccion('metodo'); setVotacionSel(null); }} style={{
+              background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',
+              color: C.tinta, fontSize: 12, textDecoration: 'underline', fontFamily: 'inherit'
+            }}>Cómo se hace esto</button>
+            {' · '}
+            <button onClick={() => { setSeccion('datos'); setVotacionSel(null); }} style={{
+              background: 'none', border: 'none', padding: '6px 2px', cursor: 'pointer',
+              color: C.tinta, fontSize: 12, textDecoration: 'underline', fontFamily: 'inherit'
+            }}>Descargar los datos</button>
+          </>)}
         </div>
       </div>
 
