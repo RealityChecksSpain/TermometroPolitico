@@ -123,6 +123,7 @@ REGLAS ESTRICTAS:
 - Prohibido atribuir intenciones, en cualquier tiempo verbal: nada de "busca", "pretende", "pretendía", "persigue", "trata de", "tiene como objetivo", "con el fin de". Di lo que el texto HACE, PIDE o PROPONE.
 - Nombra cada norma con su tipo exacto tal como sale en el texto: un real decreto no es una ley, un proyecto de real decreto no es un proyecto de ley, un decreto ley no es una ley.
 - Prohibido especular sobre consecuencias no escritas en el texto.
+- No escribas frases sobre lo que el texto no contiene ni comentarios sobre el propio texto: solo su contenido.
 - Si trata de un colectivo, una enfermedad, un territorio, un sector o una ley concreta, NÓMBRALO.
 - Si el texto trae un hueco sin rellenar (XX, __, puntos suspensivos entre corchetes), escribe "No consta en el texto".
 - Español de España, frases cortas, sin jerga jurídica. Cada frase termina en punto.

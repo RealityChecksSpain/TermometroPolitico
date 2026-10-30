@@ -15,6 +15,7 @@ const argv = process.argv.slice(2);
 const OCULTO = argv.includes('--oculto');
 const RELEER = argv.includes('--releer');
 const LIMITE = Number(argv.find(a => a.startsWith('--limite='))?.slice(9) ?? Infinity);
+const TIPO = argv.find(a => a.startsWith('--tipo='))?.slice(7) ?? null;
 
 const NOMBRE_TIPO: Record<string, string> = { PL: 'Proyecto de ley', PROPL: 'Proposición de ley', PNL: 'Proposición no de ley' };
 
@@ -31,7 +32,8 @@ function tras(ls: string[], etiqueta: RegExp): string | null {
 }
 
 function leerFicha(ls: string[], clave: string) {
-  const i = ls.findIndex(l => l === clave);
+  const pc = patronClave(clave);
+  const i = ls.findIndex(l => l === clave || (pc.test(l) && l.length < 40));
   if (i < 0) return null;
   const fin = ls.findIndex((l, k) => k > i && /^Estado:?$/i.test(l));
   const bloque = ls.slice(i + 1, fin > i ? fin : i + 2);
@@ -95,16 +97,25 @@ function desfase(paginas: string[][]): number | null {
   return mejor != null && n >= Math.max(2, paginas.length * 0.5) ? mejor : null;
 }
 
-const CABECERA = /^\s*(?:PL|PROPL|PNL|PCOP|PCOC|PE|PI|C|M|RGEP|SGS|ILP)-\d+\/\d{4}\b/;
+function patronClave(clave: string): RegExp {
+  const m = clave.match(/^([A-Z]+)-(\d+)\/(\d{4})$/);
+  return m ? new RegExp(`\\b${m[1]}-${m[2]}\\s*(?:\\(XIII\\))?\\s*\\/\\s*${m[3]}\\b`) : new RegExp(clave.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'));
+}
+
+const CABECERA_BOAM = /\b[A-Z]{1,6}-\d+\s*\(XIII\)\s*\/\s*\d{4}\s+RGEP/;
+const RUIDO_BOAM = /^(?:BOLET[ÍI]N OFICIAL DE LA ASAMBLEA DE MADRID.*|N[úu]m\.\s*\d+\s*\/?\s*\d{1,2} de \w+ de \d{4}|\d{1,6}|[─—_-]{3,})$/i;
 
 function recortar(texto: string[], clave: string): string {
-  let ini = texto.findIndex(l => l.includes(clave));
+  const pc = patronClave(clave);
+  const limpias = texto.map(l => l.trim()).filter(l => l && !RUIDO_BOAM.test(l));
+  let ini = limpias.findIndex(l => pc.test(l) && /RGEP/.test(l));
+  if (ini < 0) ini = limpias.findIndex(l => pc.test(l));
   if (ini < 0) ini = 0;
-  let fin = texto.length;
-  for (let j = ini + 1; j < texto.length; j++) {
-    if (CABECERA.test(texto[j]) && !texto[j].includes(clave)) { fin = j; break; }
+  let fin = limpias.length;
+  for (let j = ini + 1; j < limpias.length; j++) {
+    if (CABECERA_BOAM.test(limpias[j]) && !pc.test(limpias[j])) { fin = j; break; }
   }
-  return texto.slice(ini, fin).map(l => l.trim()).join('\n').replace(/-\n(?=[a-záéíóúñü])/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  return limpias.slice(ini, fin).join('\n').replace(/-\n(?=[a-záéíóúñü])/g, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 const pdfCache = new Map<string, string[][]>();
@@ -144,7 +155,7 @@ async function elegirTexto(page: Page, siglas: string, aprobada: boolean, docs: 
   const boams = docs.filter(d => /^B\.O\.A\.M\./i.test(d.etiqueta) && paginasBoam(d));
   const registros = docs.filter(d => /^RGEP\d/i.test(d.etiqueta));
   if (aprobada && siglas !== 'PNL') {
-    for (const d of boams.filter(x => /aprobaci[óo]n de la ley/i.test(x.descripcion))) {
+    for (const d of boams.filter(x => /aprobaci[óo]n de la ley/i.test(`${x.etiqueta} ${x.descripcion}`))) {
       const t = await textoBoam(page, d, clave);
       if (t) return { texto: t, clase: 'ley', doc: d };
     }
@@ -183,7 +194,7 @@ async function main() {
   const previas = await traerTodo<any>((a, b) => db().from('parl_iniciativas')
     .select('expediente, estado').eq('camara', CAMARA).order('expediente').range(a, b));
   const leidas = new Map(previas.map((p: any) => [p.expediente, p.estado]));
-  const todas = web.filter(w => porClave.has(w.clave));
+  const todas = web.filter(w => porClave.has(w.clave) && (!TIPO || porClave.get(w.clave).siglas === TIPO));
   const pendientes = todas.filter(w => RELEER || !leidas.has(w.clave) || !/TRAMITADA|DECA|RETIRA|NO ADMITIDA|ARCHIVA/i.test(String(leidas.get(w.clave) ?? '')));
   const tanda = pendientes.slice(0, LIMITE);
   console.log(`Iniciativas con página: ${todas.length} · ya leídas: ${leidas.size} · a leer ahora: ${tanda.length}`);
