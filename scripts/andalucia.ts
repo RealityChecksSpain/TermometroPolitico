@@ -158,6 +158,11 @@ function emparejar(decl: DeclaracionAnd, dips: DipCargado[]): DipCargado | null 
   return null;
 }
 
+function nombrePropio(t: string): string {
+  return t.toLowerCase().replace(/\s+/g, ' ').trim().split(' ')
+    .map(p => /^(de|del|la|las|los|y|e)$/.test(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
 function emparejarPorApellidosYZona(decl: DeclaracionAnd, dips: DipCargado[]): DipCargado | null {
   const ap = llano(decl.apellidos);
   const zona = llano(decl.circunscripcion ?? '');
@@ -189,6 +194,7 @@ function filaBienes(dip: DipCargado, decl: DeclaracionAnd, fuente: { fuente: str
     deudas_total: suma(decl.deudas),
     cargos_publicos: decl.cargos_publicos,
     actividades_privadas: decl.actividades_privadas,
+    nota: null as string | null,
     leido_at: new Date().toISOString()
   };
 }
@@ -210,6 +216,7 @@ async function cargarBienes(dips: DipCargado[]) {
           const previa = dudosas.get(otro.id_externo) ?? { nombres: new Set<string>(), fila: null, texto: '' };
           previa.nombres.add(llano(`${d.apellidos} ${d.nombre}`));
           previa.fila = filaBienes(otro, d, f);
+          previa.fila.nota = `La declaración está publicada a nombre de ${nombrePropio(`${d.nombre} ${d.apellidos}`)}; en el Parlamento figura como ${otro.nombre_completo}. Se le asigna porque coinciden los dos apellidos y la circunscripción (${nombrePropio(d.circunscripcion ?? '')}) y no hay otro diputado ni candidato con esos apellidos en ella.`;
           previa.texto = `${d.apellidos}, ${d.nombre} (${d.circunscripcion}) → ${otro.apellidos_nombre}`;
           dudosas.set(otro.id_externo, previa);
         }

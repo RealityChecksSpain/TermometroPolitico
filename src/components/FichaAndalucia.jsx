@@ -119,6 +119,7 @@ export default function FichaAndalucia({ d, onCerrar }) {
 
         <Bloque>
           <Rotulo>Propiedades</Rotulo>
+          {d.nota && <div style={{ fontSize: 12, color: C.media, marginBottom: 8, lineHeight: 1.5 }}>{d.nota}</div>}
           {!d.url_declaracion && <div style={{ fontSize: 12.5, color: C.media }}>No hemos encontrado su declaración de bienes publicada.</div>}
           {d.url_declaracion && !inmuebles.length && <div style={{ fontSize: 12.5, color: C.media }}>Su declaración no incluye ningún inmueble.</div>}
           {inmuebles.length > 0 && (
