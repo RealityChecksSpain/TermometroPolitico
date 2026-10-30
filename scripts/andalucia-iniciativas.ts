@@ -85,6 +85,11 @@ async function guardar(filas: any[]) {
 }
 
 async function main() {
+  const avisoOriginal = console.warn;
+  console.warn = (...args: any[]) => {
+    if (/TT: (?:undefined function|invalid function id)|glyf|Required .* table/i.test(String(args[0] ?? ''))) return;
+    avisoOriginal(...args);
+  };
   console.log(`\nINICIATIVAS DEL PARLAMENTO DE ANDALUCÍA  ${new Date().toISOString()}\n`);
   await mkdir(join(CARPETA, 'pdf'), { recursive: true });
   const todas = await expedientesVotados();
