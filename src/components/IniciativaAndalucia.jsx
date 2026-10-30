@@ -22,9 +22,9 @@ const estilos = `
 `;
 
 const CLASE_TEXTO = {
-  ley: 'el texto de la ley aprobada',
-  aprobado: 'el texto aprobado por el Pleno',
-  presentado: 'el texto presentado'
+  ley: 'del texto de la ley aprobada',
+  aprobado: 'del texto aprobado por el Pleno',
+  presentado: 'del texto presentado, antes de votarse'
 };
 
 function Votacion({ v, orden, total, diputados, colores }) {
@@ -162,7 +162,7 @@ export default function IniciativaAndalucia({ votacion, colores, diputados, onVo
             </div>
           )}
           <div className="iaTenue" style={{ marginTop: 10 }}>
-            Resumen automático de {CLASE_TEXTO[ini.basado_en] ?? 'el texto oficial'}{ini.texto_fuente ? `, publicado en el ${ini.texto_fuente}` : ''}.
+            Resumen automático {CLASE_TEXTO[ini.basado_en] ?? 'del texto oficial'}{ini.texto_fuente ? `, publicado en el ${ini.texto_fuente}` : ''}.
           </div>
         </div>
       )}

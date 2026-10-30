@@ -6,7 +6,7 @@ import { refrescarCaches } from '../src/lib/metricas';
 exigirEnv('GEMINI_API_KEY');
 
 const CAMARA = 'parlamento-andalucia';
-const VERSION = process.env.VERSION_PROMPT_AND ?? 'and-v1-2026-10';
+const VERSION = process.env.VERSION_PROMPT_AND ?? 'and-v2-2026-10';
 const MAX_CHARS = Number(process.env.MAX_CHARS_PROMPT ?? 60000);
 const MAX_FRASE = 75;
 const LIMITE = (() => {
@@ -67,6 +67,23 @@ function fragmentar(texto: string, tope: number): string {
   return [cuerpo.slice(0, p), '\n[…fragmento omitido del texto oficial…]\n', cuerpo.slice(medio - Math.floor(p / 2), medio + Math.floor(p / 2)), '\n[…fragmento omitido del texto oficial…]\n', cuerpo.slice(-p)].join('');
 }
 
+function marco(i: any, esLey: boolean): string {
+  const quien = i.proponente ?? 'quien la presenta';
+  if (esLey && i.texto_clase === 'ley') return 'Es una LEY aprobada por el Parlamento de Andalucía: describe lo que establece ("La ley establece…", "Crea…", "Obliga a…").';
+  if (esLey) return `Es un TEXTO PRESENTADO por ${quien}, antes de debatirse. No sabes si se aprobó ni cómo cambió. Prohibido escribir que el Parlamento lo aprobó o lo estableció: escribe lo que el texto PROPONE ("Propone crear…", "El proyecto prevé…").`;
+  const comun = `NO ES UNA LEY: es una iniciativa de impulso o de control (proposición no de ley, moción u otra). No cambia por sí sola ninguna norma.
+- Resume la parte que se somete a votación (los puntos numerados), no la exposición de motivos.
+- Las afirmaciones y valoraciones de la exposición de motivos son de quien la presenta: no las repitas como hechos.`;
+  if (i.texto_clase === 'aprobado') return `${comun}
+- Este es el TEXTO APROBADO por el Pleno: escribe lo que el Parlamento pide, insta o declara y a quién ("El Parlamento insta al Consejo de Gobierno a…").
+- En afectados, el efecto empieza por "El Parlamento pide".`;
+  return `${comun}
+- Este es el TEXTO PRESENTADO por ${quien}, antes de votarse. NO sabes si el Pleno lo aprobó o lo rechazó.
+- PROHIBIDO escribir "El Parlamento pide", "El Parlamento insta", "El Parlamento declara", "El Parlamento reafirma" o cualquier frase que dé a entender que el Parlamento lo adoptó.
+- Escribe lo que la iniciativa PROPONE: "Propone que el Parlamento inste al Consejo de Gobierno a…", "Pide crear…".
+- En afectados, el efecto empieza por "Se propone".`;
+}
+
 function prompt(i: any): { texto: string; chars: number } {
   const fuente = fragmentar(i.texto_extraido, MAX_CHARS);
   const recortado = fuente.includes('[…fragmento omitido');
@@ -84,34 +101,30 @@ ${fuente}
 ---
 ${recortado ? 'AVISO: el texto está recortado y faltan fragmentos marcados. Resume solo lo que puedas leer. Si lo que falta te impide describirlo, responde suficiente_informacion = false.' : 'El texto de arriba está completo.'}
 
-${esLey
-  ? 'Es una LEY o un proyecto o proposición de ley: describe lo que la norma establece.'
-  : `NO ES UNA LEY. Es una iniciativa de impulso o de control (proposición no de ley, moción u otra): el Parlamento pide, insta o declara algo, pero no cambia por sí sola ninguna norma.
-- Resume la parte que se somete a votación (los puntos numerados de la proposición o moción), no la exposición de motivos.
-- Escribe lo que el Parlamento pide, insta o declara y a quién: "El Parlamento insta al Consejo de Gobierno a…", "Pide al Gobierno de España que…".
-- Las afirmaciones y valoraciones de la exposición de motivos son del grupo que la presenta: no las repitas como hechos. Si una valoración forma parte de lo que se vota, atribúyela: "Declara que el Parlamento considera…".`}
+${marco(i, esLey)}
 
 REGLAS ESTRICTAS:
 - Usa SOLO el texto de arriba. Si algo no está ahí, no lo digas.
 - Prohibido valorar: nada de "necesaria", "polémica", "beneficia", "perjudica", "recorta", "mejora", "ataca".
-- Prohibido atribuir intenciones: nada de "busca", "pretende", "persigue", "trata de", "tiene como objetivo", "con el fin de". Di lo que el texto HACE o PIDE.
+- Prohibido atribuir intenciones, en cualquier tiempo verbal: nada de "busca", "pretende", "pretendía", "persigue", "trata de", "tiene como objetivo", "con el fin de". Di lo que el texto HACE, PIDE o PROPONE.
+- Nombra cada norma con su tipo exacto tal como sale en el texto: un real decreto no es una ley, un proyecto de real decreto no es un proyecto de ley, un decreto ley no es una ley.
 - Prohibido especular sobre consecuencias no escritas en el texto.
 - Si trata de un colectivo, una enfermedad, un territorio, un sector o una ley concreta, NÓMBRALO.
 - Si el texto trae un hueco sin rellenar (XX, __, puntos suspensivos entre corchetes), escribe "No consta en el texto".
 - Español de España, frases cortas, sin jerga jurídica. Cada frase termina en punto.
 
 CAMPOS:
-- frase_corta: UNA frase completa de entre 30 y ${MAX_FRASE} caracteres que se entienda sola. Empieza directo por el contenido. Prohibido empezar por "La norma", "La proposición", "regula", "establece", "aprueba", "modifica". Sin puntos suspensivos, sin partido autor, sin adjetivos valorativos.${esLey ? '' : ' Al no ser una ley, que se note: "Pide a la Junta…", "Insta al Gobierno de España a…".'}
+- frase_corta: UNA frase completa de entre 30 y ${MAX_FRASE} caracteres que se entienda sola. Empieza directo por el contenido concreto. Prohibido empezar por "La norma", "La proposición", "regula", "establece", "aprueba", "modifica". Prohibido "mejorar" o "reforzar" sin decir qué: di la medida concreta. Sin puntos suspensivos, sin partido autor, sin adjetivos valorativos.${esLey ? '' : i.texto_clase === 'aprobado' ? ' Al no ser una ley, que se note: "Pide a la Junta…", "Insta al Gobierno de España a…".' : ' Al ser una propuesta presentada, que se note: "Propone pedir a la Junta…", "Propone instar al Gobierno de España a…".'}
 - resumen: 3 a 5 frases. La primera debe poder leerse sola como resumen de todo. Prohibido empezar por "Esta propuesta", "Esta ley", "El texto" o "La iniciativa".
 - puntos_clave: 3 a 5 ${esLey ? 'medidas concretas' : 'peticiones o acuerdos concretos'}, cada uno en una frase, con cifras, plazos o artículos si el texto los da.
 - que_cambia: ${esLey ? '2 a 4 elementos con el formato "Antes X. Ahora Y." solo cuando el texto permita deducirlo. Lista vacía si no.' : 'lista vacía.'}
-- a_quien_afecta: SOLO los colectivos concretos que menciona el texto, separados por comas. Si no nombra ninguno: "El texto no nombra colectivos concretos".
+- a_quien_afecta: SOLO los colectivos de personas, empresas o sectores que menciona el texto, separados por comas. Los gobiernos y administraciones a los que se dirige la petición no son colectivos afectados. Si no nombra ninguno: "El texto no nombra colectivos concretos".
 - entrada_en_vigor: lo que diga el texto, o "No consta en el texto".
 - materia_principal: una sola, de esta lista, SIN el prefijo MAT:
 ${listaMaterias}
-- afectados: de 0 a 5 colectivos de esta lista, SIN el prefijo COL:, solo aquellos sobre los que el texto ${esLey ? 'cambia algo concreto' : 'pide o acuerda algo concreto'}:
+- afectados: de 0 a 5 colectivos de esta lista, SIN el prefijo COL:, solo aquellos sobre los que el texto ${esLey ? 'cambia algo concreto' : 'pide o propone algo concreto'}. Usa un colectivo solo si corresponde exactamente a las personas del texto: los jóvenes de hasta 35 años no son menores, un gobierno no es un colectivo. Si ninguno corresponde exactamente, deja la lista vacía:
 ${listaColectivos}
-  efecto: UNA frase de máximo 22 palabras ${esLey ? 'que diga qué les cambia en la práctica' : 'que empiece por "Se pide" o "El Parlamento pide" y diga qué se pide para ellos'}. Sin valorar.
+  efecto: UNA frase de máximo 22 palabras ${esLey ? (i.texto_clase === 'ley' ? 'que diga qué les cambia en la práctica' : 'que diga qué propone el texto para ellos') : 'que diga qué se pide o se propone para ellos, con el comienzo indicado arriba'}. Sin valorar.
 - suficiente_informacion: false si el texto es ilegible, es solo una nota de trámite o está tan recortado que no se puede describir.`;
   return { texto, chars: fuente.length };
 }
@@ -146,7 +159,9 @@ const pendientes = LIMITE ? pendientesTodas.slice(0, LIMITE) : pendientesTodas;
 console.log(`\nModelo: ${modeloActivo()} · versión ${VERSION}`);
 console.log(`Iniciativas con texto: ${todas.length} · ya resumidas: ${todas.length - pendientesTodas.length} · pendientes: ${pendientesTodas.length}${LIMITE ? ` (se hacen ${pendientes.length})` : ''}\n`);
 
-const cuenta = { insuficientes: 0, fraseRechazada: 0, sinAfectados: 0, inventados: new Set<string>(), errores: new Map<string, number>() };
+const ADOPCION = /\bel parlamento(?: de andaluc[íi]a)?\s+(?:pide|insta|declara|reafirma|exige|solicita|acuerda|rechaza|condena|reclama|manifiesta|muestra|apoya|considera|requiere|urge)\b/i;
+
+const cuenta = { adopcion: 0, insuficientes: 0, fraseRechazada: 0, sinAfectados: 0, inventados: new Set<string>(), errores: new Map<string, number>() };
 const anotar = (e: string) => cuenta.errores.set(e, (cuenta.errores.get(e) ?? 0) + 1);
 
 async function resumirUna(i: any, cadencia: Cadencia): Promise<true | null> {
@@ -158,6 +173,11 @@ async function resumirUna(i: any, cadencia: Cadencia): Promise<true | null> {
   const r = await preguntar<any>(texto, cadencia, { esquema: ESQUEMA });
   if (!r.ok || !r.datos) { anotar(r.error ?? 'sin detalle'); return null; }
   if (!r.datos.suficiente_informacion) { cuenta.insuficientes++; return null; }
+
+  if (!LEYES.has(i.tipo) && i.texto_clase === 'presentado') {
+    const todo = [r.datos.frase_corta, r.datos.resumen, ...(r.datos.puntos_clave ?? []), ...(r.datos.afectados ?? []).map((a: any) => a.efecto)].join(' ');
+    if (ADOPCION.test(todo)) { cuenta.adopcion++; anotar(`descartado: un texto presentado se resumió como si el Parlamento lo hubiera adoptado (${i.expediente})`); return null; }
+  }
 
   const frase = validarFrase(r.datos.frase_corta);
   if (!frase) cuenta.fraseRechazada++;
@@ -207,7 +227,8 @@ const progreso = await procesarLote(pendientes, async (i: any, cadencia: Cadenci
 console.log('\nRESULTADO');
 console.log(`  resumidas:            ${progreso.procesados}`);
 console.log(`  sin información sufic.: ${cuenta.insuficientes}`);
-console.log(`  fallidas:             ${progreso.fallidos - cuenta.insuficientes}`);
+console.log(`  fallidas:             ${progreso.fallidos - cuenta.insuficientes - cuenta.adopcion}`);
+console.log(`  descartadas por decir que el Parlamento adoptó un texto solo presentado: ${cuenta.adopcion}`);
 console.log(`  omitidas (cuota):     ${progreso.omitidos}`);
 console.log(`  frase corta rechazada: ${cuenta.fraseRechazada} (la web usa el extracto oficial)`);
 console.log(`  sin colectivos:       ${cuenta.sinAfectados}`);
