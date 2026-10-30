@@ -461,7 +461,7 @@ export function leerDeclaraciones(lineas: string[]): DeclaracionAnd[] {
       continue;
     }
     if (seccion === 'cargos') { d.cargos_publicos.push(l.replace(/\s{2,}/g, ' · ')); continue; }
-    if (seccion === 'privadas') { d.actividades_privadas.push(l.replace(/\s{2,}/g, ' · ')); continue; }
+    if (seccion === 'privadas') { if (/^\s*Actividad\s+Empresa en la que/i.test(l)) continue; d.actividades_privadas.push(l.replace(/\s{2,}/g, ' · ')); continue; }
   }
   if (d) salida.push(d);
   return salida.filter(x => x.apellidos);

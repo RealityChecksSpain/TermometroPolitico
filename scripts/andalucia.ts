@@ -158,6 +158,14 @@ function emparejar(decl: DeclaracionAnd, dips: DipCargado[]): DipCargado | null 
   return null;
 }
 
+function emparejarPorApellidosYZona(decl: DeclaracionAnd, dips: DipCargado[]): DipCargado | null {
+  const ap = llano(decl.apellidos);
+  const zona = llano(decl.circunscripcion ?? '');
+  if (!ap.includes(' ') || !zona) return null;
+  const candidatos = dips.filter(d => llano(d.apellidos_nombre.split(',')[0]) === ap && llano(d.circunscripcion ?? '') === zona);
+  return candidatos.length === 1 ? candidatos[0] : null;
+}
+
 function filaBienes(dip: DipCargado, decl: DeclaracionAnd, fuente: { fuente: string; url: string; fecha: string | null }) {
   const r = resumenInmuebles(decl.inmuebles);
   const suma = (l: { valor: number | null }[]) => l.some(x => x.valor != null) ? Math.round(l.reduce((s, x) => s + (x.valor ?? 0), 0) * 100) / 100 : null;
@@ -187,6 +195,7 @@ function filaBienes(dip: DipCargado, decl: DeclaracionAnd, fuente: { fuente: str
 
 async function cargarBienes(dips: DipCargado[]) {
   const elegidas = new Map<string, any>();
+  const dudosas = new Map<string, { nombres: Set<string>; fila: any; texto: string }>();
   const leer = async (f: { fuente: string; url: string; fecha: string | null }, soloDiputados: boolean) => {
     const nombre = `${f.url.replace(/[^a-z0-9]+/gi, '_').slice(-80)}.pdf`;
     const decls = leerDeclaraciones(await lineasPdf(await bajarPdf(f.url, nombre)));
@@ -195,7 +204,17 @@ async function cargarBienes(dips: DipCargado[]) {
       if (soloDiputados && d.legislatura !== 'XIII') continue;
       if (/P[ée]rdida de la condici/i.test(d.motivo ?? '')) continue;
       const dip = emparejar(d, dips);
-      if (!dip) continue;
+      if (!dip) {
+        const otro = emparejarPorApellidosYZona(d, dips);
+        if (otro) {
+          const previa = dudosas.get(otro.id_externo) ?? { nombres: new Set<string>(), fila: null, texto: '' };
+          previa.nombres.add(llano(`${d.apellidos} ${d.nombre}`));
+          previa.fila = filaBienes(otro, d, f);
+          previa.texto = `${d.apellidos}, ${d.nombre} (${d.circunscripcion}) → ${otro.apellidos_nombre}`;
+          dudosas.set(otro.id_externo, previa);
+        }
+        continue;
+      }
       elegidas.set(dip.id_externo, filaBienes(dip, d, f));
       usadas++;
     }
@@ -208,6 +227,11 @@ async function cargarBienes(dips: DipCargado[]) {
     avisos.push(...delAnyo);
   }
   for (const f of avisos) await leer(f, true);
+  for (const [id, x] of dudosas) {
+    if (elegidas.has(id) || x.nombres.size !== 1) continue;
+    elegidas.set(id, x.fila);
+    console.log(`  Emparejada por apellidos y circunscripción (nombre de pila distinto): ${x.texto}`);
+  }
   const sin = dips.filter(d => d.activo && !elegidas.has(d.id_externo));
   await enLotes('parl_bienes', [...elegidas.values()], 'camara,legislatura,id_externo');
   console.log(`Declaraciones guardadas: ${elegidas.size}.${sin.length ? ` Sin declaración encontrada (${sin.length}): ${sin.map(d => d.apellidos_nombre).join('; ')}` : ''}`);
