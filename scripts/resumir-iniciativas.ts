@@ -160,6 +160,35 @@ function limpiarHueco(t: unknown): string | null {
   return s;
 }
 
+const INTENCION = /\b(?:busca|buscan|buscaba|pretende|pretenden|pretend[íi]a|persigue|persiguen|tratan? de \p{L}+(?:ar|er|ir)\b|tiene como (?:objetivo|finalidad|fin)|tienen como (?:objetivo|finalidad|fin)|el objetivo es|la finalidad es|con el (?:fin|objetivo|prop[óo]sito) de|con la finalidad de|a fin de|para lograr)\b/iu;
+
+function sinIntencion(t: string): string {
+  const frases = String(t ?? '').match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) ?? [];
+  const buenas = frases.filter(f => !INTENCION.test(f));
+  return (buenas.length ? buenas : frases.filter(f => !INTENCION.test(f))).join('').trim();
+}
+
+if (process.argv.includes('--limpiar')) {
+  const filas = await traerTodo<any>((a, b) => db().from('parl_resumenes')
+    .select('camara, expediente, frase_corta, resumen, puntos_clave, efectos').eq('camara', CAMARA).order('expediente').range(a, b));
+  let cambiadas = 0;
+  for (const f of filas) {
+    const resumen = sinIntencion(f.resumen ?? '');
+    const puntos = (f.puntos_clave ?? []).filter((p: string) => !INTENCION.test(p));
+    const efectos = (f.efectos ?? []).filter((e: any) => !INTENCION.test(e.efecto ?? ''));
+    const frase = f.frase_corta && INTENCION.test(f.frase_corta) ? null : f.frase_corta;
+    if (resumen === (f.resumen ?? '').trim() && puntos.length === (f.puntos_clave ?? []).length && efectos.length === (f.efectos ?? []).length && frase === f.frase_corta) continue;
+    const { error } = await db().from('parl_resumenes').update({ resumen, puntos_clave: puntos, efectos, frase_corta: frase })
+      .eq('camara', f.camara).eq('expediente', f.expediente);
+    if (error) throw error;
+    cambiadas++;
+    console.log(`  ${f.expediente}: quitadas frases que atribuían intenciones`);
+  }
+  console.log(`\nResúmenes revisados: ${filas.length} · corregidos: ${cambiadas}`);
+  await refrescarCaches();
+  process.exit(0);
+}
+
 const hechas = await traerTodo<any>((a, b) => db().from('parl_resumenes')
   .select('expediente, version_prompt, texto_url').eq('camara', CAMARA).order('expediente').range(a, b));
 const hecha = new Map(hechas.map((r: any) => [r.expediente, r]));
@@ -200,6 +229,10 @@ async function resumirUna(i: any, cadencia: Cadencia): Promise<true | null> {
   const frase = validarFrase(r.datos.frase_corta);
   if (!frase) cuenta.fraseRechazada++;
   const vigor = limpiarHueco(r.datos.entrada_en_vigor);
+  r.datos.resumen = sinIntencion(r.datos.resumen ?? '');
+  if (INTENCION.test(String(r.datos.frase_corta ?? ''))) r.datos.frase_corta = null;
+  r.datos.puntos_clave = (Array.isArray(r.datos.puntos_clave) ? r.datos.puntos_clave : []).filter((p: string) => !INTENCION.test(p));
+  r.datos.afectados = (Array.isArray(r.datos.afectados) ? r.datos.afectados : []).filter((a: any) => !INTENCION.test(String(a.efecto ?? '')));
   const puntos = [
     ...(Array.isArray(r.datos.puntos_clave) ? r.datos.puntos_clave : []),
     ...(LEYES.has(i.tipo) && Array.isArray(r.datos.que_cambia) ? r.datos.que_cambia : []).map((c: string) => `Cambio: ${c}`),
