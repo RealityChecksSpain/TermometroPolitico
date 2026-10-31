@@ -9,12 +9,12 @@ const CAMARAS: Record<string, { nombre: string; corto: string; Corto: string; bo
   'parlamento-andalucia': {
     nombre: 'el Parlamento de Andalucía', corto: 'el Parlamento', Corto: 'El Parlamento',
     boletin: 'BOLETÍN OFICIAL DEL PARLAMENTO DE ANDALUCÍA', gobierno: 'el Consejo de Gobierno',
-    leyes: ['PL', 'PPL', 'ILPA', 'DL'], version: 'and-v2-2026-10'
+    leyes: ['PL', 'PPL', 'ILPA', 'DL'], version: 'and-v3-2026-10'
   },
   'asamblea-madrid': {
     nombre: 'la Asamblea de Madrid', corto: 'la Asamblea', Corto: 'La Asamblea',
     boletin: 'BOLETÍN OFICIAL DE LA ASAMBLEA DE MADRID', gobierno: 'el Gobierno de la Comunidad de Madrid',
-    leyes: ['PL', 'PROPL'], version: 'mad-v1-2026-10'
+    leyes: ['PL', 'PROPL'], version: 'mad-v2-2026-10'
   }
 };
 const CAMARA = process.argv.find(a => a.startsWith('--camara='))?.slice(9) ?? 'parlamento-andalucia';
@@ -140,9 +140,9 @@ CAMPOS:
 - entrada_en_vigor: lo que diga el texto, o "No consta en el texto".
 - materia_principal: una sola, de esta lista, SIN el prefijo MAT:
 ${listaMaterias}
-- afectados: de 0 a 5 colectivos de esta lista, SIN el prefijo COL:, solo aquellos sobre los que el texto ${esLey ? 'cambia algo concreto' : 'pide o propone algo concreto'}. Usa un colectivo solo si corresponde exactamente a las personas del texto: los jóvenes de hasta 35 años no son menores, un gobierno no es un colectivo. Si ninguno corresponde exactamente, deja la lista vacía:
+- afectados: de 0 a 5 colectivos de esta lista, SIN el prefijo COL:, solo aquellos sobre los que el texto ${esLey ? 'cambia algo concreto' : 'pide o propone algo concreto'}. Usa un colectivo solo si corresponde exactamente a las personas del texto: los jóvenes de hasta 35 años no son menores, un gobierno no es un colectivo, los cargos políticos o ex altos cargos no son empleados públicos. Si ninguno corresponde exactamente, deja la lista vacía:
 ${listaColectivos}
-  efecto: UNA frase de máximo 22 palabras ${esLey ? (i.texto_clase === 'ley' ? 'que diga qué les cambia en la práctica' : 'que diga qué propone el texto para ellos') : 'que diga qué se pide o se propone para ellos, con el comienzo indicado arriba'}. Sin valorar.
+  efecto: UNA frase de máximo 22 palabras ${i.texto_clase === 'ley' ? 'que diga qué les cambia en la práctica' : i.texto_clase === 'aprobado' ? 'que diga qué se pide para ellos, con el comienzo indicado arriba' : 'que EMPIECE por "Se propone" y diga qué se propone para ellos (el texto no está aprobado: nunca escribas como si ya se aplicara)'}. Sin valorar.
 - suficiente_informacion: false si el texto es ilegible, es solo una nota de trámite o está tan recortado que no se puede describir.`;
   return { texto, chars: fuente.length };
 }
@@ -163,7 +163,7 @@ function limpiarHueco(t: unknown): string | null {
 const INTENCION = /\b(?:busca|buscan|buscaba|pretende|pretenden|pretend[íi]a|persigue|persiguen|tratan? de \p{L}+(?:ar|er|ir)\b|tiene como (?:objetivo|finalidad|fin)|tienen como (?:objetivo|finalidad|fin)|el objetivo es|la finalidad es|con el (?:fin|objetivo|prop[óo]sito) de|con la finalidad de|a fin de|para lograr)\b/iu;
 
 function sinIntencion(t: string): string {
-  const frases = String(t ?? '').match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) ?? [];
+  const frases = String(t ?? '').match(/[\s\S]*?[.!?](?=\s+[A-ZÁÉÍÓÚÑ¿¡«"(]|\s*$)|[\s\S]+$/g) ?? [];
   const buenas = frases.filter(f => !INTENCION.test(f));
   return (buenas.length ? buenas : frases.filter(f => !INTENCION.test(f))).join('').trim();
 }
@@ -232,7 +232,8 @@ async function resumirUna(i: any, cadencia: Cadencia): Promise<true | null> {
   r.datos.resumen = sinIntencion(r.datos.resumen ?? '');
   if (INTENCION.test(String(r.datos.frase_corta ?? ''))) r.datos.frase_corta = null;
   r.datos.puntos_clave = (Array.isArray(r.datos.puntos_clave) ? r.datos.puntos_clave : []).filter((p: string) => !INTENCION.test(p));
-  r.datos.afectados = (Array.isArray(r.datos.afectados) ? r.datos.afectados : []).filter((a: any) => !INTENCION.test(String(a.efecto ?? '')));
+  r.datos.afectados = (Array.isArray(r.datos.afectados) ? r.datos.afectados : []).filter((a: any) => !INTENCION.test(String(a.efecto ?? ''))
+    && (i.texto_clase !== 'presentado' || /^\s*(?:se\s+)?propone/i.test(String(a.efecto ?? ''))));
   const puntos = [
     ...(Array.isArray(r.datos.puntos_clave) ? r.datos.puntos_clave : []),
     ...(LEYES.has(i.tipo) && Array.isArray(r.datos.que_cambia) ? r.datos.que_cambia : []).map((c: string) => `Cambio: ${c}`),

@@ -135,18 +135,19 @@ async function paginasDe(page: Page, url: string): Promise<string[][] | null> {
   return pags;
 }
 
-async function textoBoam(page: Page, d: Documento, clave: string): Promise<string | null> {
+async function textoBoam(page: Page, d: Documento, clave: string, avisar = false): Promise<string | null> {
+  const fallo = (motivo: string) => { if (avisar) console.log(`  ${clave}: no saco la ley de ${d.etiqueta}: ${motivo}`); return null; };
   const rango = paginasBoam(d);
-  if (!rango) return null;
+  if (!rango) return fallo(`el enlace no trae páginas («${d.descripcion.slice(0, 60)}»)`);
   const pags = await paginasDe(page, d.url);
-  if (!pags) return null;
+  if (!pags) return fallo('no se pudo bajar el PDF');
   const off = desfase(pags);
-  if (off == null) return null;
+  if (off == null) return fallo(`no encuentro la numeración de páginas (${pags.length} páginas en el PDF)`);
   const desde = rango[0] - off;
   const hasta = rango[1] - off;
-  if (desde < 0 || hasta >= pags.length || hasta < desde) return null;
+  if (desde < 0 || hasta >= pags.length || hasta < desde) return fallo(`las páginas ${rango[0]}-${rango[1]} caen fuera del PDF (desfase ${off}, ${pags.length} páginas)`);
   const texto = recortar(pags.slice(desde, hasta + 1).flat(), clave);
-  return texto.length > 300 ? texto : null;
+  return texto.length > 300 ? texto : fallo(`el texto recortado solo tiene ${texto.length} caracteres`);
 }
 
 async function textoRegistro(page: Page, d: Documento): Promise<string | null> {
@@ -160,8 +161,10 @@ async function elegirTexto(page: Page, siglas: string, aprobada: boolean, docs: 
   const boams = docs.filter(d => /^B\.O\.A\.M\./i.test(d.etiqueta) && paginasBoam(d));
   const registros = docs.filter(d => /^RGEP\d/i.test(d.etiqueta));
   if (aprobada && siglas !== 'PNL') {
-    for (const d of boams.filter(x => /aprobaci[óo]n de la ley/i.test(`${x.etiqueta} ${x.descripcion}`))) {
-      const t = await textoBoam(page, d, clave);
+    const deLey = boams.filter(x => /aprobaci[óo]n de la ley/i.test(`${x.etiqueta} ${x.descripcion}`));
+    if (!deLey.length) console.log(`  ${clave}: aprobada, pero no hay ningún B.O.A.M. de «Aprobación de la Ley» entre sus documentos (${boams.map(b => b.etiqueta.slice(0, 40)).join(' | ').slice(0, 220)})`);
+    for (const d of deLey) {
+      const t = await textoBoam(page, d, clave, true);
       if (t) return { texto: t, clase: 'ley', doc: d };
     }
   }
