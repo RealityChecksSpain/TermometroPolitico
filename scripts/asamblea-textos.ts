@@ -16,6 +16,7 @@ const OCULTO = argv.includes('--oculto');
 const RELEER = argv.includes('--releer');
 const LIMITE = Number(argv.find(a => a.startsWith('--limite='))?.slice(9) ?? Infinity);
 const TIPO = argv.find(a => a.startsWith('--tipo='))?.slice(7) ?? null;
+const SOLO_APROBADAS = argv.includes('--aprobadas');
 
 const NOMBRE_TIPO: Record<string, string> = { PL: 'Proyecto de ley', PROPL: 'Proposición de ley', PNL: 'Proposición no de ley' };
 
@@ -102,7 +103,7 @@ function patronClave(clave: string): RegExp {
   return m ? new RegExp(`\\b${m[1]}-${m[2]}\\s*(?:\\(XIII\\))?\\s*\\/\\s*${m[3]}\\b`) : new RegExp(clave.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'));
 }
 
-const CABECERA_BOAM = /\b[A-Z]{1,6}-\d+\s*\(XIII\)\s*\/\s*\d{4}\s+RGEP/;
+const CABECERA_BOAM = /\b[A-Z]{1,6}-\d+\s*(?:\(XIII\))?\s*\/\s*\d{4}\s+RGEP/;
 const RUIDO_BOAM = /^(?:BOLET[ÍI]N OFICIAL DE LA ASAMBLEA DE MADRID.*|N[úu]m\.\s*\d+\s*\/?\s*\d{1,2} de \w+ de \d{4}|\d{1,6}|[─—_-]{3,})$/i;
 
 function recortar(texto: string[], clave: string): string {
@@ -111,10 +112,14 @@ function recortar(texto: string[], clave: string): string {
   let ini = limpias.findIndex(l => pc.test(l) && /RGEP/.test(l));
   if (ini < 0) ini = limpias.findIndex(l => pc.test(l));
   if (ini < 0) ini = 0;
+  for (let k = ini - 1; k >= Math.max(0, ini - 6); k--) {
+    if (!/[a-záéíóúñ]/.test(limpias[k]) && limpias[k].length > 15) { ini = k; break; }
+  }
   let fin = limpias.length;
   for (let j = ini + 1; j < limpias.length; j++) {
     if (CABECERA_BOAM.test(limpias[j]) && !pc.test(limpias[j])) { fin = j; break; }
   }
+  while (fin > ini + 1 && !/[a-záéíóúñ]/.test(limpias[fin - 1])) fin--;
   return limpias.slice(ini, fin).join('\n').replace(/-\n(?=[a-záéíóúñü])/g, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -194,7 +199,8 @@ async function main() {
   const previas = await traerTodo<any>((a, b) => db().from('parl_iniciativas')
     .select('expediente, estado').eq('camara', CAMARA).order('expediente').range(a, b));
   const leidas = new Map(previas.map((p: any) => [p.expediente, p.estado]));
-  const todas = web.filter(w => porClave.has(w.clave) && (!TIPO || porClave.get(w.clave).siglas === TIPO));
+  const todas = web.filter(w => porClave.has(w.clave) && (!TIPO || porClave.get(w.clave).siglas === TIPO)
+    && (!SOLO_APROBADAS || /APROBAD/i.test(String(porClave.get(w.clave).resultado ?? ''))));
   const pendientes = todas.filter(w => RELEER || !leidas.has(w.clave) || !/TRAMITADA|DECA|RETIRA|NO ADMITIDA|ARCHIVA/i.test(String(leidas.get(w.clave) ?? '')));
   const tanda = pendientes.slice(0, LIMITE);
   console.log(`Iniciativas con página: ${todas.length} · ya leídas: ${leidas.size} · a leer ahora: ${tanda.length}`);

@@ -39,6 +39,9 @@ const CLASE: Record<string, string> = {
 const { data: materias } = await db().from('materias').select('id, slug, nombre, descripcion').order('codigo_cap');
 const { data: colectivos } = await db().from('colectivos').select('id, slug, nombre, descripcion').order('orden');
 const slugMateria = new Set((materias ?? []).map((m: any) => m.slug));
+const llanoId = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const materiaPorNombre = new Map((materias ?? []).map((m: any) => [llanoId(m.nombre), m.slug]));
+const colectivoPorNombre = new Map((colectivos ?? []).map((c: any) => [llanoId(c.nombre), c.slug]));
 const nombreColectivo = new Map((colectivos ?? []).map((c: any) => [c.slug, c.nombre]));
 const listaMaterias = (materias ?? []).map((m: any) => `  MAT:${m.slug} = ${m.nombre} (${m.descripcion})`).join('\n');
 const listaColectivos = (colectivos ?? []).map((c: any) => `  COL:${c.slug} = ${c.nombre} (${c.descripcion})`).join('\n');
@@ -204,7 +207,11 @@ async function resumirUna(i: any, cadencia: Cadencia): Promise<true | null> {
   ].filter(p => String(p ?? '').trim().length > 0);
   const sinPrefijo = (t: unknown) => String(t ?? '').replace(/^(?:MAT|COL):/i, '').trim();
   r.datos.materia_principal = sinPrefijo(r.datos.materia_principal);
-  for (const a of Array.isArray(r.datos.afectados) ? r.datos.afectados : []) a.colectivo = sinPrefijo(a.colectivo);
+  if (!slugMateria.has(r.datos.materia_principal)) r.datos.materia_principal = materiaPorNombre.get(llanoId(r.datos.materia_principal)) ?? r.datos.materia_principal;
+  for (const a of Array.isArray(r.datos.afectados) ? r.datos.afectados : []) {
+    a.colectivo = sinPrefijo(a.colectivo);
+    if (!nombreColectivo.has(a.colectivo)) a.colectivo = colectivoPorNombre.get(llanoId(a.colectivo)) ?? a.colectivo;
+  }
   const materia = slugMateria.has(r.datos.materia_principal) ? r.datos.materia_principal : null;
   if (!materia && r.datos.materia_principal) cuenta.inventados.add(`materia:${r.datos.materia_principal}`);
   const efectos = (Array.isArray(r.datos.afectados) ? r.datos.afectados : []).slice(0, 5).map((a: any) => {
