@@ -246,7 +246,7 @@ async function main() {
       proponente: ficha.autores.join(', ') || null,
       extracto: ficha.texto || null,
       procedimiento: ficha.procedimiento,
-      estado: [ficha.estado, ficha.numero].filter(Boolean).join(' · ') || null,
+      estado: [ficha.estado, ini.resultado && !String(ficha.estado ?? '').toUpperCase().includes(String(ini.resultado).toUpperCase()) ? ini.resultado : null, ficha.numero].filter(Boolean).join(' · ') || null,
       fecha_creacion: ficha.apertura,
       comision: ficha.organo,
       materias_parlamento: [],
