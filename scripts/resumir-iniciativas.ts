@@ -195,9 +195,9 @@ const hecha = new Map(hechas.map((r: any) => [r.expediente, r]));
 
 const todas = await traerTodo<any>((a, b) => db().from('parl_iniciativas')
   .select('expediente, legislatura, tipo, tipo_nombre, proponente, extracto, estado, texto_url, texto_fuente, texto_clase, texto_chars')
-  .eq('camara', CAMARA).gt('texto_chars', 400).order('legislatura', { ascending: false }).order('expediente').range(a, b));
+  .eq('camara', CAMARA).gt('texto_chars', 150).order('legislatura', { ascending: false }).order('expediente').range(a, b));
 
-const pendientesTodas = todas.filter((i: any) => {
+const pendientesTodas = todas.filter((i: any) => LEYES.has(i.tipo) ? Number(i.texto_chars) > 400 : true).filter((i: any) => {
   const r = hecha.get(i.expediente);
   return !r || r.version_prompt !== VERSION || r.texto_url !== i.texto_url;
 });

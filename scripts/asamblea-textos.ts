@@ -176,15 +176,17 @@ async function elegirTexto(page: Page, siglas: string, aprobada: boolean, docs: 
     }
   }
   if (siglas === 'PNL' && fichaTexto.length > 200) return { texto: fichaTexto, clase: 'presentado', doc: registros[0] ?? null };
+  let mejor: { texto: string; clase: string; doc: Documento } | null = null;
   for (const d of boams.slice(0, 1)) {
     const t = await textoBoam(page, d, clave);
-    if (t) return { texto: t, clase: 'presentado', doc: d };
+    if (t) mejor = { texto: t, clase: 'presentado', doc: d };
   }
+  if (mejor && mejor.texto.length >= 3000) return mejor;
   for (const d of registros.slice(0, 1)) {
     const t = await textoRegistro(page, d);
-    if (t) return { texto: t, clase: 'presentado', doc: d };
+    if (t && (!mejor || t.length > mejor.texto.length)) mejor = { texto: t, clase: 'presentado', doc: d };
   }
-  return null;
+  return mejor;
 }
 
 async function main() {
