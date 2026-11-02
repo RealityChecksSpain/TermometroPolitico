@@ -31,8 +31,8 @@ const RESULTADOS = [
 const ESTADO = {
   APROBADA: ['aprobada', '#DDEFE5', '#1F6B45'],
   RECHAZADA: ['rechazada', '#F7E0DC', '#9A2F22'],
-  PENDIENTE: ['pendiente', '#EFEFE9', '#5A6067'],
-  CALIFICADA: ['calificada', '#EFEFE9', '#5A6067'],
+  PENDIENTE: ['en trámite', '#EFEFE9', '#5A6067'],
+  CALIFICADA: ['en trámite', '#EFEFE9', '#5A6067'],
   DECAIDA: ['decaída', '#F3EEE2', '#6B5518'],
   RETIRADA: ['retirada', '#F3EEE2', '#6B5518'],
   'NO ADMITIDA': ['no admitida', '#F3EEE2', '#6B5518'],

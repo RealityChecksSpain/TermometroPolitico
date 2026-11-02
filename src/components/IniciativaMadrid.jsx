@@ -60,7 +60,9 @@ export default function IniciativaMadrid({ ley, colores, onVolver }) {
     .filter((p, k, todos) => !/^Entrada en vigor:/i.test(p) || !todos.some((q, j) => j !== k && !/^Entrada en vigor:/i.test(q) && /entrada en vigor|entrar[áa] en vigor/i.test(q)));
   const tramites = Array.isArray(ini?.tramites) ? ini.tramites : [];
   const autor = autorCorto(ley.autor);
-  const resultado = ley.resultado === 'APROBADA' ? 'aprobada' : ley.resultado === 'RECHAZADA' ? 'rechazada' : String(ley.estado ?? '').toLowerCase();
+  const resultado = ley.resultado === 'APROBADA' ? 'aprobada' : ley.resultado === 'RECHAZADA' ? 'rechazada'
+    : /^(PENDIENTE|CALIFICADA)$/i.test(String(ley.estado ?? '')) ? 'en tramitación, sin votar todavía'
+    : String(ley.estado ?? '').toLowerCase();
 
   return (
     <div>
