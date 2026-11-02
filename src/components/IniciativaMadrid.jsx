@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PALETAS } from './Bauhaus.jsx';
 import { traerIniciativaMadrid } from '../lib/cliente.js';
-import { implicacionDe } from '../lib/implicaciones.js';
 
 const P = PALETAS.madrid;
 
@@ -57,7 +56,8 @@ export default function IniciativaMadrid({ ley, colores, onVolver }) {
   const oficial = ley.asunto ?? ini?.extracto ?? '';
   const titulo = ini?.frase_corta || (oficial.length > 180 ? `${oficial.slice(0, 180).replace(/\s+\S*$/, '')}…` : oficial);
   const efectos = Array.isArray(ini?.efectos) ? ini.efectos : [];
-  const puntos = Array.isArray(ini?.puntos_clave) ? ini.puntos_clave : [];
+  const puntos = (Array.isArray(ini?.puntos_clave) ? ini.puntos_clave : [])
+    .filter((p, k, todos) => !/^Entrada en vigor:/i.test(p) || !todos.some((q, j) => j !== k && !/^Entrada en vigor:/i.test(q) && /entrada en vigor|entrar[áa] en vigor/i.test(q)));
   const tramites = Array.isArray(ini?.tramites) ? ini.tramites : [];
   const autor = autorCorto(ley.autor);
   const resultado = ley.resultado === 'APROBADA' ? 'aprobada' : ley.resultado === 'RECHAZADA' ? 'rechazada' : String(ley.estado ?? '').toLowerCase();
@@ -92,9 +92,9 @@ export default function IniciativaMadrid({ ley, colores, onVolver }) {
         )}
         {resultado && <div><span style={{ color: P.gris }}>Resultado: </span><strong>{resultado}</strong></div>}
         {tipo !== 'PNL' && ley.num_ley && ley.num_ley !== '-' && <div><strong>Ley {ley.num_ley}</strong></div>}
-        {ley.fecha && <div><span style={{ color: P.gris }}>Fecha </span>{fecha(ley.fecha)}</div>}
+        {(ini?.fecha_creacion || ley.fecha) && <div><span style={{ color: P.gris }}>Presentada el </span>{fecha(ini?.fecha_creacion || ley.fecha)}</div>}
       </div>
-      {ley.firmantes && <div className="imTenue" style={{ marginTop: 6 }}>Firman: {ley.firmantes}</div>}
+      {ley.firmantes && !/^\s*consejo de gobierno\s*$/i.test(ley.firmantes) && <div className="imTenue" style={{ marginTop: 6 }}>Firman: {ley.firmantes}</div>}
 
       {QUE_ES[tipo] && (
         <div style={{ marginTop: 12, padding: '8px 11px', fontSize: 12.5, lineHeight: 1.5, background: esLey ? P.crema : '#FFF6DB', border: `2px solid ${esLey ? P.negro : P.b}` }}>
@@ -108,14 +108,12 @@ export default function IniciativaMadrid({ ley, colores, onVolver }) {
         <div className="imBloque">
           <div className="imRotulo">Si esto te afecta</div>
           {efectos.map(e => {
-            const tip = implicacionDe(e.slug);
             return (
               <div key={e.slug} style={{ display: 'flex', gap: 11, padding: '10px 0', borderBottom: '1px solid #E1E5EA' }}>
                 <span style={{ flexShrink: 0, width: 8, height: 8, marginTop: 6, background: ini?.materia_color || P.a }} />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{e.nombre}</div>
                   <div style={{ fontSize: 13.5, lineHeight: 1.5, marginTop: 3 }}>{e.efecto}</div>
-                  {tip && esLey && ini?.basado_en === 'ley' && <div className="imTenue" style={{ marginTop: 6 }}><strong style={{ color: P.negro }}>Qué mirar:</strong> {tip.hacer}</div>}
                 </div>
               </div>
             );
@@ -168,7 +166,9 @@ export default function IniciativaMadrid({ ley, colores, onVolver }) {
           <div key={i} className="imTramite">
             <span className="em" style={{ color: P.gris, fontSize: 11 }}>{fecha(t.fecha)}</span>
             <span>
-              {t.descripcion}
+              {/^desde la p[áa]gina/i.test(t.descripcion || '')
+                ? `Publicación en el Boletín Oficial de la Asamblea (págs. ${(t.descripcion.match(/\d+/g) ?? []).slice(0, 2).join('-')})`
+                : t.descripcion}
               {t.enlaces?.length > 0 && (
                 <span style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 3 }}>
                   {t.enlaces.map(e => <a key={e.url + e.texto} className="imEnlace" href={e.url} target="_blank" rel="noopener noreferrer">{e.texto} ↗</a>)}

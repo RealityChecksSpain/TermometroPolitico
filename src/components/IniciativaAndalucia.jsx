@@ -3,7 +3,6 @@ import { PALETAS } from './Bauhaus.jsx';
 import { VotosDeVotacion } from './VotacionesAndalucia.jsx';
 import Edad from './EdadAndalucia.jsx';
 import { traerIniciativaAndalucia, traerVotacionesDeExpedienteAndalucia } from '../lib/cliente.js';
-import { implicacionDe } from '../lib/implicaciones.js';
 import {
   TIPO_INICIATIVA, SENTIDO, tituloLegible, fechaCorta, etiquetaLegislatura, autoresDe, ES_LEY, QUE_ES_TIPO
 } from '../lib/andalucia-web.js';
@@ -81,7 +80,8 @@ export default function IniciativaAndalucia({ votacion, colores, diputados, onVo
   const titulo = ini?.frase_corta || ini?.extracto || tituloLegible(votacion);
   const oficial = ini?.extracto || tituloLegible(votacion);
   const efectos = Array.isArray(ini?.efectos) ? ini.efectos : [];
-  const puntos = Array.isArray(ini?.puntos_clave) ? ini.puntos_clave : [];
+  const puntos = (Array.isArray(ini?.puntos_clave) ? ini.puntos_clave : [])
+    .filter((p, k, todos) => !/^Entrada en vigor:/i.test(p) || !todos.some((q, j) => j !== k && !/^Entrada en vigor:/i.test(q) && /entrada en vigor|entrar[áa] en vigor/i.test(q)));
   const tramites = Array.isArray(ini?.tramites) ? ini.tramites : [];
   const visibles = votaciones && !todas ? votaciones.slice(0, 3) : votaciones;
 
@@ -131,14 +131,12 @@ export default function IniciativaAndalucia({ votacion, colores, diputados, onVo
         <div className="iaBloque">
           <div className="iaRotulo">Si esto te afecta</div>
           {efectos.map(e => {
-            const tip = implicacionDe(e.slug);
             return (
               <div key={e.slug} style={{ display: 'flex', gap: 11, padding: '10px 0', borderBottom: '1px solid #D5E2D9' }}>
                 <span style={{ flexShrink: 0, width: 8, height: 8, marginTop: 6, background: ini?.materia_color || P.a }} />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{e.nombre}</div>
                   <div style={{ fontSize: 13.5, lineHeight: 1.5, marginTop: 3 }}>{e.efecto}</div>
-                  {tip && esLey && <div className="iaTenue" style={{ marginTop: 6 }}><strong style={{ color: P.negro }}>Qué mirar:</strong> {tip.hacer}</div>}
                 </div>
               </div>
             );
