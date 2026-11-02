@@ -358,6 +358,8 @@ export async function traerVotos(votacionId) {
 
 export function traerEjes() {
   return recordar('ejes', async () => {
+    const activos = await supabase.from('v_ejes_activos').select('*').order('numero');
+    if (!activos.error) return activos.data ?? [];
     const { data, error } = await supabase
       .from('ejes_calculados')
       .select('*')
