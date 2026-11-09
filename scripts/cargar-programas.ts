@@ -133,6 +133,14 @@ for (const fichero of ficheros) {
     console.log(`              AVISO: muy poco texto. Puede ser un PDF escaneado sin capa de texto.`);
   }
 
+  const { data: gemelos } = await db().from('programas').select('eleccion')
+    .eq('partido_id', partido.id).neq('eleccion', ELECCION).eq('paginas', totalPages).eq('chars', limpio.length);
+  if (gemelos?.length) {
+    console.log(`              SE SALTA: es el mismo PDF que el programa de ${partido.siglas} de ${gemelos[0].eleccion}. No es un programa de ${ELECCION}.`);
+    cargados.pop();
+    continue;
+  }
+
   if (SOLO_LISTAR) continue;
 
   const { data: programa, error } = await db().from('programas').upsert({
