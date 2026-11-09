@@ -83,7 +83,7 @@ Por cada compromiso:
   false para intenciones vagas: "apostar por", "impulsar", "fomentar", "trabajar para".
 
 Si el fragmento no contiene compromisos, devuelve lista vacia. No inventes nada.
-Espanol de Espana. No valores el contenido.`;
+El campo texto siempre en espanol de Espana, aunque el programa este en gallego, catalan o euskera; el campo literal, en el idioma original del programa. No valores el contenido.`;
 }
 
 let ficheros: string[];
