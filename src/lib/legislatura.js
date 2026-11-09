@@ -1,5 +1,6 @@
 export const DISOLUCION = '2026-10-06';
 export const ELECCIONES = '2026-11-29';
+export const ELECCION_ANTERIOR = '2023-07-23';
 export const CONSTITUCION = '2026-12-23';
 export const BOE_DISOLUCION = 'https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-20742';
 

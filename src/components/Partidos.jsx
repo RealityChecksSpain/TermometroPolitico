@@ -10,6 +10,7 @@ import Cuentas from './Cuentas.jsx';
 import Fiscalizacion from './Fiscalizacion.jsx';
 import { siglasPartido } from '../lib/etiquetas.js';
 import Explica from './Explica.jsx';
+import { ELECCION_ANTERIOR, ELECCIONES } from '../lib/legislatura.js';
 
 const ESTADO = {
   cumplida: { icono: '✓', color: '#2E7D5B', fondo: '#E6F2EB', texto: 'cumplida' },
@@ -142,13 +143,26 @@ export default function Partidos({ onDiputados }) {
   const [promesas, setPromesas] = useState({});
   const [soloVerificables, setSoloVerificables] = useState(true);
   const [fMateria, setFMateria] = useState(null);
+  const [vistas, setVistas] = useState({});
 
   const [resumen, setResumen] = useState(null);
   const [transparencia, setTransparencia] = useState(null);
   const [finanzas, setFinanzas] = useState(null);
   const [fiscalizacion, setFiscalizacion] = useState(undefined);
 
-  useEffect(() => { traerProgramas().then(setProgramas).catch(() => setProgramas([])); }, []);
+  useEffect(() => {
+    traerProgramas()
+      .then(filas => {
+        const nuevos = new Map(filas.filter(f => f.eleccion === ELECCIONES).map(f => [f.partido, f]));
+        const anteriores = filas.filter(f => f.eleccion === ELECCION_ANTERIOR);
+        const lista = anteriores.map(f => ({ ...f, nuevo: nuevos.get(f.partido) ?? null }));
+        for (const [partido, f] of nuevos) {
+          if (!anteriores.some(a => a.partido === partido)) lista.push({ ...f, sin2023: true, nuevo: f });
+        }
+        setProgramas(lista);
+      })
+      .catch(() => setProgramas([]));
+  }, []);
   useEffect(() => { traerResumenPromesas().then(setResumen).catch(() => setResumen(null)); }, []);
   useEffect(() => { traerTransparencia().then(setTransparencia).catch(() => setTransparencia(null)); }, []);
   useEffect(() => { traerCuentas().then(setFinanzas).catch(() => setFinanzas(null)); }, []);
@@ -158,9 +172,12 @@ export default function Partidos({ onDiputados }) {
     if (!programas?.length) return;
     let vivo = true;
     for (const p of programas) {
-      traerPromesas(p.partido, false, 400)
-        .then(l => { if (vivo) setPromesas(prev => ({ ...prev, [p.partido]: l })); })
-        .catch(() => {});
+      const elecciones = [...(p.sin2023 ? [] : [ELECCION_ANTERIOR]), ...(p.nuevo ? [ELECCIONES] : [])];
+      for (const e of elecciones) {
+        traerPromesas(p.partido, false, 1000, e)
+          .then(l => { if (vivo) setPromesas(prev => ({ ...prev, [`${p.partido}:${e}`]: l })); })
+          .catch(() => {});
+      }
     }
     return () => { vivo = false; };
   }, [programas]);
@@ -172,8 +189,9 @@ export default function Partidos({ onDiputados }) {
       const delServidor = desdeResumen(resumen?.[clave]);
       if (delServidor) m[p.partido] = delServidor;
     }
-    for (const k of Object.keys(promesas)) {
-      if (!m[k]) m[k] = contar(promesas[k]);
+    for (const p of programas ?? []) {
+      const filas = promesas[`${p.partido}:${ELECCION_ANTERIOR}`];
+      if (!m[p.partido] && !p.sin2023 && filas) m[p.partido] = contar(filas);
     }
     return m;
   }, [promesas, programas, resumen]);
@@ -195,6 +213,15 @@ export default function Partidos({ onDiputados }) {
 
   function abrir(p) {
     setAbierto(abierto === p.partido ? null : p.partido);
+    setFMateria(null);
+  }
+
+  function eleccionDe(p) {
+    return vistas[p.partido] ?? (p.nuevo ? ELECCIONES : ELECCION_ANTERIOR);
+  }
+
+  function cambiarVista(p, e) {
+    setVistas(prev => ({ ...prev, [p.partido]: e }));
     setFMateria(null);
   }
 
@@ -241,8 +268,10 @@ export default function Partidos({ onDiputados }) {
       {ordenados.map((p, indice) => {
         const activo = abierto === p.partido;
         const c = cuentas[p.partido];
-        const cargando = !c;
-        const todas = (promesas[p.partido] ?? []).filter(x => !soloVerificables || x.verificable);
+        const cargando = !c && !p.sin2023;
+        const eleccion = eleccionDe(p);
+        const de2026 = eleccion === ELECCIONES;
+        const todas = (promesas[`${p.partido}:${eleccion}`] ?? []).filter(x => !soloVerificables || x.verificable);
         const materias = Array.from(
           todas.reduce((m, x) => {
             if (!x.materia) return m;
@@ -251,9 +280,9 @@ export default function Partidos({ onDiputados }) {
           }, new Map()).entries()
         ).sort((a, b) => b[1].n - a[1].n);
         const filtradas = fMateria ? todas.filter(x => x.materia === fMateria) : todas;
-        const lista = [...filtradas].sort(
-          (x, y) => (ORDEN.indexOf(x.estado) + 1 || 99) - (ORDEN.indexOf(y.estado) + 1 || 99)
-        );
+        const lista = de2026
+          ? [...filtradas].sort((x, y) => (x.orden ?? 0) - (y.orden ?? 0))
+          : [...filtradas].sort((x, y) => (ORDEN.indexOf(x.estado) + 1 || 99) - (ORDEN.indexOf(y.estado) + 1 || 99));
 
         return (
           <motion.div key={p.id} layout
@@ -280,13 +309,20 @@ export default function Partidos({ onDiputados }) {
                   )}
                 </span>
                 <span style={{ display: 'block', fontSize: 12, color: C.media, lineHeight: 1.45, margin: '4px 0 7px' }}>
-                  {cargando ? 'Cruzando compromisos con votaciones…' : frase(p, c)}
+                  {p.sin2023 ? 'Sin programa propio en 2023.' : cargando ? 'Cruzando compromisos con votaciones…' : frase(p, c)}
                 </span>
-                {!cargando && <Balanza c={c} color={p.color} animar={indice < 8} />}
-                <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue, marginTop: 6 }}>
-                  {p.promesas} compromisos en el programa · {p.verificables} verificables · {p.paginas} páginas
-                  {c ? <> · emparejados con una votación: <Cifra valor={c.juzgadas} /> de {c.total} (<Cifra valor={c.cobertura} sufijo="%" />)</> : null}
-                </span>
+                {!cargando && c && <Balanza c={c} color={p.color} animar={indice < 8} />}
+                {!p.sin2023 && (
+                  <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue, marginTop: 6 }}>
+                    {p.promesas} compromisos en el programa de 2023 · {p.verificables} verificables · {p.paginas} páginas
+                    {c ? <> · emparejados con una votación: <Cifra valor={c.juzgadas} /> de {c.total} (<Cifra valor={c.cobertura} sufijo="%" />)</> : null}
+                  </span>
+                )}
+                {p.nuevo && (
+                  <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue, marginTop: 3 }}>
+                    {p.nuevo.promesas} compromisos en el programa para el 29 de noviembre · {p.nuevo.verificables} verificables · {p.nuevo.paginas} páginas
+                  </span>
+                )}
               </span>
 
               <span style={{ color: C.tenue, fontSize: 15, flexShrink: 0 }}>{activo ? '−' : '+'}</span>
@@ -296,6 +332,26 @@ export default function Partidos({ onDiputados }) {
               <div style={{ padding: '0 15px 15px' }}>
               <div className="ficha">
               <div style={{ minWidth: 0 }}>
+                {p.nuevo && !p.sin2023 && (
+                  <div role="tablist" style={{ display: 'flex', marginBottom: 10 }}>
+                    {[[ELECCION_ANTERIOR, 'Promesas 2023'], [ELECCIONES, 'Promesas 2026']].map(([e, texto], i) => (
+                      <button key={e} role="tab" aria-selected={eleccion === e} onClick={() => cambiarVista(p, e)} style={{
+                        padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600,
+                        borderRadius: i ? '0 2px 2px 0' : '2px 0 0 2px', marginLeft: i ? -1 : 0,
+                        background: eleccion === e ? C.tinta : 'transparent',
+                        color: eleccion === e ? '#F3F1E8' : C.media,
+                        border: `1px solid ${eleccion === e ? C.tinta : C.linea}`
+                      }}>
+                        {texto}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {de2026 && (
+                  <div style={{ fontSize: 12, color: C.media, lineHeight: 1.5, marginBottom: 10 }}>
+                    Lo que promete en su programa para las elecciones del 29 de noviembre. Son promesas para la próxima legislatura, que aún no ha empezado.
+                  </div>
+                )}
                 <button onClick={() => setSoloVerificables(!soloVerificables)} className="em" style={{
                   padding: '4px 9px', fontSize: 10.5, cursor: 'pointer', borderRadius: 2, marginBottom: 10,
                   background: soloVerificables ? C.tinta : 'transparent',
@@ -338,7 +394,7 @@ export default function Partidos({ onDiputados }) {
                   <div key={pr.id} style={{ padding: '9px 0', borderTop: `1px solid ${C.linea}` }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       <div style={{ fontSize: 12.5, lineHeight: 1.5, flex: 1, minWidth: 0 }}>{pr.texto}</div>
-                      {pr.verificable && <Estado pr={pr} />}
+                      {pr.verificable && !de2026 && <Estado pr={pr} />}
                     </div>
                     <div className="em" style={{ fontSize: 10, color: C.tenue, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {pr.materia_nombre && (
@@ -346,12 +402,12 @@ export default function Partidos({ onDiputados }) {
                           {pr.materia_nombre}
                         </span>
                       )}
-                      {pr.norma_titular && (
+                      {!de2026 && pr.norma_titular && (
                         <span style={{ color: C.media }}>
                           {pr.norma_titular.length > 64 ? pr.norma_titular.slice(0, 64) + '…' : pr.norma_titular}
                         </span>
                       )}
-                      {pr.votaciones_relacionadas > 0 && (
+                      {!de2026 && pr.votaciones_relacionadas > 0 && (
                         <span>{pr.votaciones_relacionadas} votaciones relacionadas</span>
                       )}
                     </div>

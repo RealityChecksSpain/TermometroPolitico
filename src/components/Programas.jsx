@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { traerProgramasInicio, traerPromesasVotadas } from '../lib/cliente.js';
+import { traerProgramas, traerProgramasInicio, traerPromesas, traerPromesasVotadas } from '../lib/cliente.js';
+import { ELECCIONES } from '../lib/legislatura.js';
 import { useTelefono } from '../lib/pantalla.js';
 import { declaracionesDe, partidosSoloDeclaraciones, SIN_DATOS, REVISADO } from '../lib/declaraciones2026.js';
 
@@ -419,7 +420,49 @@ function Pasado({ partido, filtro }) {
   );
 }
 
-function Ahora({ siglas, color, filtro }) {
+function ProgramaNuevo({ programa, color, filtro }) {
+  const [filas, setFilas] = useState(null);
+  const [todas, setTodas] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setFilas(null);
+    traerPromesas(programa.partido, false, 1000, ELECCIONES).then(l => { if (vivo) setFilas(l); }).catch(() => { if (vivo) setFilas([]); });
+    return () => { vivo = false; };
+  }, [programa.partido]);
+  const lista = (filas ?? []).filter(x => todas || x.verificable);
+  return (
+    <div style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
+      <Rotulo adorno={<Rayas />}>2026 · lo que promete ahora</Rotulo>
+      <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+        Programa electoral para el 29 de noviembre: {numero(programa.promesas)} compromisos, {numero(programa.verificables)} de ellos verificables.
+      </div>
+      <div role="tablist" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button role="tab" aria-selected={!todas} className="bh-chip" data-on={todas ? '0' : '1'} onClick={() => setTodas(false)}>Verificables · {numero(programa.verificables)}</button>
+        <button role="tab" aria-selected={todas} className="bh-chip" data-on={todas ? '1' : '0'} onClick={() => setTodas(true)}>Todos · {numero(programa.promesas)}</button>
+      </div>
+      {filtro && <div style={{ fontSize: 13, color: GRIS }}>Las promesas de los programas de 2026 aún no están clasificadas por tema.</div>}
+      {filas === null ? (
+        <div style={{ fontSize: 13, color: GRIS }}>Cargando el programa…</div>
+      ) : (
+        <ul className="bh-scroll" style={{ listStyle: 'none', margin: 0, padding: '0 6px 0 0', maxHeight: 360, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+          {lista.length ? lista.map((f, i) => (
+            <Medida key={f.id} i={i} color={color} pie={f.materia_nombre}>
+              <Resaltado texto={f.texto} />
+            </Medida>
+          )) : <li style={{ fontSize: 13, color: GRIS }}>Sin compromisos que mostrar.</li>}
+        </ul>
+      )}
+      {lista.length > 3 && (
+        <div className="bh-mono" style={{ fontSize: 10.5, color: GRIS, textTransform: 'none', letterSpacing: '.02em' }}>
+          {lista.length} en total · desliza dentro del recuadro para verlas todas
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Ahora({ siglas, color, filtro, nuevo }) {
+  if (nuevo) return <ProgramaNuevo programa={nuevo} color={color} filtro={filtro} />;
   const d = declaracionesDe(siglas);
   return (
     <div style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
@@ -450,6 +493,13 @@ export default function Programas({ onIr }) {
   const [fallo, setFallo] = useState(false);
   const [elegido, setElegido] = useState(null);
   const [filtro, setFiltro] = useState(null);
+  const [nuevos, setNuevos] = useState({});
+
+  useEffect(() => {
+    traerProgramas()
+      .then(filas => setNuevos(Object.fromEntries(filas.filter(f => f.eleccion === ELECCIONES && numero(f.promesas) > 0).map(f => [String(f.siglas ?? '').trim().toUpperCase(), f]))))
+      .catch(() => setNuevos({}));
+  }, []);
 
   useEffect(() => {
     traerProgramasInicio()
@@ -473,10 +523,10 @@ export default function Programas({ onIr }) {
     if (!filtro || !partidos) return {};
     return Object.fromEntries(partidos.map(p => {
       const de2023 = numero(p.filtros?.[filtro]?.n);
-      const de2026 = (declaracionesDe(p.siglas)?.puntos ?? []).filter(x => x.filtros?.includes(filtro)).length;
-      return [p.siglas, { de2023, de2026, total: de2023 + de2026 }];
+      const de2026 = nuevos[String(p.siglas).toUpperCase()] ? null : (declaracionesDe(p.siglas)?.puntos ?? []).filter(x => x.filtros?.includes(filtro)).length;
+      return [p.siglas, { de2023, de2026, total: de2023 + (de2026 ?? 0) }];
     }));
-  }, [filtro, partidos]);
+  }, [filtro, partidos, nuevos]);
 
   useEffect(() => {
     if (!filtro || !partidos || cuentas[elegido]?.total) return;
@@ -492,6 +542,7 @@ export default function Programas({ onIr }) {
 
   const actual = partidos.find(p => p.siglas === elegido) ?? partidos[0];
   const color = colorDe(actual);
+  const nuevoActual = nuevos[String(actual.siglas).toUpperCase()] ?? null;
 
   return (
     <AnimatePresence>
@@ -533,7 +584,7 @@ export default function Programas({ onIr }) {
             <motion.div key={`${actual.siglas}-detalle`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}
               style={{ display: 'grid', gridTemplateColumns: estrecho || actual.soloDeclaraciones ? '1fr' : '1fr 1fr', gap: estrecho ? 22 : 26, padding: estrecho ? 16 : 24 }}>
               {!actual.soloDeclaraciones && <Pasado partido={actual} filtro={filtro} />}
-              <Ahora siglas={actual.siglas} color={color} filtro={filtro} />
+              <Ahora siglas={actual.siglas} color={color} filtro={filtro} nuevo={nuevoActual} />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -556,7 +607,7 @@ export default function Programas({ onIr }) {
                   <span className="bh-nombre">{p.siglas}</span>
                   <span className="bh-sub">{p.soloDeclaraciones ? 'solo 2026' : `${numero(p.promesas)} promesas`}</span>
                 </span>
-                {n ? <span className="bh-cuenta" title={`${n.de2023} en 2023 · ${n.de2026} en 2026`}>{n.total}</span> : <span />}
+                {n ? <span className="bh-cuenta" title={n.de2026 === null ? `${n.de2023} en 2023` : `${n.de2023} en 2023 · ${n.de2026} en 2026`}>{n.total}</span> : <span />}
               </motion.button>
             );
           })}
@@ -580,7 +631,7 @@ export default function Programas({ onIr }) {
           ))}
         </div>
         <p style={{ fontSize: 12, color: GRIS, lineHeight: 1.5, margin: '2px 0 0' }}>
-          Cada tema tiene sus dos sentidos. El número de cada partido suma sus promesas de 2023 en esa línea y sus declaraciones de 2026 que van en ella. Las de 2023 las clasifica un modelo de lenguaje promesa a promesa con las mismas reglas para todos; las de 2026, a mano, con su fuente. Las palabras en color marcan el tema de cada medida. «Sin votación» no quiere decir que la promesa no llegara al Congreso, sino que no hemos encontrado una votación relacionada.
+          Cada tema tiene sus dos sentidos. El número de cada partido suma sus promesas de 2023 en esa línea y, si aún no ha publicado programa para 2026, sus declaraciones de 2026 que van en ella. Las de 2023 las clasifica un modelo de lenguaje promesa a promesa con las mismas reglas para todos; las declaraciones, a mano, con su fuente. Las palabras en color marcan el tema de cada medida. «Sin votación» no quiere decir que la promesa no llegara al Congreso, sino que no hemos encontrado una votación relacionada.
         </p>
       </div>
     </motion.section>

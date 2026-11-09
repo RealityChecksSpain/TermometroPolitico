@@ -2,6 +2,7 @@ import { PostgrestClient } from '@supabase/postgrest-js';
 import { clasificarVehiculos } from './vehiculos.js';
 import { contarInmuebles } from './inmuebles.js';
 import { sanearImporte, patrimonioLiquido } from './euros.js';
+import { ELECCION_ANTERIOR } from './legislatura.js';
 
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
 const clave = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
@@ -412,10 +413,10 @@ export function traerProgramas() {
   });
 }
 
-export function traerPromesas(partido, soloVerificables = false, limite = 200) {
-  return recordar(`promesas:${partido}:${soloVerificables}:${limite}`, async () => {
+export function traerPromesas(partido, soloVerificables = false, limite = 200, eleccion = ELECCION_ANTERIOR) {
+  return recordar(`promesas:${partido}:${soloVerificables}:${limite}:${eleccion}`, async () => {
     const { data, error } = await leerConRespaldo('mv_promesa_estado', 'v_promesa_estado', base => {
-      let q = base.select('*').eq('partido', partido);
+      let q = base.select('*').eq('partido', partido).eq('eleccion', eleccion);
       if (soloVerificables) q = q.eq('verificable', true);
       return q.order('orden').limit(limite);
     });
@@ -437,6 +438,7 @@ export function traerPromesasVotadas(partido) {
     const { data, error } = await leerConRespaldo('mv_promesa_estado', 'v_promesa_estado', base =>
       base.select('id, texto, estado, norma_titular, norma_fecha')
         .eq('partido', partido)
+        .eq('eleccion', ELECCION_ANTERIOR)
         .eq('verificable', true)
         .in('estado', ['cumplida', 'apoyada_no_decisiva', 'apoyada_sin_aprobar', 'contradicha', 'abstencion', 'se_opuso_a_lo_contrario']));
     if (error) throw error;

@@ -189,7 +189,7 @@ const yaHechas = await traerTodo<any>((a, b) =>
 const hechas = new Set(yaHechas.map((r: any) => r.promesa_id));
 
 const todas = await traerTodo<any>((a, b) =>
-  db().from('v_promesas').select('id, texto, literal, siglas').order('id').range(a, b));
+  db().from('v_promesas').select('id, texto, literal, siglas').eq('eleccion', process.env.ELECCION ?? '2023-07-23').order('id').range(a, b));
 
 const pendientes = todas.filter((p: any) => !hechas.has(p.id));
 

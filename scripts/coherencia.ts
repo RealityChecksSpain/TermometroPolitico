@@ -52,7 +52,7 @@ const hechas = new Set(yaHechas.map((r: any) => r.promesa_id));
 
 const todas = await traerTodo<any>((a, b) =>
   db().from('v_promesas').select('id, texto, partido, siglas')
-    .eq('verificable', true).order('id').range(a, b));
+    .eq('verificable', true).eq('eleccion', process.env.ELECCION ?? '2023-07-23').order('id').range(a, b));
 
 const descartadas = await traerTodo<any>((a, b) =>
   db().from('promesa_votacion_descartada').select('promesa_id, votacion_id').order('promesa_id').range(a, b));
