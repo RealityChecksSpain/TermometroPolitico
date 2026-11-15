@@ -14,6 +14,7 @@ const TODO = process.argv.includes('--todo');
 const DESEMPATE = process.argv.includes('--desempate');
 const INFORME = process.argv.includes('--informe');
 const APLICAR = process.argv.includes('--aplicar');
+const POR_DESEMPATE = process.env.DESACUERDO === 'desempate';
 const LIMITE = Number(process.argv.find(a => a.startsWith('--limite='))?.split('=')[1] ?? 0);
 
 process.env.MODELO_IA = DESEMPATE ? MODELO_DESEMPATE : CONTROL ? MODELO_CONTROL : MODELO;
@@ -106,9 +107,12 @@ function final(id: string, dec: any): { valor: boolean; motivo: string; via: str
   if (!m) return null;
   if (!c) return { valor: m.verificable, motivo: m.motivo, via: 'solo' };
   if (m.verificable === c.verificable) return { valor: m.verificable, motivo: m.motivo, via: 'acuerdo' };
-  const d = dec.d.get(id);
-  if (!d) return null;
-  return { valor: d.verificable, motivo: d.motivo, via: 'desempate' };
+  if (POR_DESEMPATE) {
+    const d = dec.d.get(id);
+    if (!d) return null;
+    return { valor: d.verificable, motivo: d.motivo, via: 'desempate' };
+  }
+  return { valor: false, motivo: `Los dos modelos no coinciden. Uno: ${m.verificable ? m.motivo : c.motivo}`, via: 'duda' };
 }
 
 async function informe() {
@@ -118,7 +122,7 @@ async function informe() {
   let conControl = 0, iguales = 0, sinControl = 0, sinDesempate = 0;
   for (const p of promesas) {
     const clave = `${p.eleccion}  ${String(p.siglas).padEnd(10)}`;
-    const g = grupos.get(clave) ?? { total: 0, antes: 0, despues: 0, decididas: 0, aFalse: 0, aTrue: 0, comparadas: 0, iguales: 0, pendientes: 0 };
+    const g = grupos.get(clave) ?? { total: 0, antes: 0, despues: 0, decididas: 0, aFalse: 0, aTrue: 0, comparadas: 0, iguales: 0, pendientes: 0, dudas: 0 };
     g.total++;
     if (p.verificable) g.antes++;
     const m: any = dec.m.get(p.id);
@@ -126,10 +130,11 @@ async function informe() {
     if (m && c) {
       g.comparadas++; conControl++;
       if (m.verificable === c.verificable) { g.iguales++; iguales++; }
-      else if (!dec.d.has(p.id)) sinDesempate++;
+      else if (POR_DESEMPATE && !dec.d.has(p.id)) sinDesempate++;
     } else if (m) sinControl++;
     const f = final(p.id, dec);
     if (!f || f.via === 'solo') g.pendientes++;
+    if (f?.via === 'duda') g.dudas++;
     if (f) {
       g.decididas++;
       if (f.valor) g.despues++;
@@ -138,15 +143,17 @@ async function informe() {
     }
     grupos.set(clave, g);
   }
-  console.log('\nELECCION    PARTIDO     PROMESAS  VERIFICABLES AHORA  CON LA REGLA ÚNICA  PASAN A NO  PASAN A SÍ  ACUERDO ENTRE MODELOS  PENDIENTES');
+  console.log('\nELECCION    PARTIDO     PROMESAS  VERIFICABLES AHORA  CON LA REGLA ÚNICA  PASAN A NO  PASAN A SÍ  ACUERDO ENTRE MODELOS  EN DUDA  PENDIENTES');
   for (const [clave, g] of [...grupos.entries()].sort()) {
     console.log(
-      `${clave}  ${String(g.total).padStart(8)}  ${pct(g.antes, g.total).padStart(18)}  ${pct(g.despues, g.decididas).padStart(18)}  ${String(g.aFalse).padStart(10)}  ${String(g.aTrue).padStart(10)}  ${pct(g.iguales, g.comparadas).padStart(21)}  ${String(g.pendientes).padStart(10)}`
+      `${clave}  ${String(g.total).padStart(8)}  ${pct(g.antes, g.total).padStart(18)}  ${pct(g.despues, g.decididas).padStart(18)}  ${String(g.aFalse).padStart(10)}  ${String(g.aTrue).padStart(10)}  ${pct(g.iguales, g.comparadas).padStart(21)}  ${String(g.dudas).padStart(7)}  ${String(g.pendientes).padStart(10)}`
     );
   }
   console.log(`\nModelos: principal ${MODELO} · control ${MODELO_CONTROL} · desempate ${MODELO_DESEMPATE}`);
   console.log(`Coinciden principal y control en ${iguales} de ${conControl} (${pct(iguales, conControl)})`);
-  console.log(`Desempates resueltos: ${dec.d.size} · sin control todavía: ${sinControl} · desacuerdos sin desempate: ${sinDesempate}`);
+  console.log(POR_DESEMPATE
+    ? `Desempates resueltos: ${dec.d.size} · sin control todavía: ${sinControl} · desacuerdos sin desempate: ${sinDesempate}`
+    : `Si los dos modelos no coinciden, la promesa cuenta como NO verificable (columna EN DUDA). Sin los dos modelos todavía: ${sinControl}`);
 
   const cambios = promesas.filter((p: any) => { const f = final(p.id, dec); return f && f.via !== 'solo' && f.valor !== p.verificable; });
   if (cambios.length) {
@@ -154,7 +161,7 @@ async function informe() {
     for (const p of [...cambios].sort(() => Math.random() - 0.5).slice(0, 12)) {
       const f: any = final(p.id, dec);
       console.log(`  ${f.valor ? 'pasa a SÍ' : 'pasa a NO'}  [${p.siglas} ${p.eleccion.slice(0, 4)}] ${p.texto}`);
-      console.log(`             ${f.via === 'desempate' ? 'desempate' : 'acuerdo'}: ${f.motivo}`);
+      console.log(`             ${f.via}: ${f.motivo}`);
     }
   }
   console.log('');
@@ -165,7 +172,7 @@ async function aplicar() {
   const dec = await decisiones();
   const falta = promesas.filter((p: any) => { const f = final(p.id, dec); return !f || f.via === 'solo'; }).length;
   if (falta > 0) {
-    console.log(`\nQuedan ${falta} promesas sin decisión de los dos modelos o sin desempate. Mira: npm run verificables -- --informe\n`);
+    console.log(`\nQuedan ${falta} promesas sin la decisión de los dos modelos. Vuelve a ejecutar npm run verificables y npm run verificables -- --control --todo\n`);
     process.exit(1);
   }
   const aTrue = promesas.filter((p: any) => final(p.id, dec)!.valor && !p.verificable).map((p: any) => p.id);
