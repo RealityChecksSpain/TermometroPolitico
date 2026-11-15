@@ -4,15 +4,20 @@ import { refrescarMetricas } from '../src/lib/metricas';
 
 const MODELO = process.env.MODELO_VERIFICABLE ?? 'gemini-3.1-flash-lite';
 const MODELO_CONTROL = process.env.MODELO_CONTROL ?? 'gemini-flash-lite-latest';
+const MODELO_DESEMPATE = process.env.MODELO_DESEMPATE ?? 'gemini-flash-latest';
 const VERSION = 'verificable-v1-2026-11';
+const V_CONTROL = `${VERSION}-control`;
+const V_DESEMPATE = `${VERSION}-desempate`;
 const LOTE = Number(process.env.LOTE_VERIFICABLE ?? 30);
 const CONTROL = process.argv.includes('--control');
+const TODO = process.argv.includes('--todo');
+const DESEMPATE = process.argv.includes('--desempate');
 const INFORME = process.argv.includes('--informe');
 const APLICAR = process.argv.includes('--aplicar');
 const LIMITE = Number(process.argv.find(a => a.startsWith('--limite='))?.split('=')[1] ?? 0);
 
-process.env.MODELO_IA = CONTROL ? MODELO_CONTROL : MODELO;
-const version = CONTROL ? `${VERSION}-control` : VERSION;
+process.env.MODELO_IA = DESEMPATE ? MODELO_DESEMPATE : CONTROL ? MODELO_CONTROL : MODELO;
+const version = DESEMPATE ? V_DESEMPATE : CONTROL ? V_CONTROL : VERSION;
 
 const { preguntar, procesarLote, modeloActivo } = await import('../src/lib/gemini');
 
@@ -84,52 +89,69 @@ function pct(a: number, b: number) {
   return b ? `${Math.round((a / b) * 100)} %` : '—';
 }
 
+async function decisiones() {
+  const [principal, control, desempate] = await Promise.all([leerDecisiones(VERSION), leerDecisiones(V_CONTROL), leerDecisiones(V_DESEMPATE)]);
+  const m = new Map(principal.map((d: any) => [d.promesa_id, d]));
+  const c = new Map(control.map((d: any) => [d.promesa_id, d]));
+  const d = new Map(desempate.map((x: any) => [x.promesa_id, x]));
+  return { m, c, d };
+}
+
+function final(id: string, dec: any): { valor: boolean; motivo: string; via: string } | null {
+  const m = dec.m.get(id);
+  const c = dec.c.get(id);
+  if (!m) return null;
+  if (!c) return { valor: m.verificable, motivo: m.motivo, via: 'solo' };
+  if (m.verificable === c.verificable) return { valor: m.verificable, motivo: m.motivo, via: 'acuerdo' };
+  const d = dec.d.get(id);
+  if (!d) return null;
+  return { valor: d.verificable, motivo: d.motivo, via: 'desempate' };
+}
+
 async function informe() {
   const promesas = await leerPromesas();
-  const decisiones = new Map((await leerDecisiones(VERSION)).map((d: any) => [d.promesa_id, d]));
-  const grupos = new Map<string, { total: number; antes: number; despues: number; aFalse: number; aTrue: number; sin: number }>();
+  const dec = await decisiones();
+  const grupos = new Map<string, any>();
+  let conControl = 0, iguales = 0, sinControl = 0, sinDesempate = 0;
   for (const p of promesas) {
     const clave = `${p.eleccion}  ${String(p.siglas).padEnd(10)}`;
-    const g = grupos.get(clave) ?? { total: 0, antes: 0, despues: 0, aFalse: 0, aTrue: 0, sin: 0 };
-    const d: any = decisiones.get(p.id);
+    const g = grupos.get(clave) ?? { total: 0, antes: 0, despues: 0, decididas: 0, aFalse: 0, aTrue: 0, comparadas: 0, iguales: 0, pendientes: 0 };
     g.total++;
     if (p.verificable) g.antes++;
-    if (!d) g.sin++;
-    else {
-      if (d.verificable) g.despues++;
-      if (p.verificable && !d.verificable) g.aFalse++;
-      if (!p.verificable && d.verificable) g.aTrue++;
+    const m: any = dec.m.get(p.id);
+    const c: any = dec.c.get(p.id);
+    if (m && c) {
+      g.comparadas++; conControl++;
+      if (m.verificable === c.verificable) { g.iguales++; iguales++; }
+      else if (!dec.d.has(p.id)) sinDesempate++;
+    } else if (m) sinControl++;
+    const f = final(p.id, dec);
+    if (!f || f.via === 'solo') g.pendientes++;
+    if (f) {
+      g.decididas++;
+      if (f.valor) g.despues++;
+      if (p.verificable && !f.valor) g.aFalse++;
+      if (!p.verificable && f.valor) g.aTrue++;
     }
     grupos.set(clave, g);
   }
-  console.log('\nELECCION    PARTIDO     PROMESAS  VERIFICABLES AHORA  CON LA REGLA ÚNICA  PASAN A NO  PASAN A SÍ  SIN CLASIFICAR');
+  console.log('\nELECCION    PARTIDO     PROMESAS  VERIFICABLES AHORA  CON LA REGLA ÚNICA  PASAN A NO  PASAN A SÍ  ACUERDO ENTRE MODELOS  PENDIENTES');
   for (const [clave, g] of [...grupos.entries()].sort()) {
-    const clasificadas = g.total - g.sin;
     console.log(
-      `${clave}  ${String(g.total).padStart(8)}  ${pct(g.antes, g.total).padStart(18)}  ${pct(g.despues, clasificadas).padStart(18)}  ${String(g.aFalse).padStart(10)}  ${String(g.aTrue).padStart(10)}  ${String(g.sin).padStart(14)}`
+      `${clave}  ${String(g.total).padStart(8)}  ${pct(g.antes, g.total).padStart(18)}  ${pct(g.despues, g.decididas).padStart(18)}  ${String(g.aFalse).padStart(10)}  ${String(g.aTrue).padStart(10)}  ${pct(g.iguales, g.comparadas).padStart(21)}  ${String(g.pendientes).padStart(10)}`
     );
   }
+  console.log(`\nModelos: principal ${MODELO} · control ${MODELO_CONTROL} · desempate ${MODELO_DESEMPATE}`);
+  console.log(`Coinciden principal y control en ${iguales} de ${conControl} (${pct(iguales, conControl)})`);
+  console.log(`Desempates resueltos: ${dec.d.size} · sin control todavía: ${sinControl} · desacuerdos sin desempate: ${sinDesempate}`);
 
-  const control = await leerDecisiones(`${VERSION}-control`);
-  if (control.length) {
-    let iguales = 0, comparadas = 0;
-    for (const c of control) {
-      const d: any = decisiones.get(c.promesa_id);
-      if (!d) continue;
-      comparadas++;
-      if (d.verificable === c.verificable) iguales++;
-    }
-    console.log(`\nCONTROL con otro modelo (${MODELO_CONTROL}) sobre una muestra fija del 10 %:`);
-    console.log(`  coinciden ${iguales} de ${comparadas} (${pct(iguales, comparadas)})`);
-  }
-
-  const cambios = promesas.filter((p: any) => decisiones.has(p.id) && (decisiones.get(p.id) as any).verificable !== p.verificable);
+  const cambios = promesas.filter((p: any) => { const f = final(p.id, dec); return f && f.via !== 'solo' && f.valor !== p.verificable; });
   if (cambios.length) {
     console.log('\nEJEMPLOS DE CAMBIOS (al azar):');
     for (const p of [...cambios].sort(() => Math.random() - 0.5).slice(0, 12)) {
-      const d: any = decisiones.get(p.id);
-      console.log(`  ${d.verificable ? 'pasa a SÍ' : 'pasa a NO'}  [${p.siglas} ${p.eleccion.slice(0, 4)}] ${p.texto}`);
-      console.log(`             motivo: ${d.motivo}`);
+      const f: any = final(p.id, dec);
+      console.log(`  ${f.valor ? 'pasa a SÍ' : 'pasa a NO'}  [${p.siglas} ${p.eleccion.slice(0, 4)}] ${p.texto}`);
+      console.log(`             ${f.via === 'desempate' ? 'desempate' : 'acuerdo'}: ${f.motivo}`);
     }
   }
   console.log('');
@@ -137,14 +159,14 @@ async function informe() {
 
 async function aplicar() {
   const promesas = await leerPromesas();
-  const decisiones = new Map((await leerDecisiones(VERSION)).map((d: any) => [d.promesa_id, d.verificable]));
-  const sin = promesas.filter((p: any) => !decisiones.has(p.id)).length;
-  if (sin > 0) {
-    console.log(`\nQuedan ${sin} promesas sin clasificar. Ejecuta antes: npm run verificables\n`);
+  const dec = await decisiones();
+  const falta = promesas.filter((p: any) => { const f = final(p.id, dec); return !f || f.via === 'solo'; }).length;
+  if (falta > 0) {
+    console.log(`\nQuedan ${falta} promesas sin decisión de los dos modelos o sin desempate. Mira: npm run verificables -- --informe\n`);
     process.exit(1);
   }
-  const aTrue = promesas.filter((p: any) => decisiones.get(p.id) === true && !p.verificable).map((p: any) => p.id);
-  const aFalse = promesas.filter((p: any) => decisiones.get(p.id) === false && p.verificable).map((p: any) => p.id);
+  const aTrue = promesas.filter((p: any) => final(p.id, dec)!.valor && !p.verificable).map((p: any) => p.id);
+  const aFalse = promesas.filter((p: any) => !final(p.id, dec)!.valor && p.verificable).map((p: any) => p.id);
   for (const [valor, ids] of [[true, aTrue], [false, aFalse]] as [boolean, string[]][]) {
     for (let i = 0; i < ids.length; i += 200) {
       const { error } = await db().from('promesas').update({ verificable: valor }).in('id', ids.slice(i, i + 200));
@@ -159,17 +181,24 @@ async function aplicar() {
 async function clasificar() {
   const promesas = await leerPromesas();
   const hechas = new Set((await leerDecisiones(version)).map((d: any) => d.promesa_id));
-  let pendientes = promesas.filter((p: any) => !hechas.has(p.id) && (!CONTROL || enMuestraDeControl(p.id)));
+  let enDisputa: Set<string> | null = null;
+  if (DESEMPATE) {
+    const dec = await decisiones();
+    enDisputa = new Set(promesas.filter((p: any) => dec.m.has(p.id) && dec.c.has(p.id) && dec.m.get(p.id).verificable !== dec.c.get(p.id).verificable).map((p: any) => p.id));
+  }
+  let pendientes = promesas.filter((p: any) => !hechas.has(p.id)
+    && (!CONTROL || TODO || enMuestraDeControl(p.id))
+    && (!enDisputa || enDisputa.has(p.id)));
   if (LIMITE > 0) pendientes = pendientes.slice(0, LIMITE);
 
   const lotes: any[][] = [];
   for (let i = 0; i < pendientes.length; i += LOTE) lotes.push(pendientes.slice(i, i + LOTE));
 
-  console.log(`\nModelo: ${modeloActivo()}${CONTROL ? ' (control)' : ''}`);
+  console.log(`\nModelo: ${modeloActivo()}${DESEMPATE ? ' (desempate)' : CONTROL ? ' (control)' : ''}`);
   console.log(`Promesas: ${promesas.length} · ya clasificadas: ${hechas.size} · pendientes: ${pendientes.length}`);
   console.log(`Llamadas a la IA: ${lotes.length}\n`);
   if (!lotes.length) {
-    console.log(CONTROL ? 'Control terminado. Ejecuta: npm run verificables -- --informe\n' : 'Todo clasificado. Ejecuta: npm run verificables -- --informe\n');
+    console.log('Nada pendiente. Ejecuta: npm run verificables -- --informe\n');
     return;
   }
 
