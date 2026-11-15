@@ -5,7 +5,7 @@ import { refrescarMetricas } from '../src/lib/metricas';
 const MODELO = process.env.MODELO_VERIFICABLE ?? 'gemini-3.1-flash-lite';
 const MODELO_CONTROL = process.env.MODELO_CONTROL ?? 'gemini-flash-lite-latest';
 const MODELO_DESEMPATE = process.env.MODELO_DESEMPATE ?? 'gemini-flash-latest';
-const VERSION = 'verificable-v1-2026-11';
+const VERSION = 'verificable-v2-2026-11';
 const V_CONTROL = `${VERSION}-control`;
 const V_DESEMPATE = `${VERSION}-desempate`;
 const LOTE = Number(process.env.LOTE_VERIFICABLE ?? 30);
@@ -50,14 +50,16 @@ Para cada compromiso decide si es VERIFICABLE: si se puede contrastar con una vo
 verificable = true cuando el compromiso fija una medida identificable:
 - aprobar, derogar o modificar una ley o una norma concreta;
 - crear, subir, bajar o suprimir un impuesto, una cuota, una prestación o una partida, aunque no dé la cifra exacta;
-- fijar una cifra, un plazo o un porcentaje (por ejemplo, el 7 % del PIB para educación);
+- fijar una cifra, un plazo o un porcentaje de la propia medida: un presupuesto, un impuesto, un salario, una plantilla, una prestación (por ejemplo, el 7 % del PIB para educación);
 - crear o suprimir un organismo, un registro, un derecho o una prohibición concretos;
 - una actuación concreta del Gobierno que las Cortes pueden pedir o rechazar en una votación (una auditoría de algo determinado, un plan con nombre y objeto definidos).
 
 verificable = false cuando:
 - es una intención o un objetivo sin medida: «impulsar», «fomentar», «apostar por», «promover», «trabajar para», «mejorar», «reforzar», «defender», «avanzar hacia», sin decir cómo;
 - es un diagnóstico, una crítica, un principio o un valor;
-- lo decide solo un parlamento autonómico, un ayuntamiento o una institución europea, sin intervención de las Cortes.
+- es un resultado que se quiere conseguir y no la medida para conseguirlo, aunque lleve cifra: «reducir un 50 % los accidentes mortales», «que el 10 % de la electricidad sea de autoconsumo en 2030», «bajar el paro al 8 %»;
+- solo dice que se estudiará, evaluará, revisará o analizará algo, sin decir qué cambiará;
+- lo decide solo un parlamento autonómico, un ayuntamiento o una institución europea, sin intervención de las Cortes: aprobar una directiva o reformar los tratados de la Unión es decisión europea; trasponer una directiva con una ley española sí es de las Cortes.
 
 Reglas:
 - Juzga solo el texto, no si la medida es buena, mala, realista o constitucional.
