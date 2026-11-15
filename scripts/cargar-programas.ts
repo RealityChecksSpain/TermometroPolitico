@@ -17,6 +17,7 @@ const ELECCION = process.env.ELECCION ?? '2023-07-23';
 const VERSION = 'promesas-v1-2026-08';
 const CHUNK = Number(process.env.CHARS_CHUNK ?? 22000);
 const SOLO_LISTAR = process.argv.includes('--listar');
+const REHACER = process.argv.includes('--rehacer');
 
 const ESQUEMA = {
   type: 'object',
@@ -141,7 +142,23 @@ for (const fichero of ficheros) {
     continue;
   }
 
+  const { data: previo } = await db().from('programas').select('id')
+    .eq('partido_id', partido.id).eq('eleccion', ELECCION).maybeSingle();
+  if (previo && !REHACER) {
+    const { count } = await db().from('promesas').select('id', { count: 'exact', head: true }).eq('programa_id', previo.id);
+    if ((count ?? 0) > 0) {
+      console.log(`              YA CARGADO: ${count} promesas de ${ELECCION}. Se salta.`);
+      fragmentosPrevistos -= trozosPrevios;
+      continue;
+    }
+  }
+
   if (SOLO_LISTAR) continue;
+
+  if (previo && REHACER) {
+    const { error: borrado } = await db().from('promesas').delete().eq('programa_id', previo.id);
+    if (borrado) { console.log(`  ERROR ${fichero}: ${borrado.message}`); continue; }
+  }
 
   const { data: programa, error } = await db().from('programas').upsert({
     partido_id: partido.id,
