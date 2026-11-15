@@ -18,6 +18,7 @@ const LIMITE = Number(process.argv.find(a => a.startsWith('--limite='))?.split('
 
 process.env.MODELO_IA = DESEMPATE ? MODELO_DESEMPATE : CONTROL ? MODELO_CONTROL : MODELO;
 const version = DESEMPATE ? V_DESEMPATE : CONTROL ? V_CONTROL : VERSION;
+process.env.MAX_TOKENS_IA ??= '16384';
 
 const { preguntar, procesarLote, modeloActivo } = await import('../src/lib/gemini');
 
@@ -203,9 +204,13 @@ async function clasificar() {
   }
 
   let guardadas = 0;
+  let errores = 0;
   const progreso = await procesarLote(lotes, async (lote, cadencia) => {
     const r = await preguntar<any>(prompt(lote), cadencia, { esquema: ESQUEMA, temperatura: 0 });
-    if (!r.ok || !r.datos) return null;
+    if (!r.ok || !r.datos) {
+      if (++errores <= 3) console.log(`  sin respuesta: ${r.error ?? 'formato no válido'}`);
+      return null;
+    }
     if (r.modelo !== modeloActivo()) return null;
     const vistos = new Set<number>();
     const filas = (r.datos.resultados ?? [])
