@@ -53,6 +53,7 @@
     "programas:listar": "node --env-file=.env --import tsx scripts/cargar-programas.ts --listar",
     "probar:cuota": "node --env-file=.env --import tsx scripts/probar-cuota.ts",
     "coherencia": "node --env-file=.env --import tsx scripts/coherencia.ts",
+    "verificables": "node --env-file=.env --import tsx scripts/reclasificar-verificables.ts",
     "codificar": "node --env-file=.env --import tsx scripts/codificar-promesas.ts",
     "codificar:leyes": "node --env-file=.env --import tsx scripts/codificar-leyes.ts",
     "sondear:patrimonio": "node --import tsx scripts/sondear-patrimonio.ts",
