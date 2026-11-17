@@ -15,6 +15,7 @@ const DESEMPATE = process.argv.includes('--desempate');
 const INFORME = process.argv.includes('--informe');
 const APLICAR = process.argv.includes('--aplicar');
 const POR_DESEMPATE = process.env.DESACUERDO === 'desempate';
+const DUDA_ES_SI = process.env.DESACUERDO === 'si';
 const LIMITE = Number(process.argv.find(a => a.startsWith('--limite='))?.split('=')[1] ?? 0);
 
 process.env.MODELO_IA = DESEMPATE ? MODELO_DESEMPATE : CONTROL ? MODELO_CONTROL : MODELO;
@@ -112,7 +113,7 @@ function final(id: string, dec: any): { valor: boolean; motivo: string; via: str
     if (!d) return null;
     return { valor: d.verificable, motivo: d.motivo, via: 'desempate' };
   }
-  return { valor: false, motivo: `Los dos modelos no coinciden. Uno: ${m.verificable ? m.motivo : c.motivo}`, via: 'duda' };
+  return { valor: DUDA_ES_SI, motivo: `Los dos modelos no coinciden. Uno: ${m.verificable ? m.motivo : c.motivo}`, via: 'duda' };
 }
 
 async function informe() {
@@ -153,7 +154,7 @@ async function informe() {
   console.log(`Coinciden principal y control en ${iguales} de ${conControl} (${pct(iguales, conControl)})`);
   console.log(POR_DESEMPATE
     ? `Desempates resueltos: ${dec.d.size} · sin control todavía: ${sinControl} · desacuerdos sin desempate: ${sinDesempate}`
-    : `Si los dos modelos no coinciden, la promesa cuenta como NO verificable (columna EN DUDA). Sin los dos modelos todavía: ${sinControl}`);
+    : `Si los dos modelos no coinciden, la promesa cuenta como ${DUDA_ES_SI ? 'SÍ' : 'NO'} verificable (columna EN DUDA). Sin los dos modelos todavía: ${sinControl}`);
 
   const cambios = promesas.filter((p: any) => { const f = final(p.id, dec); return f && f.via !== 'solo' && f.valor !== p.verificable; });
   if (cambios.length) {
