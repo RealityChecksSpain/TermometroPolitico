@@ -626,6 +626,19 @@ export default function Metodologia({ cobertura }) {
           votación posible que lo confirme o lo desmienta.
         </p>
         <p style={{ margin: '10px 0 0' }}>
+          Lo decide un modelo de lenguaje con una regla escrita, la misma para todos los partidos y
+          todas las elecciones: es verificable si dice qué medida se tomaría, como aprobar o cambiar
+          una ley, un impuesto, una partida o una prestación, fijar su cifra o crear un organismo o
+          un plan con nombre y objeto. No lo es un objetivo sin medida, un resultado que se quiere
+          conseguir aunque lleve cifra («reducir un 50 % los accidentes mortales»), ni lo que decide
+          solo un parlamento autonómico, un ayuntamiento o la Unión Europea.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
+          Cada promesa la clasifican por separado dos modelos distintos, que coinciden en el 89 % de
+          los casos. Cuando no coinciden, la promesa cuenta como verificable y decide el cruce con
+          las votaciones, que solo empareja una votación si trata exactamente la misma medida.
+        </p>
+        <p style={{ margin: '10px 0 0' }}>
           El porcentaje de cada partido se calcula <strong>solo sobre las promesas que llegaron a
           votación</strong>: es la parte de ellas en la que votó a favor, saliera o no adelante.
           Las que nunca se sometieron a votación se cuentan aparte, porque mezclarlas produciría
