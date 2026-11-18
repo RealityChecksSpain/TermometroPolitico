@@ -1,10 +1,15 @@
 import { db, exigirEnv } from '../src/lib/supabase';
 import { traerTodo } from '../src/lib/paginar';
-import { preguntar, procesarLote, modeloActivo, Cadencia } from '../src/lib/gemini';
-import { refrescarMetricas } from '../src/lib/metricas';
 
-exigirEnv('GEMINI_API_KEY');
-const VERSION = process.env.VERSION_COHERENCIA ?? 'coherencia-v1-2026-08';
+const MODELO = process.env.MODELO_COHERENCIA ?? 'gemini-3.1-flash-lite';
+process.env.MODELO_IA = MODELO;
+const { preguntar, procesarLote, modeloActivo } = await import('../src/lib/gemini');
+type Cadencia = InstanceType<typeof import('../src/lib/gemini').Cadencia>;
+
+const VERSION = process.env.VERSION_COHERENCIA ?? 'coherencia-v2-2026-11';
+const ELECCION = process.env.ELECCION ?? '2023-07-23';
+const INFORME = process.argv.includes('--informe');
+const LIMITE = Number(process.argv.find(a => a.startsWith('--limite='))?.split('=')[1] ?? 0);
 
 const ESQUEMA = {
   type: 'object',
@@ -46,29 +51,64 @@ REGLAS ESTRICTAS:
 - Espanol de Espana.`;
 }
 
-const yaHechas = await traerTodo<any>((a, b) =>
-  db().from('promesa_votacion').select('promesa_id').eq('version_prompt', VERSION).order('promesa_id').range(a, b));
-const hechas = new Set(yaHechas.map((r: any) => r.promesa_id));
-
 const todas = await traerTodo<any>((a, b) =>
   db().from('v_promesas').select('id, texto, partido, siglas')
-    .eq('verificable', true).eq('eleccion', process.env.ELECCION ?? '2023-07-23').order('id').range(a, b));
+    .eq('verificable', true).eq('eleccion', ELECCION).order('id').range(a, b));
+
+const cruces = await traerTodo<any>((a, b) =>
+  db().from('promesa_cruce').select('promesa_id, resultado, relacion, coherente').eq('version', VERSION).order('promesa_id').range(a, b));
+const hechas = new Set(cruces.map((r: any) => r.promesa_id));
+
+if (INFORME) {
+  const actuales = await traerTodo<any>((a, b) =>
+    db().from('promesa_votacion').select('promesa_id').order('promesa_id').range(a, b));
+  const conVotoAhora = new Set(actuales.map((r: any) => r.promesa_id));
+  const porCruce = new Map(cruces.map((r: any) => [r.promesa_id, r]));
+  const g = new Map<string, any>();
+  for (const p of todas) {
+    const x = g.get(p.siglas) ?? { total: 0, cruzadas: 0, nuevas: 0, coherentes: 0, ahora: 0 };
+    x.total++;
+    const c: any = porCruce.get(p.id);
+    if (c) x.cruzadas++;
+    if (c?.resultado === 'emparejada') { x.nuevas++; if (c.coherente) x.coherentes++; }
+    if (conVotoAhora.has(p.id)) x.ahora++;
+    g.set(p.siglas, x);
+  }
+  console.log(`\nCRUCE ${VERSION} con ${MODELO}, programas de ${ELECCION}\n`);
+  console.log('PARTIDO     VERIFICABLES  CRUZADAS  CON VOTACIÓN (NUEVO)  COHERENTES (NUEVO)  CON VOTACIÓN (PUBLICADO)');
+  for (const [siglas, x] of [...g.entries()].sort()) {
+    console.log(`${String(siglas).padEnd(10)}  ${String(x.total).padStart(12)}  ${String(x.cruzadas).padStart(8)}  ${String(x.nuevas).padStart(20)}  ${String(x.coherentes).padStart(18)}  ${String(x.ahora).padStart(24)}`);
+  }
+  const faltan = todas.filter((p: any) => !hechas.has(p.id)).length;
+  console.log(`\nFaltan por cruzar: ${faltan}${faltan ? ' · vuelve a ejecutar npm run coherencia' : ' · listo para publicar'}\n`);
+  process.exit(0);
+}
 
 const descartadas = await traerTodo<any>((a, b) =>
   db().from('promesa_votacion_descartada').select('promesa_id, votacion_id').order('promesa_id').range(a, b));
 const parDescartado = new Set(descartadas.map((d: any) => `${d.promesa_id}|${d.votacion_id}`));
 
-const pendientes = todas.filter((p: any) => !hechas.has(p.id));
+let pendientes = todas.filter((p: any) => !hechas.has(p.id));
+if (LIMITE > 0) pendientes = pendientes.slice(0, LIMITE);
 
-console.log(`\nModelo: ${modeloActivo()}`);
-console.log(`Promesas verificables: ${todas?.length ?? 0}`);
+console.log(`\nModelo: ${modeloActivo()} (fijo, no cambia a otro si se acaba la cuota)`);
+console.log(`Versión: ${VERSION}`);
+console.log(`Promesas verificables de ${ELECCION}: ${todas.length}`);
+console.log(`Ya cruzadas en esta versión: ${hechas.size}`);
 console.log(`Pendientes: ${pendientes.length}`);
-console.log(`Pares descartados que no se vuelven a proponer: ${parDescartado.size}`);
-console.log(`Tiempo estimado: ~${Math.round((pendientes.length * 2.3) / 60)} min\n`);
+console.log(`Pares descartados que no se vuelven a proponer: ${parDescartado.size}\n`);
 
 if (!pendientes.length) {
-  console.log('Nada pendiente. Comprueba: select * from mv_coherencia;\n');
+  console.log('Nada pendiente. Ejecuta: npm run coherencia -- --informe\n');
   process.exit(0);
+}
+
+async function anotar(fila: any) {
+  const { error } = await db().from('promesa_cruce').upsert(
+    { version: VERSION, modelo: MODELO, votacion_id: null, relacion: null, coherente: null, similitud: null, justificacion: null, ...fila },
+    { onConflict: 'promesa_id,version' }
+  );
+  return !error;
 }
 
 let emparejadas = 0, sinCorrespondencia = 0, sinCandidatas = 0, quitadas = 0;
@@ -86,18 +126,19 @@ const progreso = await procesarLote(
       return !fuera;
     }).slice(0, 6);
 
-    if (!candidatas?.length) { sinCandidatas++; return true; }
+    if (!candidatas?.length) { sinCandidatas++; return (await anotar({ promesa_id: p.id, resultado: 'sin_candidatas' })) || null; }
 
     const r = await preguntar<any>(prompt(p, candidatas), cadencia, { esquema: ESQUEMA });
     if (!r.ok || !r.datos) {
       errores.set(r.error ?? 'sin detalle', (errores.get(r.error ?? 'sin detalle') ?? 0) + 1);
       return null;
     }
+    if (r.modelo !== MODELO) return null;
 
     const idx = r.datos.votacion_indice;
     if (typeof idx !== 'number' || idx < 0 || idx >= candidatas.length || !['desarrolla', 'contradice'].includes(r.datos.relacion)) {
       sinCorrespondencia++;
-      return true;
+      return (await anotar({ promesa_id: p.id, resultado: 'sin_correspondencia', justificacion: String(r.datos.justificacion ?? '').slice(0, 300) })) || null;
     }
 
     const c = candidatas[idx];
@@ -105,23 +146,21 @@ const progreso = await procesarLote(
       p_votacion_id: c.votacion_id, p_partido_slug: p.partido
     });
 
-    if (!voto) { sinCorrespondencia++; return true; }
+    if (!voto) { sinCorrespondencia++; return (await anotar({ promesa_id: p.id, resultado: 'sin_voto_del_partido', votacion_id: c.votacion_id })) || null; }
 
     const desarrolla = r.datos.relacion === 'desarrolla';
     const coherente = desarrolla ? voto === 'si' : voto === 'no';
 
-    const { error: e } = await db().from('promesa_votacion').upsert({
+    const ok = await anotar({
       promesa_id: p.id,
+      resultado: 'emparejada',
       votacion_id: c.votacion_id,
       coherente,
       relacion: r.datos.relacion,
       similitud: c.similitud,
-      justificacion: String(r.datos.justificacion ?? '').slice(0, 300),
-      modelo: r.modelo ?? modeloActivo(),
-      version_prompt: VERSION
-    }, { onConflict: 'promesa_id,votacion_id' });
-
-    if (e) return null;
+      justificacion: String(r.datos.justificacion ?? '').slice(0, 300)
+    });
+    if (!ok) return null;
     emparejadas++;
     return true;
   },
@@ -148,13 +187,7 @@ if (errores.size > 0) {
     .forEach(([e, n]) => console.log(`  ${String(n).padStart(4)}  ${String(e).slice(0, 120)}`));
 }
 
-const { data: juicios, error: eJuicio } = await db().rpc('recalcular_juicio_promesas');
-console.log(eJuicio ? `\nrecalcular_juicio_promesas FALLÓ: ${eJuicio.message}` : `\nJuicios recalculados: ${juicios}`);
-
-await refrescarMetricas();
-
-const { data: caches, error: eCaches } = await db().rpc('crear_caches');
-console.log(eCaches ? `crear_caches FALLÓ: ${eCaches.message}` : `Cachés: ${JSON.stringify(caches)}`);
-console.log('\nComprueba: select estado, count(*) from v_promesa_estado group by 1;\n');
+if (progreso.cuotaAgotada) console.log(`\nCuota diaria de ${MODELO} agotada. Mañana, el mismo comando sigue donde lo dejó.`);
+console.log('\nNada de esto cambia la web todavía. Para ver cómo va: npm run coherencia -- --informe\n');
 
 export {};
