@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { traerProgramas, traerProgramasInicio, traerPromesas, traerPromesasVotadas } from '../lib/cliente.js';
 import { ELECCIONES } from '../lib/legislatura.js';
+import { candidatura2026 } from '../lib/etiquetas.js';
 import { useTelefono } from '../lib/pantalla.js';
 import { declaracionesDe, partidosSoloDeclaraciones, SIN_DATOS, REVISADO } from '../lib/declaraciones2026.js';
 
@@ -434,7 +435,7 @@ function ProgramaNuevo({ programa, color, filtro }) {
     <div style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
       <Rotulo adorno={<Rayas />}>2026 · lo que promete ahora</Rotulo>
       <div style={{ fontSize: 14, lineHeight: 1.5 }}>
-        Programa electoral para el 29 de noviembre: {numero(programa.promesas)} compromisos, {numero(programa.verificables)} de ellos verificables.
+        {candidatura2026(programa.siglas) ? `Programa de ${candidatura2026(programa.siglas)}` : 'Programa electoral'} para el 29 de noviembre: {numero(programa.promesas)} compromisos, {numero(programa.verificables)} de ellos verificables.
       </div>
       <div role="tablist" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button role="tab" aria-selected={!todas} className="bh-chip" data-on={todas ? '0' : '1'} onClick={() => setTodas(false)}>Verificables · {numero(programa.verificables)}</button>

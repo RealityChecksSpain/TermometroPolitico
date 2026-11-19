@@ -27,6 +27,14 @@ const ALIAS_PARTIDO = {
   'EHBILDU': 'BILDU'
 };
 
+const CANDIDATURA_2026 = {
+  SUMAR: 'Frente Amplio'
+};
+
+export function candidatura2026(siglas) {
+  return CANDIDATURA_2026[String(siglas ?? '').trim().toUpperCase()] ?? null;
+}
+
 export function siglasPartido(s) {
   if (!s) return s;
   const clave = String(s).trim().toUpperCase();

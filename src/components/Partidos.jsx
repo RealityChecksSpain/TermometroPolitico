@@ -8,7 +8,7 @@ import { Cifra, Rotulo } from './Movimiento.jsx';
 import Transparencia from './Transparencia.jsx';
 import Cuentas from './Cuentas.jsx';
 import Fiscalizacion from './Fiscalizacion.jsx';
-import { siglasPartido } from '../lib/etiquetas.js';
+import { siglasPartido, candidatura2026 } from '../lib/etiquetas.js';
 import Explica from './Explica.jsx';
 import { ELECCION_ANTERIOR, ELECCIONES } from '../lib/legislatura.js';
 
@@ -320,7 +320,7 @@ export default function Partidos({ onDiputados }) {
                 )}
                 {p.nuevo && (
                   <span className="em" style={{ display: 'block', fontSize: 10, color: C.tenue, marginTop: 3 }}>
-                    {p.nuevo.promesas} compromisos en el programa para el 29 de noviembre · {p.nuevo.verificables} verificables · {p.nuevo.paginas} páginas
+                    {p.nuevo.promesas} compromisos en el programa {candidatura2026(p.siglas) ? `de ${candidatura2026(p.siglas)} ` : ''}para el 29 de noviembre · {p.nuevo.verificables} verificables · {p.nuevo.paginas} páginas
                   </span>
                 )}
               </span>
@@ -349,7 +349,7 @@ export default function Partidos({ onDiputados }) {
                 )}
                 {de2026 && (
                   <div style={{ fontSize: 12, color: C.media, lineHeight: 1.5, marginBottom: 10 }}>
-                    Lo que promete en su programa para las elecciones del 29 de noviembre. Son promesas para la próxima legislatura, que aún no ha empezado.
+                    {candidatura2026(p.siglas) ? `En 2026 se presenta como ${candidatura2026(p.siglas)}. Esto es lo que promete en su programa` : 'Lo que promete en su programa'} para las elecciones del 29 de noviembre. Son promesas para la próxima legislatura, que aún no ha empezado.
                   </div>
                 )}
                 <button onClick={() => setSoloVerificables(!soloVerificables)} className="em" style={{
