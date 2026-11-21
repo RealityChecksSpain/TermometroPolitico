@@ -112,6 +112,7 @@ console.log('  PARTIDO     PAGINAS      CHARS  FRAGMENTOS  FICHERO');
 console.log('  ' + '-'.repeat(74));
 
 const trabajos: any[] = [];
+const programasPendientes: any[] = [];
 const sinReconocer: string[] = [];
 const cargados: string[] = [];
 let fragmentosPrevistos = 0;
@@ -161,26 +162,26 @@ for (const fichero of ficheros) {
 
   if (SOLO_LISTAR) continue;
 
-  if (previo && REHACER) {
-    const { error: borrado } = await db().from('promesas').delete().eq('programa_id', previo.id);
-    if (borrado) { console.log(`  ERROR ${fichero}: ${borrado.message}`); continue; }
-  }
-
-  const { data: programa, error } = await db().from('programas').upsert({
-    partido_id: partido.id,
-    eleccion: ELECCION,
-    fecha_eleccion: ELECCION,
-    titulo: `Programa electoral ${partido.siglas} ${ELECCION.slice(0, 4)}`,
-    fichero_origen: fichero,
-    paginas: totalPages,
-    chars: limpio.length
-  }, { onConflict: 'partido_id,eleccion' }).select('id').single();
-
-  if (error) { console.log(`  ERROR ${fichero}: ${error.message}`); continue; }
-
-  trocear(limpio, CHUNK).forEach((t, i) =>
-    trabajos.push({ programaId: programa.id, siglas: partido.siglas, trozo: t, indice: i })
-  );
+  const trozos = trocear(limpio, CHUNK);
+  const pendiente = {
+    fichero,
+    siglas: partido.siglas,
+    previoId: previo?.id ?? null,
+    datos: {
+      partido_id: partido.id,
+      eleccion: ELECCION,
+      fecha_eleccion: ELECCION,
+      titulo: `Programa electoral ${partido.siglas} ${ELECCION.slice(0, 4)}`,
+      fichero_origen: fichero,
+      paginas: totalPages,
+      chars: limpio.length
+    },
+    total: trozos.length,
+    hechos: new Set<number>(),
+    filas: [] as any[]
+  };
+  programasPendientes.push(pendiente);
+  trozos.forEach((t, i) => trabajos.push({ programa: pendiente, siglas: partido.siglas, trozo: t, indice: i }));
 }
 
 const { data: todosPartidos } = await db().from('partidos').select('siglas, slug');
@@ -228,38 +229,61 @@ const progreso = await procesarLote(
         if (!mId) { materiasInventadas.add(p.materia); return null; }
         if (!p.texto || String(p.texto).length < 15) return null;
         return {
-          programa_id: t.programaId,
           texto: String(p.texto).slice(0, 400),
           literal: String(p.literal ?? '').slice(0, 400) || null,
           materia_id: mId,
           verificable: p.verificable === true,
           orden: t.indice * 100 + k,
           chunk: t.indice,
-          modelo: modeloActivo(),
+          modelo: r.modelo ?? modeloActivo(),
           version_prompt: VERSION
         };
       })
       .filter(Boolean);
 
-    if (filas.length > 0) {
-      const { error } = await db().from('promesas').insert(filas);
-      if (error) return null;
-      promesasTotales += filas.length;
-    }
+    t.programa.filas.push(...filas);
+    t.programa.hechos.add(t.indice);
     return true;
   },
   {
     alProgreso: (n, total, t: any, ok) => {
-      if (n % 5 === 0 || !ok) console.log(`  [${String(n).padStart(4)}/${total}] ${ok ? 'ok ' : '-- '} ${t.siglas} fragmento ${t.indice}  (${promesasTotales} promesas)`);
+      if (n % 5 === 0 || !ok) console.log(`  [${String(n).padStart(4)}/${total}] ${ok ? 'ok ' : '-- '} ${t.siglas} fragmento ${t.indice}`);
     }
   }
 );
+
+const incompletos: string[] = [];
+for (const pg of programasPendientes) {
+  if (pg.hechos.size < pg.total) {
+    incompletos.push(`${pg.siglas}: ${pg.hechos.size} de ${pg.total} fragmentos`);
+    continue;
+  }
+  if (pg.previoId) {
+    const { error: borrado } = await db().from('promesas').delete().eq('programa_id', pg.previoId);
+    if (borrado) { console.log(`  ERROR ${pg.fichero}: ${borrado.message}`); continue; }
+  }
+  const { data: programa, error } = await db().from('programas')
+    .upsert(pg.datos, { onConflict: 'partido_id,eleccion' }).select('id').single();
+  if (error) { console.log(`  ERROR ${pg.fichero}: ${error.message}`); continue; }
+  const filas = pg.filas.map((f: any) => ({ ...f, programa_id: programa.id }));
+  let ok = true;
+  for (let i = 0; i < filas.length; i += 500) {
+    const { error: e } = await db().from('promesas').insert(filas.slice(i, i + 500));
+    if (e) { console.log(`  ERROR ${pg.fichero}: ${e.message}`); ok = false; break; }
+  }
+  if (ok) promesasTotales += filas.length;
+}
 
 console.log('\nRESULTADO');
 console.log(`  fragmentos procesados: ${progreso.procesados}`);
 console.log(`  promesas extraidas:    ${promesasTotales}`);
 console.log(`  fallidos:              ${progreso.fallidos}`);
 console.log(`  omitidos por cuota:    ${progreso.omitidos}`);
+if (incompletos.length > 0) {
+  console.log('\n  PROGRAMAS SIN GUARDAR (no se publica un programa a medias):');
+  incompletos.forEach(x => console.log(`    ${x}`));
+  console.log('  Vuelve a ejecutar el mismo comando cuando haya cuota; se extraen de nuevo enteros.');
+}
 if (materiasInventadas.size > 0) {
   console.log(`\n  materias inventadas (descartadas): ${Array.from(materiasInventadas).slice(0, 10).join(', ')}`);
 }
