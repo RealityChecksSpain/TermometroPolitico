@@ -44,8 +44,14 @@ const { data: materias } = await db().from('materias').select('id, slug, nombre,
 const idMateria = new Map((materias ?? []).map((m: any) => [m.slug, m.id]));
 const listaMaterias = (materias ?? []).map((m: any) => `  ${m.slug} = ${m.nombre}`).join('\n');
 
+const ALIAS_FICHERO: [RegExp, string][] = [
+  [/frente[\s_-]*amplio/, 'sumar']
+];
+
 function partidoDeFichero(nombre: string) {
   const base = nombre.toLowerCase().replace(/\.pdf$/, '');
+  const alias = ALIAS_FICHERO.find(([re]) => re.test(base));
+  if (alias) return (partidos ?? []).find((p: any) => p.slug === alias[1]);
   return (partidos ?? []).find((p: any) =>
     base.includes(p.slug) || base.includes(String(p.siglas).toLowerCase().replace(/\s/g, ''))
   );
